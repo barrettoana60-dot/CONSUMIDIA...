@@ -1,27 +1,31 @@
-streamlit
-pandas
-numpy
-matplotlib
-plotly
-networkx
-pyvis
-scikit-learn
-fpdf
-openpyxl
-pandas
-plotly
-networkx
-pyvis
-fpdf2
-kaleido
+# runtime
 streamlit>=1.18.0
+
+# data / numéricos
 pandas>=1.5.0
+numpy>=1.24.0
+
+# visualização
+matplotlib>=3.5.0
 plotly>=5.6.0
+kaleido>=0.2.1
+
+# grafos / redes
 networkx>=3.0
-fpdf>=1.7.2
+pyvis>=0.2.1
+
+# ML / busca
+scikit-learn>=1.1.0
+joblib>=1.2.0
+
+# leitura / excel
 openpyxl>=3.0.0
-pandas
-numpy
-scikit-learn
-joblib
-pip install supabase
+
+# PDF
+fpdf>=1.7.2
+# opcional: fpdf2 (alternativa moderna). Remova o comentário se quiser instalar também:
+# fpdf2
+
+# integração externa
+supabase
+
