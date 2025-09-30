@@ -1,11 +1,3 @@
-# dashboard_consumidia_updated.py
-# CONSUMIDIA — Dashboard completo (versão atualizada)
-# - MELHORIA DE BUSCA: A busca agora ignora acentos e a coluna 'Ano' foi removida dos filtros.
-# - MELHORIA DE MENSAGENS: A função "Responder" agora cita a mensagem original automaticamente.
-# - NOVO: Troca de arquivos (dropbox) integrada ao sistema de mensagens.
-# - CORREÇÃO: Corrigido o erro 'StreamlitAPIException' ao limpar o anexo após o envio da mensagem.
-# - MELHORIA VISUAL: Efeito Liquid-glass aprimorado, ícones integrados aos botões de navegação.
-# - MELHORIA FUNCIONAL: Nome do usuário de origem agora é salvo e exibido nos Favoritos.
 
 import streamlit as st
 import pandas as pd
@@ -101,7 +93,7 @@ except Exception:
 # -------------------------
 st.set_page_config(page_title="CONSUMIDIA", layout="wide", initial_sidebar_state="expanded")
 
-# load css (prefer file so user may edit)
+# load css (prefer file para que o usuário possa editar)
 css_path = Path("style.css")
 if css_path.exists():
     try:
@@ -931,8 +923,10 @@ elif st.session_state.page == "mensagens":
     outbox = get_user_messages(USERNAME, 'outbox')
     tab_inbox, tab_compose, tab_sent = st.tabs([f"📥 Caixa de Entrada ({UNREAD_COUNT})", "✍️ Escrever Nova", f"📤 Enviadas ({len(outbox)})"])
 
+    # --------- INBOX (modificado: responder inline no expander) -----------
     with tab_inbox:
-        if not inbox: st.info("Sua caixa de entrada está vazia.")
+        if not inbox:
+            st.info("Sua caixa de entrada está vazia.")
         else:
             for m in inbox:
                 is_read = m.get("read", False)
@@ -941,9 +935,12 @@ elif st.session_state.page == "mensagens":
                     st.markdown(f"**Recebido em:** `{m.get('ts')}`")
                     st.markdown("---")
                     st.markdown(m.get("body"))
+
+                    # Marca como lida (persistente) sem forçar rerun imediato
                     if not is_read:
                         mark_message_read(m.get('id'), USERNAME)
-                        st.rerun()
+                        # não forçamos st.rerun() aqui para não sair da aba automaticamente
+
                     if m.get("attachment"):
                         attachment_info = m["attachment"]
                         st.markdown("---")
@@ -955,21 +952,51 @@ elif st.session_state.page == "mensagens":
                                 )
                         except FileNotFoundError:
                             st.warning("O anexo não foi encontrado no servidor.")
-                    c1, c2 = st.columns(2)
+
+                    # Inicializa flag de reply no session_state (se necessário)
+                    reply_key = f"reply_open_{m.get('id')}"
+                    if reply_key not in st.session_state:
+                        st.session_state[reply_key] = False
+
+                    c1, c2 = st.columns([0.5, 0.5])
                     with c1:
-                        if st.button("Responder", key=f"reply_{m.get('id')}", use_container_width=True):
-                            st.session_state.compose_to = m.get('from')
-                            st.session_state.compose_subject = f"Re: {m.get('subject')}"
-                            original_body = m.get('body', '')
-                            quoted_text = f"\n\n---\nEm {m.get('ts')}, {m.get('from')} escreveu:\n> " + "\n> ".join(original_body.split('\n'))
-                            st.session_state.compose_body = quoted_text
-                            st.rerun()
+                        # Ao clicar, apenas abre o formulário inline (sem mudar de aba)
+                        if st.button("Responder", key=f"reply_btn_{m.get('id')}", use_container_width=True):
+                            st.session_state[reply_key] = True
                     with c2:
                         if st.button("Apagar", key=f"del_inbox_{m.get('id')}", use_container_width=True):
                             delete_message(m.get('id'), USERNAME)
                             st.toast("Mensagem apagada.")
-                            st.rerun()
+                            st.experimental_rerun()
 
+                    # Se o usuário clicou em "Responder", mostramos um formulário inline aqui
+                    if st.session_state.get(reply_key):
+                        st.markdown("---")
+                        st.markdown("### Responder (inline)")
+                        # Mostramos destinatário e assunto preenchidos — o usuário não precisa alterar
+                        recipient = m.get('from')
+                        default_subject = f"Re: {m.get('subject')}" if m.get('subject') else "Re: (sem assunto)"
+                        quoted = m.get('body', '')
+                        quoted_text = f"\n\n---\nEm {m.get('ts')}, {m.get('from')} escreveu:\n> " + "\n> ".join(quoted.split('\n'))
+
+                        # Formulário de resposta
+                        with st.form(key=f"reply_form_{m.get('id')}", clear_on_submit=False):
+                            st.markdown(f"**Para:** `{recipient}`")
+                            subj_input = st.text_input("Assunto:", value=default_subject, key=f"reply_subj_{m.get('id')}")
+                            body_input = st.text_area("Mensagem:", value=quoted_text, height=160, key=f"reply_body_{m.get('id')}")
+                            attach = st.file_uploader("Anexar arquivo (opcional):", key=f"reply_attach_{m.get('id')}")
+                            send = st.form_submit_button("✉️ Enviar Resposta", use_container_width=True)
+
+                            if send:
+                                # envia mensagem usando a função existente
+                                send_message(USERNAME, recipient, subj_input, body_input, attachment_file=attach)
+                                st.success(f"Resposta enviada para {recipient}.")
+                                # fecha o formulário
+                                st.session_state[reply_key] = False
+                                # opcional: atualiza a interface para refletir caixa de enviadas/caixa de entrada
+                                st.experimental_rerun()
+
+    # --------- COMPOSE (mantido, para acesso manual) -----------
     with tab_compose:
         with st.form(key="compose_form", clear_on_submit=True):
             all_usernames = list(load_users().keys())
@@ -995,6 +1022,7 @@ elif st.session_state.page == "mensagens":
                     if st.session_state.autosave: save_state_for_user(USERNAME)
                     st.rerun()
 
+    # --------- SENT (Outbox) -----------
     with tab_sent:
         if not outbox: st.info("Você ainda não enviou mensagens.")
         else:
