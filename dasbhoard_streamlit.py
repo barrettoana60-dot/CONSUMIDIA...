@@ -584,11 +584,22 @@ with top2:
         if st.button("💾 Salvar", key="btn_save_now", use_container_width=True):
             save_state_for_user(USERNAME)
             st.success("Progresso salvo.")
-    with nav_right3:
-        if st.button("🚪 Sair", key="btn_logout", use_container_width=True):
-            for key in list(st.session_state.keys()): del st.session_state[key]
-            st.rerun()
-
+with nav_right3:
+    if st.button("🚪 Sair", key="btn_logout", use_container_width=True):
+        # Resetar apenas o necessário — preserva dados úteis (backups, favoritos, grafo, CSS, etc.)
+        st.session_state.authenticated = False
+        st.session_state.username = None
+        st.session_state.user_obj = None
+        st.session_state.reply_message_id = None
+        # limpar campos sensíveis do formulário de login/registro (se existirem)
+        for k in ("ui_login_user", "ui_login_pass", "ui_reg_user", "ui_reg_name"):
+            if k in st.session_state:
+                try:
+                    del st.session_state[k]
+                except Exception:
+                    st.session_state[k] = ""
+        # força rerun para mostrar tela de login "limpa"
+        st.experimental_rerun()
 st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
 nav_cols = st.columns(6)
 nav_buttons = {
