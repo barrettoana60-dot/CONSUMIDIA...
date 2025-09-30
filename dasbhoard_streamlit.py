@@ -517,13 +517,20 @@ def action_button(label, icon_key, st_key, expanded_label=None, wide=False):
     return clicked
 
 # -------------------------
-# Main App Logic
+# Authentication block (robust)
 # -------------------------
-st.markdown("<div style='display:flex; justify-content:center;'><h1 class='consumidia-title'>CONSUMIDIA</h1></div>", unsafe_allow_html=True)
+# debug flag (desativar em produção)
+if "debug_auth" not in st.session_state:
+    st.session_state.debug_auth = False
 
-users = load_users()
+def ensure_users_file():
+    users = load_users()
+    if not users:
+        users = {"admin": {"name": "Administrador", "scholarship": "Admin", "password": "admin123", "created_at": datetime.utcnow().isoformat()}}
+        save_users(users)
+    return users
 
-# --- Authentication ---
+# Show login/register card
 if not st.session_state.authenticated:
     st.markdown("<div class='glass-box auth' style='max-width:1100px;margin:0 auto; position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Acesso — Faça login ou cadastre-se")
@@ -532,13 +539,21 @@ if not st.session_state.authenticated:
         login_user = st.text_input("Usuário", key="ui_login_user")
         login_pass = st.text_input("Senha", type="password", key="ui_login_pass")
         if st.button("Entrar", "btn_login_main"):
-            # garante que lemos o arquivo users.json *no momento* do clique
             users = load_users()
-            if login_user and login_user in users and users[login_user].get("password") == login_pass:
+            if not users:
+                users = ensure_users_file()
+                st.warning("Nenhum usuário encontrado. Usuário de emergência criado: 'admin' / 'admin123' (troque a senha).")
+            lu = (login_user or "").strip()
+            lp = (login_pass or "").strip()
+            if st.session_state.debug_auth:
+                st.write("DEBUG: users keys:", list(users.keys()))
+                st.write("DEBUG: attempting login for:", repr(lu))
+            if not lu or not lp:
+                st.warning("Preencha usuário e senha.")
+            elif lu in users and users[lu].get("password", "") == lp:
                 st.session_state.authenticated = True
-                st.session_state.username = login_user
-                st.session_state.user_obj = users[login_user]
-                # limpar campo de senha do session_state (segurança)
+                st.session_state.username = lu
+                st.session_state.user_obj = users[lu]
                 if "ui_login_pass" in st.session_state:
                     try:
                         del st.session_state["ui_login_pass"]
@@ -547,29 +562,37 @@ if not st.session_state.authenticated:
                 st.success("Login efetuado.")
                 safe_rerun()
             else:
-                st.warning("Usuário ou senha incorretos.")
+                if lu not in users:
+                    st.warning("Usuário não encontrado.")
+                else:
+                    st.warning("Senha incorreta.")
     with tabs[1]:
         reg_name = st.text_input("Nome completo", key="ui_reg_name")
         reg_bolsa = st.selectbox("Tipo de bolsa", ["IC - Iniciação Científica", "BIA - Bolsa de Incentivo Acadêmico", "Extensão", "Doutorado"], key="ui_reg_bolsa")
         reg_user = st.text_input("Escolha um username", key="ui_reg_user")
         if st.button("Cadastrar", "btn_register_main"):
             users = load_users()
-            if not reg_user or not reg_user.strip():
+            if users is None:
+                users = {}
+            new_user = (reg_user or "").strip()
+            if not new_user:
                 st.warning("Escolha um username válido.")
-            elif reg_user in users:
+            elif new_user in users:
                 st.warning("Username já existe.")
             else:
                 pwd = gen_password(8)
-                users[reg_user] = {"name": reg_name or reg_user, "scholarship": reg_bolsa, "password": pwd, "created_at": datetime.utcnow().isoformat()}
+                users[new_user] = {"name": reg_name or new_user, "scholarship": reg_bolsa, "password": pwd, "created_at": datetime.utcnow().isoformat()}
                 save_users(users)
-                st.success(f"Usuário criado. Username: **{reg_user}** — Senha gerada: **{pwd}**")
-                st.info("Anote a senha.")
+                st.success(f"Usuário criado. Username: **{new_user}** — Senha gerada: **{pwd}**")
+                st.info("Anote a senha e troque-a depois.")
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-
-# --- Post-Auth Setup ---
+# -------------------------
+# Post-auth setup and UI
+# -------------------------
 USERNAME = st.session_state.username
+users = load_users()
 USER_OBJ = st.session_state.user_obj or users.get(USERNAME, {})
 USER_STATE = user_state_file(USERNAME)
 
@@ -580,7 +603,7 @@ if not st.session_state.restored_from_saved and os.path.exists(USER_STATE):
     except Exception:
         pass
 
-# --- Unread Messages Notification ---
+# Unread messages
 MESSAGES_PATH = Path("messages.json")
 UNREAD_COUNT = 0
 try:
@@ -601,8 +624,7 @@ if UNREAD_COUNT > st.session_state.last_unread_count:
 st.session_state.last_unread_count = UNREAD_COUNT
 mens_label = f"✉️ Mensagens ({UNREAD_COUNT})" if UNREAD_COUNT > 0 else "✉️ Mensagens"
 
-
-# --- Top Bar & Navigation ---
+# Top bar & navigation
 st.markdown("<div class='glass-box' style='padding-top:10px; padding-bottom:10px;'><div class='specular'></div>", unsafe_allow_html=True)
 top1, top2 = st.columns([0.6, 0.4])
 with top1:
@@ -617,12 +639,10 @@ with top2:
             st.success("Progresso salvo.")
     with nav_right3:
         if st.button("🚪 Sair", key="btn_logout", use_container_width=True):
-            # Resetar apenas o necessário — preserva dados úteis (backups, favoritos, grafo, CSS, etc.)
             st.session_state.authenticated = False
             st.session_state.username = None
             st.session_state.user_obj = None
             st.session_state.reply_message_id = None
-            # limpar alguns campos do formulário de login/registro para evitar valores antigos
             for k in ("ui_login_user", "ui_login_pass", "ui_reg_user", "ui_reg_name"):
                 if k in st.session_state:
                     try:
@@ -641,16 +661,11 @@ for i, (page_key, page_label) in enumerate(nav_buttons.items()):
     with nav_cols[i]:
         if st.button(page_label, key=f"nav_{page_key}", use_container_width=True):
             st.session_state.page = page_key
-            st.session_state.reply_message_id = None # Limpa o estado de resposta ao mudar de página
+            st.session_state.reply_message_id = None
             safe_rerun()
 st.markdown("</div></div><hr>", unsafe_allow_html=True)
 
-
-# =========================
-# === PAGE DISPATCHER ===
-# =========================
-
-# --- Planilha Page ---
+# PAGE DISPATCHER
 if st.session_state.page == "planilha":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Planilha / Backup")
@@ -693,7 +708,6 @@ if st.session_state.page == "planilha":
         st.dataframe(st.session_state.df, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Mapa Mental Page ---
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Mapa Mental 3D — Editor")
@@ -742,7 +756,6 @@ elif st.session_state.page == "mapa":
         st.error(f"Erro ao renderizar grafo: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Anotações Page ---
 elif st.session_state.page == "anotacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Anotações com Marca-texto")
@@ -753,7 +766,6 @@ elif st.session_state.page == "anotacoes":
     st.download_button("Baixar Anotações (PDF)", data=pdf_bytes, file_name="anotacoes_consumidia.pdf", mime="application/pdf")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Gráficos Page ---
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Gráficos Personalizados")
@@ -781,7 +793,6 @@ elif st.session_state.page == "graficos":
                 st.error(f"Erro ao gerar gráficos: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Busca Page ---
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
     tab_busca, tab_favoritos = st.tabs([f"🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"])
@@ -811,7 +822,6 @@ elif st.session_state.page == "busca":
         if backups_df is None:
             st.warning("Nenhum backup de usuário encontrado para a busca. Salve seu progresso para criar um.")
         else:
-            # Filtra colunas indesejadas para a busca, como 'ano'
             all_cols = [c for c in backups_df.columns if c.lower() not in ['_artemis_username', 'ano']]
 
             col1, col2, col3 = st.columns([0.6, 0.25, 0.15])
@@ -903,11 +913,8 @@ elif st.session_state.page == "busca":
                             safe_rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Mensagens Page (com Supabase; fallback local) ---
-# Esta seção utiliza supabase-py quando as credenciais estão presentes em .streamlit/secrets.toml.
-# Caso contrário, usa armazenamento local (messages.json + pasta user_files/).
-
-# tentamos importar o cliente Supabase
+# Mensagens (Supabase fallback local)
+# tenta importar supabase client
 try:
     from supabase import create_client
 except Exception:
@@ -923,15 +930,11 @@ if create_client and SUPABASE_URL and SUPABASE_KEY:
     except Exception:
         _supabase = None
 
-# Local fallback paths
 MESSAGES_FILE = "messages.json"
-ATTACHMENTS_BUCKET = "user_files"  # nome do bucket no supabase; local fallback é pasta 'user_files'
+ATTACHMENTS_BUCKET = "user_files"
 ATTACHMENTS_DIR = Path("user_files")
 ATTACHMENTS_DIR.mkdir(exist_ok=True)
 
-# -------------------------
-# Funções Supabase (simples, defensivas)
-# -------------------------
 def _supabase_insert_message(entry):
     try:
         _supabase.table("messages").insert(entry).execute()
@@ -987,9 +990,6 @@ def _supabase_remove_file(path):
     except Exception:
         return False
 
-# -------------------------
-# Local fallback functions
-# -------------------------
 def _local_load_all_messages():
     if os.path.exists(MESSAGES_FILE):
         try:
@@ -1020,9 +1020,6 @@ def _local_remove_attachment(path):
         pass
     return False
 
-# -------------------------
-# API used by the UI (defensivo)
-# -------------------------
 def load_all_messages():
     if _supabase:
         msgs = _supabase_get_messages()
@@ -1144,9 +1141,7 @@ def delete_message(message_id, username):
         return True
     return False
 
-# -------------------------
-# UI rendering for Mensagens (reaproveita funções acima)
-# -------------------------
+# Mensagens UI
 st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
 st.subheader("Central de Mensagens")
 
