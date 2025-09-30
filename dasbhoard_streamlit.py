@@ -2,7 +2,7 @@
 # CONSUMIDIA — Dashboard completo (versão atualizada)
 # - MELHORIA DE BUSCA: A busca agora ignora acentos e a coluna 'Ano' foi removida dos filtros.
 # - MELHORIA DE MENSAGENS: A função "Responder" agora abre um formulário de resposta no local, citando a mensagem original.
-# - NOVO: Troca de arquivos (dropbox) integrada ao sistema de mensagens.
+# - NOVO: Troca de arquivos (dropbox) integrada ao sistema de mensagens com Supabase e fallback local.
 # - CORREÇÃO: Corrigido o erro 'StreamlitAPIException' ao limpar o anexo após o envio da mensagem.
 # - MELHORIA VISUAL: Efeito Liquid-glass aprimorado, ícones integrados aos botões de navegação.
 # - MELHORIA FUNCIONAL: Nome do usuário de origem agora é salvo e exibido nos Favoritos.
@@ -101,7 +101,7 @@ except Exception:
 # -------------------------
 st.set_page_config(page_title="CONSUMIDIA", layout="wide", initial_sidebar_state="expanded")
 
-# load css (prefer file so user may edit)
+# load css (prefer file para editar)
 css_path = Path("style.css")
 if css_path.exists():
     try:
@@ -861,186 +861,356 @@ elif st.session_state.page == "busca":
                             st.rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-# --- Mensagens Page ---
-elif st.session_state.page == "mensagens":
-    MESSAGES_FILE = "messages.json"
-    ATTACHMENTS_DIR = Path("user_files")
-    ATTACHMENTS_DIR.mkdir(exist_ok=True)
+# --- Mensagens Page (com Supabase; fallback local) ---
+# Esta seção utiliza supabase-py quando as credenciais estão presentes em .streamlit/secrets.toml.
+# Caso contrário, usa armazenamento local (messages.json + pasta user_files/).
 
-    def load_all_messages():
-        if os.path.exists(MESSAGES_FILE):
-            try:
-                with open(MESSAGES_FILE, "r", encoding="utf-8") as f: return json.load(f)
-            except Exception: return []
-        return []
+# tentamos importar o cliente Supabase
+try:
+    from supabase import create_client
+except Exception:
+    create_client = None
 
-    def save_all_messages(msgs):
-        with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
-            json.dump(msgs, f, ensure_ascii=False, indent=2)
+SUPABASE_URL = st.secrets.get("SUPABASE_URL") if hasattr(st, "secrets") else None
+SUPABASE_KEY = st.secrets.get("SUPABASE_KEY") if hasattr(st, "secrets") else None
 
-    def send_message(sender, recipient, subject, body, attachment_file=None):
-        msgs = load_all_messages()
-        mid = f"m_{int(time.time())}_{random.randint(1000,9999)}"
-        entry = {
-            "id": mid, "from": sender, "to": recipient, "subject": subject or "(sem assunto)",
-            "body": body, "ts": datetime.utcnow().isoformat(), "read": False, "attachment": None
-        }
-        if attachment_file:
-            safe_filename = re.sub(r'[^\w\.\-]', '_', attachment_file.name)
-            unique_filename = f"{int(time.time())}_{sender}_{safe_filename}"
-            save_path = ATTACHMENTS_DIR / unique_filename
-            with open(save_path, "wb") as f:
-                f.write(attachment_file.getbuffer())
-            entry["attachment"] = {"name": attachment_file.name, "path": str(save_path)}
-        msgs.append(entry)
-        save_all_messages(msgs)
-        return entry
+_supabase = None
+if create_client and SUPABASE_URL and SUPABASE_KEY:
+    try:
+        _supabase = create_client(SUPABASE_URL, SUPABASE_KEY)
+    except Exception:
+        _supabase = None
 
-    def get_user_messages(username, box_type='inbox'):
-        msgs = load_all_messages()
-        key = "to" if box_type == 'inbox' else "from"
-        user_msgs = [m for m in msgs if m.get(key) == username]
-        user_msgs.sort(key=lambda x: x.get("ts", ""), reverse=True)
-        return user_msgs
+# Local fallback paths
+MESSAGES_FILE = "messages.json"
+ATTACHMENTS_BUCKET = "user_files"  # nome do bucket no supabase; local fallback é pasta 'user_files'
+ATTACHMENTS_DIR = Path("user_files")
+ATTACHMENTS_DIR.mkdir(exist_ok=True)
 
-    def mark_message_read(message_id, username):
-        msgs, changed = load_all_messages(), False
-        for m in msgs:
-            if m.get("id") == message_id and m.get("to") == username:
-                if not m.get("read"):
-                    m["read"], changed = True, True
-                break
-        if changed: save_all_messages(msgs)
-        return changed
-
-    def delete_message(message_id, username):
-        msgs = load_all_messages()
-        msg_to_delete = next((m for m in msgs if m.get("id") == message_id and (m.get("to") == username or m.get("from") == username)), None)
-        if msg_to_delete:
-            if msg_to_delete.get("attachment"):
-                try: os.remove(msg_to_delete["attachment"]["path"])
-                except OSError: pass
-            new_msgs = [m for m in msgs if m.get("id") != message_id]
-            save_all_messages(new_msgs)
-            return True
+# -------------------------
+# Funções Supabase (simples, defensivas)
+# -------------------------
+def _supabase_insert_message(entry):
+    try:
+        _supabase.table("messages").insert(entry).execute()
+        return True
+    except Exception:
         return False
 
-    st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("Central de Mensagens")
+def _supabase_update_message(message_id, updates: dict):
+    try:
+        _supabase.table("messages").update(updates).eq("id", message_id).execute()
+        return True
+    except Exception:
+        return False
 
-    inbox = get_user_messages(USERNAME, 'inbox')
-    outbox = get_user_messages(USERNAME, 'outbox')
-    tab_inbox, tab_compose, tab_sent = st.tabs([f"📥 Caixa de Entrada ({UNREAD_COUNT})", "✍️ Escrever Nova", f"📤 Enviadas ({len(outbox)})"])
+def _supabase_delete_message(message_id):
+    try:
+        _supabase.table("messages").delete().eq("id", message_id).execute()
+        return True
+    except Exception:
+        return False
 
-    with tab_inbox:
-        if not inbox:
-            st.info("Sua caixa de entrada está vazia.")
+def _supabase_get_messages(filter_col=None, filter_val=None, box='inbox'):
+    try:
+        q = _supabase.table("messages").select("*").order("ts", desc=True)
+        if filter_col and filter_val is not None:
+            q = q.eq(filter_col, filter_val)
+        res = q.execute()
+        msgs = getattr(res, "data", None) or (res[0] if isinstance(res, (list, tuple)) and res else res)
+        return msgs or []
+    except Exception:
+        return None
+
+def _supabase_upload_file(filename, file_bytes):
+    try:
+        path = f"{int(time.time())}_{filename}"
+        _supabase.storage.from_(ATTACHMENTS_BUCKET).upload(path, file_bytes, {"cacheControl":"3600","upsert":False})
+        public = _supabase.storage.from_(ATTACHMENTS_BUCKET).get_public_url(path)
+        public_url = None
+        if isinstance(public, dict):
+            public_url = public.get("publicURL") or public.get("public_url")
+        elif hasattr(public, "get"):
+            public_url = public.get("publicURL")
         else:
-            reply_message_id = st.session_state.get('reply_message_id')
-            for m in inbox:
-                m_id = m.get('id')
-                is_read = m.get("read", False)
-                expander_label = f"{'✅' if is_read else '🔵'} De: **{m.get('from')}** | Assunto: **{m.get('subject')}**"
-                
-                with st.expander(expander_label, expanded=(reply_message_id == m_id)):
-                    st.markdown(f"**Recebido em:** `{m.get('ts')}`")
+            public_url = getattr(public, "publicURL", None) or getattr(public, "public_url", None)
+        return {"name": filename, "path": path, "url": public_url}
+    except Exception:
+        return None
+
+def _supabase_remove_file(path):
+    try:
+        _supabase.storage.from_(ATTACHMENTS_BUCKET).remove([path])
+        return True
+    except Exception:
+        return False
+
+# -------------------------
+# Local fallback functions
+# -------------------------
+def _local_load_all_messages():
+    if os.path.exists(MESSAGES_FILE):
+        try:
+            with open(MESSAGES_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def _local_save_all_messages(msgs):
+    with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
+        json.dump(msgs, f, ensure_ascii=False, indent=2)
+
+def _local_upload_attachment(sender, attachment_file):
+    safe_filename = re.sub(r'[^\w\.\-]', '_', attachment_file.name)
+    unique_filename = f"{int(time.time())}_{sender}_{safe_filename}"
+    save_path = ATTACHMENTS_DIR / unique_filename
+    with open(save_path, "wb") as f:
+        f.write(attachment_file.getbuffer())
+    return {"name": attachment_file.name, "path": str(save_path)}
+
+def _local_remove_attachment(path):
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+            return True
+    except Exception:
+        pass
+    return False
+
+# -------------------------
+# API used by the UI (defensivo)
+# -------------------------
+def load_all_messages():
+    if _supabase:
+        msgs = _supabase_get_messages()
+        if msgs is not None:
+            return msgs
+    return _local_load_all_messages()
+
+def save_all_messages(msgs):
+    if _supabase:
+        try:
+            for m in msgs:
+                try:
+                    _supabase_insert_message(m)
+                except Exception:
+                    pass
+            return True
+        except Exception:
+            pass
+    _local_save_all_messages(msgs)
+    return True
+
+def send_message(sender, recipient, subject, body, attachment_file=None):
+    mid = f"m_{int(time.time())}_{random.randint(1000,9999)}"
+    entry = {
+        "id": mid,
+        "from": sender,
+        "to": recipient,
+        "subject": subject or "(sem assunto)",
+        "body": body,
+        "ts": datetime.utcnow().isoformat(),
+        "read": False,
+        "attachment": None
+    }
+    if _supabase:
+        if attachment_file:
+            try:
+                content_bytes = attachment_file.getbuffer()
+                upload_meta = _supabase_upload_file(attachment_file.name, content_bytes)
+                if upload_meta:
+                    entry["attachment"] = upload_meta
+            except Exception:
+                entry["attachment"] = None
+        ok = _supabase_insert_message(entry)
+        if ok:
+            return entry
+    if attachment_file:
+        entry["attachment"] = _local_upload_attachment(sender, attachment_file)
+    msgs = _local_load_all_messages()
+    msgs.append(entry)
+    _local_save_all_messages(msgs)
+    return entry
+
+def get_user_messages(username, box_type='inbox'):
+    if _supabase:
+        try:
+            if box_type == 'inbox':
+                msgs = _supabase_get_messages(filter_col="to", filter_val=username)
+            else:
+                msgs = _supabase_get_messages(filter_col="from", filter_val=username)
+            if msgs is not None:
+                return sorted(msgs, key=lambda x: x.get("ts",""), reverse=True)
+        except Exception:
+            pass
+    msgs = _local_load_all_messages()
+    key = "to" if box_type == 'inbox' else "from"
+    user_msgs = [m for m in msgs if m.get(key) == username]
+    user_msgs.sort(key=lambda x: x.get("ts", ""), reverse=True)
+    return user_msgs
+
+def mark_message_read(message_id, username):
+    if _supabase:
+        try:
+            _supabase_update_message(message_id, {"read": True})
+            return True
+        except Exception:
+            pass
+    msgs = _local_load_all_messages()
+    changed = False
+    for m in msgs:
+        if m.get("id") == message_id and m.get("to") == username:
+            if not m.get("read"):
+                m["read"] = True
+                changed = True
+            break
+    if changed:
+        _local_save_all_messages(msgs)
+    return changed
+
+def delete_message(message_id, username):
+    if _supabase:
+        try:
+            resp = _supabase.table("messages").select("*").eq("id", message_id).execute()
+            msg = getattr(resp, "data", None) or (resp[0] if isinstance(resp, (list,tuple)) and resp else None)
+            if msg:
+                if msg.get("to") == username or msg.get("from") == username:
+                    if msg.get("attachment"):
+                        path = msg["attachment"].get("path")
+                        if path:
+                            try:
+                                _supabase_remove_file(path)
+                            except Exception:
+                                pass
+                    _supabase_delete_message(message_id)
+                    return True
+        except Exception:
+            pass
+    msgs = _local_load_all_messages()
+    msg_to_delete = next((m for m in msgs if m.get("id") == message_id and (m.get("to") == username or m.get("from") == username)), None)
+    if msg_to_delete:
+        if msg_to_delete.get("attachment"):
+            try:
+                apath = msg_to_delete["attachment"].get("path")
+                if apath and apath.startswith(str(ATTACHMENTS_DIR)):
+                    _local_remove_attachment(apath)
+            except Exception:
+                pass
+        new_msgs = [m for m in msgs if m.get("id") != message_id]
+        _local_save_all_messages(new_msgs)
+        return True
+    return False
+
+# -------------------------
+# UI rendering for Mensagens (reaproveita funções acima)
+# -------------------------
+st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
+st.subheader("Central de Mensagens")
+
+inbox = get_user_messages(USERNAME, 'inbox')
+outbox = get_user_messages(USERNAME, 'outbox')
+tab_inbox, tab_compose, tab_sent = st.tabs([f"📥 Caixa de Entrada ({sum(1 for m in inbox if not m.get('read'))})", "✍️ Escrever Nova", f"📤 Enviadas ({len(outbox)})"])
+
+with tab_inbox:
+    if not inbox:
+        st.info("Sua caixa de entrada está vazia.")
+    else:
+        reply_message_id = st.session_state.get('reply_message_id')
+        for m in inbox:
+            m_id = m.get('id')
+            is_read = m.get("read", False)
+            expander_label = f"{'✅' if is_read else '🔵'} De: **{m.get('from')}** | Assunto: **{m.get('subject')}**"
+            with st.expander(expander_label, expanded=(reply_message_id == m_id)):
+                st.markdown(f"**Recebido em:** `{m.get('ts')}`")
+                st.markdown("---")
+                st.markdown(m.get("body"))
+                if not is_read:
+                    mark_message_read(m_id, USERNAME)
+                    st.experimental_rerun()
+                if m.get("attachment"):
+                    att = m["attachment"]
                     st.markdown("---")
-                    st.markdown(m.get("body"))
-                    
-                    if not is_read:
-                        mark_message_read(m_id, USERNAME)
-                        st.rerun()
-
-                    if m.get("attachment"):
-                        attachment_info = m["attachment"]
-                        st.markdown("---")
-                        try:
-                            with open(attachment_info["path"], "rb") as fp:
-                                st.download_button(
-                                    label=f"⬇️ Baixar Anexo: {attachment_info['name']}",
-                                    data=fp, file_name=attachment_info["name"], key=f"dl_{m_id}"
-                                )
-                        except FileNotFoundError:
-                            st.warning("O anexo não foi encontrado no servidor.")
-                    
-                    st.markdown("<br>", unsafe_allow_html=True) # Add space before buttons
-
-                    # --- NEW REPLY LOGIC ---
-                    if reply_message_id == m_id:
-                        st.markdown("---")
-                        st.subheader("Responder")
-                        with st.form(key=f"reply_form_{m_id}", clear_on_submit=True):
-                            original_body = m.get('body', '')
-                            quoted_text = f"\n\n---\nEm {m.get('ts')}, {m.get('from')} escreveu:\n> " + "\n> ".join(original_body.split('\n'))
-                            
-                            reply_body = st.text_area("Mensagem:", value=quoted_text, height=150, key=f"reply_body_{m_id}")
-                            reply_attachment = st.file_uploader("Anexar arquivo:", key=f"reply_attach_{m_id}")
-                            
-                            c1_form, c2_form = st.columns(2)
-                            with c1_form:
-                                if st.form_submit_button("✉️ Enviar Resposta", use_container_width=True):
-                                    send_message(
-                                        sender=USERNAME, recipient=m.get('from'), subject=f"Re: {m.get('subject')}",
-                                        body=reply_body, attachment_file=reply_attachment
-                                    )
-                                    st.session_state.reply_message_id = None
-                                    st.toast("Resposta enviada!")
-                                    st.rerun()
-                            with c2_form:
-                                if st.form_submit_button("Cancelar", use_container_width=True):
-                                    st.session_state.reply_message_id = None
-                                    st.rerun()
+                    if att.get("url"):
+                        st.markdown(f"[⬇️ Baixar Anexo: {att.get('name')}]({att.get('url')})")
                     else:
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            if st.button("Responder", key=f"reply_{m_id}", use_container_width=True):
-                                st.session_state.reply_message_id = m_id
-                                st.rerun()
-                        with c2:
-                            if st.button("Apagar", key=f"del_inbox_{m_id}", use_container_width=True):
-                                delete_message(m_id, USERNAME)
-                                if st.session_state.reply_message_id == m_id:
-                                    st.session_state.reply_message_id = None
-                                st.toast("Mensagem apagada.")
-                                st.rerun()
-
-    with tab_compose:
-        with st.form(key="compose_form", clear_on_submit=True):
-            all_usernames = list(load_users().keys())
-            if USERNAME in all_usernames:
-                all_usernames.remove(USERNAME)
-            
-            to_user = st.selectbox("Para:", options=all_usernames)
-            subj = st.text_input("Assunto:")
-            body = st.text_area("Mensagem:", height=200)
-            attachment = st.file_uploader("Anexar arquivo (Dropbox):", key="compose_attachment")
-            
-            submitted = st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True)
-
-            if submitted:
-                if not to_user:
-                    st.error("Destinatário inválido.")
-                else:
-                    send_message(USERNAME, to_user, subj, body, attachment_file=attachment)
-                    st.success(f"Mensagem enviada para {to_user}.")
-                    if st.session_state.autosave:
-                        save_state_for_user(USERNAME)
-                    st.rerun()
-
-    with tab_sent:
-        if not outbox:
-            st.info("Você ainda não enviou mensagens.")
-        else:
-            for m in outbox:
-                with st.expander(f"Para: **{m.get('to')}** | Assunto: **{m.get('subject')}**"):
-                    st.markdown(f"**Enviado em:** `{m.get('ts')}`")
+                        localp = att.get("path")
+                        try:
+                            if localp and os.path.exists(localp):
+                                with open(localp, "rb") as fp:
+                                    st.download_button(label=f"⬇️ Baixar Anexo: {att.get('name')}", data=fp, file_name=att.get('name'), key=f"dl_{m_id}")
+                            else:
+                                st.warning("O anexo não foi encontrado.")
+                        except Exception:
+                            st.warning("Erro ao disponibilizar o anexo.")
+                st.markdown("<br>", unsafe_allow_html=True)
+                if reply_message_id == m_id:
                     st.markdown("---")
-                    st.markdown(m.get("body"))
-                    if m.get("attachment"):
-                        st.info(f"Anexo enviado: {m['attachment']['name']}")
-                    if st.button("Apagar", key=f"del_outbox_{m.get('id')}", use_container_width=True):
-                        delete_message(m.get('id'), USERNAME)
-                        st.toast("Mensagem apagada.")
-                        st.rerun()
+                    st.subheader("Responder")
+                    with st.form(key=f"reply_form_{m_id}", clear_on_submit=True):
+                        original_body = m.get('body', '')
+                        quoted_text = f"\n\n---\nEm {m.get('ts')}, {m.get('from')} escreveu:\n> " + "\n> ".join(original_body.split('\n'))
+                        reply_body = st.text_area("Mensagem:", value=quoted_text, height=150, key=f"reply_body_{m_id}")
+                        reply_attachment = st.file_uploader("Anexar arquivo:", key=f"reply_attach_{m_id}")
+                        c1_form, c2_form = st.columns(2)
+                        with c1_form:
+                            if st.form_submit_button("✉️ Enviar Resposta", use_container_width=True):
+                                send_message(sender=USERNAME, recipient=m.get('from'), subject=f"Re: {m.get('subject')}", body=reply_body, attachment_file=reply_attachment)
+                                st.session_state.reply_message_id = None
+                                st.toast("Resposta enviada!")
+                                st.experimental_rerun()
+                        with c2_form:
+                            if st.form_submit_button("Cancelar", use_container_width=True):
+                                st.session_state.reply_message_id = None
+                                st.experimental_rerun()
+                else:
+                    c1, c2 = st.columns(2)
+                    with c1:
+                        if st.button("Responder", key=f"reply_{m_id}", use_container_width=True):
+                            st.session_state.reply_message_id = m_id
+                            st.experimental_rerun()
+                    with c2:
+                        if st.button("Apagar", key=f"del_inbox_{m_id}", use_container_width=True):
+                            delete_message(m_id, USERNAME)
+                            if st.session_state.reply_message_id == m_id:
+                                st.session_state.reply_message_id = None
+                            st.toast("Mensagem apagada.")
+                            st.experimental_rerun()
 
-    st.markdown("</div>", unsafe_allow_html=True)
+with tab_compose:
+    with st.form(key="compose_form", clear_on_submit=True):
+        all_usernames = list(load_users().keys())
+        if USERNAME in all_usernames:
+            all_usernames.remove(USERNAME)
+        to_user = st.selectbox("Para:", options=all_usernames)
+        subj = st.text_input("Assunto:")
+        body = st.text_area("Mensagem:", height=200)
+        attachment = st.file_uploader("Anexar arquivo (Dropbox -> Supabase):", key="compose_attachment")
+        submitted = st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True)
+        if submitted:
+            if not to_user:
+                st.error("Destinatário inválido.")
+            else:
+                send_message(USERNAME, to_user, subj, body, attachment_file=attachment)
+                st.success(f"Mensagem enviada para {to_user}.")
+                if st.session_state.autosave:
+                    save_state_for_user(USERNAME)
+                st.experimental_rerun()
+
+with tab_sent:
+    if not outbox:
+        st.info("Você ainda não enviou mensagens.")
+    else:
+        for m in outbox:
+            with st.expander(f"Para: **{m.get('to')}** | Assunto: **{m.get('subject')}**"):
+                st.markdown(f"**Enviado em:** `{m.get('ts')}`")
+                st.markdown("---")
+                st.markdown(m.get("body"))
+                if m.get("attachment"):
+                    st.info(f"Anexo enviado: {m['attachment'].get('name')}")
+                if st.button("Apagar", key=f"del_outbox_{m.get('id')}", use_container_width=True):
+                    delete_message(m.get('id'), USERNAME)
+                    st.toast("Mensagem apagada.")
+                    st.experimental_rerun()
+
+st.markdown("</div>", unsafe_allow_html=True)
