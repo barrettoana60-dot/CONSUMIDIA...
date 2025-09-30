@@ -1,6 +1,6 @@
 # dashboard_consumidia_updated.py
 # CONSUMIDIA — Dashboard completo (versão atualizada)
-# Versão com safe_rerun(), login/logout robustos e integração Supabase (fallback local).
+# Versão com PostgreSQL integrado
 
 import streamlit as st
 import pandas as pd
@@ -27,26 +27,17 @@ from sklearn.metrics.pairwise import cosine_similarity
 try:
     import psycopg2
     from dotenv import load_dotenv
-    
+    import os
+
     # Load environment variables from .env
     load_dotenv()
+
+    # String de conexão direta do Supabase
+    DATABASE_URL = "postgresql://postgres.jagzzokffoqqunjvkdyk:[YOUR-PASSWORD]@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
     
-    # Fetch variables
-    USER = os.getenv("user")
-    PASSWORD = os.getenv("password")
-    HOST = os.getenv("host")
-    PORT = os.getenv("port")
-    DBNAME = os.getenv("dbname")
-    
-    # Connect to the database
+    # Connect to the database usando string de conexão
     try:
-        connection = psycopg2.connect(
-            user=USER,
-            password=PASSWORD,
-            host=HOST,
-            port=PORT,
-            dbname=DBNAME
-        )
+        connection = psycopg2.connect(DATABASE_URL)
         print("PostgreSQL Connection successful!")
         
         # Create a cursor to execute SQL queries
