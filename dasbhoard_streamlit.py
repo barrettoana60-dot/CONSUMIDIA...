@@ -33,7 +33,7 @@ try:
     load_dotenv()
 
     # String de conexão direta do Supabase - SUBSTITUA [YOUR-PASSWORD] pela sua senha real
-    DATABASE_URL = "postgresql://postgres.jagzzokffoqqunjvkdyk:[YOUR-PASSWORD]@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+    DATABASE_URL = "postgresql:https://jagzzokffoqqunjvkdyk.supabase.co:[Capivara69@]@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
     
     # Connect to the database usando string de conexão
     try:
