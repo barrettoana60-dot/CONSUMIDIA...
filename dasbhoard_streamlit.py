@@ -1,11 +1,6 @@
 # dashboard_consumidia_updated.py
 # CONSUMIDIA — Dashboard completo (versão atualizada)
-# - MELHORIA DE BUSCA: A busca agora ignora acentos e a coluna 'Ano' foi removida dos filtros.
-# - MELHORIA DE MENSAGENS: A função "Responder" agora abre um formulário de resposta no local, citando a mensagem original.
-# - NOVO: Troca de arquivos (dropbox) integrada ao sistema de mensagens com Supabase e fallback local.
-# - CORREÇÃO: Corrigido o erro 'StreamlitAPIException' ao limpar o anexo após o envio da mensagem.
-# - MELHORIA VISUAL: Efeito Liquid-glass aprimorado, ícones integrados aos botões de navegação.
-# - MELHORIA FUNCIONAL: Nome do usuário de origem agora é salvo e exibido nos Favoritos.
+# Versão com safe_rerun(), login/logout robustos e integração Supabase (fallback local).
 
 import streamlit as st
 import pandas as pd
@@ -25,6 +20,32 @@ import joblib
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
+
+# -------------------------
+# Helper: rerun seguro (fallbacks)
+# -------------------------
+def safe_rerun():
+    """
+    Chama st.rerun() quando disponível, senão tenta st.experimental_rerun().
+    Se nenhuma estiver disponível, faz st.stop() para evitar crash não tratado.
+    Use no lugar de chamadas diretas a st.rerun() / st.experimental_rerun().
+    """
+    try:
+        if hasattr(st, "rerun") and callable(getattr(st, "rerun")):
+            st.rerun()
+            return
+        if hasattr(st, "experimental_rerun") and callable(getattr(st, "experimental_rerun")):
+            st.experimental_rerun()
+            return
+    except Exception as e:
+        try:
+            st.error(f"safe_rerun: não foi possível reiniciar a app (erro: {e}). Verifique logs.")
+        except Exception:
+            pass
+    try:
+        st.stop()
+    except Exception:
+        raise RuntimeError("safe_rerun falhou e não foi possível chamar st.stop()")
 
 # -------------------------
 # Default CSS (liquid glass aprimorado)
@@ -101,7 +122,7 @@ except Exception:
 # -------------------------
 st.set_page_config(page_title="CONSUMIDIA", layout="wide", initial_sidebar_state="expanded")
 
-# load css (prefer file para editar)
+# load css (prefer file so user may edit)
 css_path = Path("style.css")
 if css_path.exists():
     try:
@@ -511,11 +532,20 @@ if not st.session_state.authenticated:
         login_user = st.text_input("Usuário", key="ui_login_user")
         login_pass = st.text_input("Senha", type="password", key="ui_login_pass")
         if st.button("Entrar", "btn_login_main"):
+            # garante que lemos o arquivo users.json *no momento* do clique
+            users = load_users()
             if login_user and login_user in users and users[login_user].get("password") == login_pass:
                 st.session_state.authenticated = True
                 st.session_state.username = login_user
                 st.session_state.user_obj = users[login_user]
-                st.rerun()
+                # limpar campo de senha do session_state (segurança)
+                if "ui_login_pass" in st.session_state:
+                    try:
+                        del st.session_state["ui_login_pass"]
+                    except Exception:
+                        st.session_state["ui_login_pass"] = ""
+                st.success("Login efetuado.")
+                safe_rerun()
             else:
                 st.warning("Usuário ou senha incorretos.")
     with tabs[1]:
@@ -523,6 +553,7 @@ if not st.session_state.authenticated:
         reg_bolsa = st.selectbox("Tipo de bolsa", ["IC - Iniciação Científica", "BIA - Bolsa de Incentivo Acadêmico", "Extensão", "Doutorado"], key="ui_reg_bolsa")
         reg_user = st.text_input("Escolha um username", key="ui_reg_user")
         if st.button("Cadastrar", "btn_register_main"):
+            users = load_users()
             if not reg_user or not reg_user.strip():
                 st.warning("Escolha um username válido.")
             elif reg_user in users:
@@ -584,22 +615,22 @@ with top2:
         if st.button("💾 Salvar", key="btn_save_now", use_container_width=True):
             save_state_for_user(USERNAME)
             st.success("Progresso salvo.")
-with nav_right3:
-    if st.button("🚪 Sair", key="btn_logout", use_container_width=True):
-        # Resetar apenas o necessário — preserva dados úteis (backups, favoritos, grafo, CSS, etc.)
-        st.session_state.authenticated = False
-        st.session_state.username = None
-        st.session_state.user_obj = None
-        st.session_state.reply_message_id = None
-        # limpar campos sensíveis do formulário de login/registro (se existirem)
-        for k in ("ui_login_user", "ui_login_pass", "ui_reg_user", "ui_reg_name"):
-            if k in st.session_state:
-                try:
-                    del st.session_state[k]
-                except Exception:
-                    st.session_state[k] = ""
-        # força rerun para mostrar tela de login "limpa"
-        st.experimental_rerun()
+    with nav_right3:
+        if st.button("🚪 Sair", key="btn_logout", use_container_width=True):
+            # Resetar apenas o necessário — preserva dados úteis (backups, favoritos, grafo, CSS, etc.)
+            st.session_state.authenticated = False
+            st.session_state.username = None
+            st.session_state.user_obj = None
+            st.session_state.reply_message_id = None
+            # limpar alguns campos do formulário de login/registro para evitar valores antigos
+            for k in ("ui_login_user", "ui_login_pass", "ui_reg_user", "ui_reg_name"):
+                if k in st.session_state:
+                    try:
+                        del st.session_state[k]
+                    except Exception:
+                        st.session_state[k] = ""
+            safe_rerun()
+
 st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
 nav_cols = st.columns(6)
 nav_buttons = {
@@ -611,7 +642,7 @@ for i, (page_key, page_label) in enumerate(nav_buttons.items()):
         if st.button(page_label, key=f"nav_{page_key}", use_container_width=True):
             st.session_state.page = page_key
             st.session_state.reply_message_id = None # Limpa o estado de resposta ao mudar de página
-            st.rerun()
+            safe_rerun()
 st.markdown("</div></div><hr>", unsafe_allow_html=True)
 
 
@@ -684,7 +715,7 @@ elif st.session_state.page == "mapa":
                             st.session_state.G.add_edge(n, connect_to)
                         st.success(f"Nó '{n}' adicionado.")
                         if st.session_state.autosave: save_state_for_user(USERNAME)
-                        st.rerun()
+                        safe_rerun()
             with right:
                 del_n = st.selectbox("Excluir nó", [""] + list(st.session_state.G.nodes), key=f"del_{USERNAME}")
                 if st.button("Excluir nó", key=f"btn_del_{USERNAME}"):
@@ -692,7 +723,7 @@ elif st.session_state.page == "mapa":
                         st.session_state.G.remove_node(del_n)
                         st.success(f"Nó '{del_n}' removido.")
                         if st.session_state.autosave: save_state_for_user(USERNAME)
-                        st.rerun()
+                        safe_rerun()
                 st.markdown("---")
                 r_old = st.selectbox("Renomear: selecione nó", [""] + list(st.session_state.G.nodes), key=f"r_old_{USERNAME}")
                 r_new = st.text_input("Novo nome", key=f"r_new_{USERNAME}")
@@ -701,7 +732,7 @@ elif st.session_state.page == "mapa":
                         nx.relabel_nodes(st.session_state.G, {r_old: r_new}, copy=False)
                         st.success(f"'{r_old}' → '{r_new}'")
                         if st.session_state.autosave: save_state_for_user(USERNAME)
-                        st.rerun()
+                        safe_rerun()
 
     st.markdown("### Visualização 3D")
     try:
@@ -846,7 +877,7 @@ elif st.session_state.page == "busca":
                 if action_button("Limpar Todos", "trash", "clear_favs", wide=True):
                     clear_all_favorites()
                     save_state_for_user(USERNAME)
-                    st.rerun()
+                    safe_rerun()
 
             st.markdown("---")
             sorted_favorites = sorted(favorites, key=lambda x: x['added_at'], reverse=True)
@@ -869,7 +900,7 @@ elif st.session_state.page == "busca":
                         if action_button("Remover", "trash", f"del_fav_{fav['id']}", wide=True):
                             remove_from_favorites(fav['id'])
                             save_state_for_user(USERNAME)
-                            st.rerun()
+                            safe_rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 # --- Mensagens Page (com Supabase; fallback local) ---
@@ -1138,7 +1169,7 @@ with tab_inbox:
                 st.markdown(m.get("body"))
                 if not is_read:
                     mark_message_read(m_id, USERNAME)
-                    st.experimental_rerun()
+                    safe_rerun()
                 if m.get("attachment"):
                     att = m["attachment"]
                     st.markdown("---")
@@ -1169,24 +1200,24 @@ with tab_inbox:
                                 send_message(sender=USERNAME, recipient=m.get('from'), subject=f"Re: {m.get('subject')}", body=reply_body, attachment_file=reply_attachment)
                                 st.session_state.reply_message_id = None
                                 st.toast("Resposta enviada!")
-                                st.experimental_rerun()
+                                safe_rerun()
                         with c2_form:
                             if st.form_submit_button("Cancelar", use_container_width=True):
                                 st.session_state.reply_message_id = None
-                                st.experimental_rerun()
+                                safe_rerun()
                 else:
                     c1, c2 = st.columns(2)
                     with c1:
                         if st.button("Responder", key=f"reply_{m_id}", use_container_width=True):
                             st.session_state.reply_message_id = m_id
-                            st.experimental_rerun()
+                            safe_rerun()
                     with c2:
                         if st.button("Apagar", key=f"del_inbox_{m_id}", use_container_width=True):
                             delete_message(m_id, USERNAME)
                             if st.session_state.reply_message_id == m_id:
                                 st.session_state.reply_message_id = None
                             st.toast("Mensagem apagada.")
-                            st.experimental_rerun()
+                            safe_rerun()
 
 with tab_compose:
     with st.form(key="compose_form", clear_on_submit=True):
@@ -1206,7 +1237,7 @@ with tab_compose:
                 st.success(f"Mensagem enviada para {to_user}.")
                 if st.session_state.autosave:
                     save_state_for_user(USERNAME)
-                st.experimental_rerun()
+                safe_rerun()
 
 with tab_sent:
     if not outbox:
@@ -1222,6 +1253,6 @@ with tab_sent:
                 if st.button("Apagar", key=f"del_outbox_{m.get('id')}", use_container_width=True):
                     delete_message(m.get('id'), USERNAME)
                     st.toast("Mensagem apagada.")
-                    st.experimental_rerun()
+                    safe_rerun()
 
 st.markdown("</div>", unsafe_allow_html=True)
