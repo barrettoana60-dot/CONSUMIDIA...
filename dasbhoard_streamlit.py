@@ -1,3 +1,6 @@
+# dashboard_consumidia_updated.py
+# CONSUMIDIA — Dashboard completo (versão atualizada)
+# Versão com PostgreSQL e Supabase integrados
 
 import streamlit as st
 import pandas as pd
@@ -168,6 +171,17 @@ if css_path.exists():
         st.markdown(f"<style>{css_path.read_text()}</style>", unsafe_allow_html=True)
 else:
     st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
+
+# -------------------------
+# Título visível na tela de login (fora do glass-box)
+# -------------------------
+st.markdown(
+    "<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'>"
+    "<h1 class='consumidia-title' style='font-size:40px;margin:0;line-height:1;'>CONSUMIDIA</h1>"
+    "</div>",
+    unsafe_allow_html=True
+)
+# -------------------------
 
 # -------------------------
 # Helpers: users + auth
@@ -569,9 +583,8 @@ def ensure_users_file():
 
 # Show login/register card
 if not st.session_state.authenticated:
-    # <-- ADDED: show CONSUMIDIA title also inside the login/register card -->
     st.markdown("<div class='glass-box auth' style='max-width:1100px;margin:0 auto; position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.markdown("<h2 class='consumidia-title' style='text-align:center; margin-bottom:8px; font-size:28px;'>CONSUMIDIA</h2>", unsafe_allow_html=True)
+    # note: title already shown above (outside box) to ensure visibility
     st.subheader("Acesso — Faça login ou cadastre-se")
     tabs = st.tabs(["Entrar", "Cadastrar"])
     with tabs[0]:
@@ -626,11 +639,6 @@ if not st.session_state.authenticated:
                 st.info("Anote a senha e troque-a depois.")
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
-
-# -------------------------
-# Título CONSUMIDIA
-# -------------------------
-st.markdown("<h1 class='consumidia-title' style='text-align: center; margin-bottom: 20px;'>CONSUMIDIA</h1>", unsafe_allow_html=True)
 
 # -------------------------
 # Post-auth setup and UI
@@ -838,8 +846,8 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 elif st.session_state.page == "busca":
-    st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_ALLOW_HTML=True)
-    tab_busca, tab_favoritos = st.tabs([f"🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"]) 
+    st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
+    tab_busca, tab_favoritos = st.tabs([f"🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"])
 
     with tab_busca:
         st.header("Busca Inteligente")
@@ -894,7 +902,7 @@ elif st.session_state.page == "busca":
                 st.markdown(f"**{len(results_df)} resultado(s) encontrado(s).** Exibindo os 20 primeiros.")
                 st.markdown("---")
                 for idx, row in results_df.head(20).iterrows():
-                    with st.container(border=True):
+                    with st.container():
                         result_data = row.to_dict()
                         username = result_data.get('_artemis_username', 'N/A')
                         col_info, col_action = st.columns([0.8, 0.2])
@@ -936,7 +944,7 @@ elif st.session_state.page == "busca":
             st.markdown("---")
             sorted_favorites = sorted(favorites, key=lambda x: x['added_at'], reverse=True)
             for fav in sorted_favorites:
-                with st.container(border=True):
+                with st.container():
                     col_info, col_action = st.columns([0.8, 0.2])
                     with col_info:
                         fav_data = fav['data'].copy()
@@ -955,7 +963,7 @@ elif st.session_state.page == "busca":
                             remove_from_favorites(fav['id'])
                             save_state_for_user(USERNAME)
                             safe_rerun()
-    st.markdown("</div>", unsafe_ALLOW_HTML=True)
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
 # Supabase Integration para Mensagens
