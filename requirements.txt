@@ -8,11 +8,11 @@ numpy>=1.24.0
 # visualização
 matplotlib>=3.5.0
 plotly>=5.6.0
-kaleido>=0.2.1
+kaleido==0.2.1
 
 # grafos / redes
 networkx>=3.0
-pyvis>=0.2.1
+pyvis==0.2.1
 
 # ML / busca
 scikit-learn>=1.1.0
@@ -23,9 +23,6 @@ openpyxl>=3.0.0
 
 # PDF
 fpdf>=1.7.2
-# opcional: fpdf2 
-# fpdf2
 
-# integração externa
-supabase-py>=2.0.0
-
+# integração externa (cliente supabase no PyPI é 'supabase')
+supabase>=2.0.0
