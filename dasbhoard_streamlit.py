@@ -1,6 +1,3 @@
-# dashboard_consumidia_updated.py
-# CONSUMIDIA — Dashboard completo (versão atualizada)
-# Versão com PostgreSQL e Supabase integrados
 
 import streamlit as st
 import pandas as pd
@@ -572,7 +569,9 @@ def ensure_users_file():
 
 # Show login/register card
 if not st.session_state.authenticated:
+    # <-- ADDED: show CONSUMIDIA title also inside the login/register card -->
     st.markdown("<div class='glass-box auth' style='max-width:1100px;margin:0 auto; position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.markdown("<h2 class='consumidia-title' style='text-align:center; margin-bottom:8px; font-size:28px;'>CONSUMIDIA</h2>", unsafe_allow_html=True)
     st.subheader("Acesso — Faça login ou cadastre-se")
     tabs = st.tabs(["Entrar", "Cadastrar"])
     with tabs[0]:
@@ -839,8 +838,8 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 elif st.session_state.page == "busca":
-    st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
-    tab_busca, tab_favoritos = st.tabs([f"🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"])
+    st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_ALLOW_HTML=True)
+    tab_busca, tab_favoritos = st.tabs([f"🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"]) 
 
     with tab_busca:
         st.header("Busca Inteligente")
@@ -956,7 +955,7 @@ elif st.session_state.page == "busca":
                             remove_from_favorites(fav['id'])
                             save_state_for_user(USERNAME)
                             safe_rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_ALLOW_HTML=True)
 
 # -------------------------
 # Supabase Integration para Mensagens
@@ -1299,6 +1298,5 @@ with tab_sent:
                 if st.button("Apagar", key=f"del_outbox_{m.get('id')}", use_container_width=True):
                     delete_message(m.get('id'), USERNAME)
                     st.toast("Mensagem apagada.")
-                    safe_rerun()
 
 st.markdown("</div>", unsafe_allow_html=True)
