@@ -22,6 +22,55 @@ from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
 
 # -------------------------
+# PostgreSQL Integration
+# -------------------------
+try:
+    import psycopg2
+    from dotenv import load_dotenv
+    
+    # Load environment variables from .env
+    load_dotenv()
+    
+    # Fetch variables
+    USER = os.getenv("user")
+    PASSWORD = os.getenv("password")
+    HOST = os.getenv("host")
+    PORT = os.getenv("port")
+    DBNAME = os.getenv("dbname")
+    
+    # Connect to the database
+    try:
+        connection = psycopg2.connect(
+            user=USER,
+            password=PASSWORD,
+            host=HOST,
+            port=PORT,
+            dbname=DBNAME
+        )
+        print("PostgreSQL Connection successful!")
+        
+        # Create a cursor to execute SQL queries
+        cursor = connection.cursor()
+        
+        # Example query
+        cursor.execute("SELECT NOW();")
+        result = cursor.fetchone()
+        print("PostgreSQL Current Time:", result)
+
+        # Close the cursor and connection
+        cursor.close()
+        connection.close()
+        print("PostgreSQL Connection closed.")
+
+    except Exception as e:
+        print(f"Failed to connect to PostgreSQL: {e}")
+
+except ImportError:
+    print("psycopg2 not available, PostgreSQL integration disabled")
+except Exception as e:
+    print(f"Error in PostgreSQL setup: {e}")
+
+# -------------------------
 # Helper: rerun seguro (fallbacks)
 # -------------------------
 def safe_rerun():
@@ -587,6 +636,11 @@ if not st.session_state.authenticated:
                 st.info("Anote a senha e troque-a depois.")
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
+
+# -------------------------
+# Título CONSUMIDIA
+# -------------------------
+st.markdown("<h1 class='consumidia-title' style='text-align: center; margin-bottom: 20px;'>CONSUMIDIA</h1>", unsafe_allow_html=True)
 
 # -------------------------
 # Post-auth setup and UI
