@@ -1,3 +1,11 @@
+# dashboard_consumidia_updated.py
+# CONSUMIDIA — Dashboard completo (versão atualizada)
+# - MELHORIA DE BUSCA: A busca agora ignora acentos e a coluna 'Ano' foi removida dos filtros.
+# - MELHORIA DE MENSAGENS: A função "Responder" agora cita a mensagem original automaticamente.
+# - NOVO: Troca de arquivos (dropbox) integrada ao sistema de mensagens.
+# - CORREÇÃO: Corrigido o erro 'StreamlitAPIException' ao limpar o anexo após o envio da mensagem.
+# - MELHORIA VISUAL: Efeito Liquid-glass aprimorado, ícones integrados aos botões de navegação.
+# - MELHORIA FUNCIONAL: Nome do usuário de origem agora é salvo e exibido nos Favoritos.
 
 import streamlit as st
 import pandas as pd
