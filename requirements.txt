@@ -23,9 +23,9 @@ openpyxl>=3.0.0
 
 # PDF
 fpdf>=1.7.2
-# opcional: fpdf2 (alternativa moderna). Remova o comentário se quiser instalar também:
+# opcional: fpdf2 
 # fpdf2
 
 # integração externa
-supabase
+supabase-py>=2.0.0
 
