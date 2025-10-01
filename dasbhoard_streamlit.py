@@ -249,7 +249,7 @@ def add_to_favorites(result_data):
     return False
 
 def remove_from_favorites(favorite_id):
-    """Remove um favorito da lista na sessão."""
+    """Remove um favorito da lista na sessão.""" 
     favorites = get_session_favorites()
     new_favorites = [fav for fav in favorites if fav["id"] != favorite_id]
     st.session_state.favorites = new_favorites
@@ -727,7 +727,7 @@ except Exception:
 
 # Configuração direta do Supabase - CREDENCIAIS COMPLETAS
 SUPABASE_URL = "https://jagzzokffoqqunjvkdyk.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImphZ3p6b2tmZm9xcXVuanZrZHlrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTE2NjY4NywiZXhwIjoyMDc0NzQyNjg3fQ.Iu0ski4A0-g4I9rBJkPGjGgE5jPEhFbuUvT8j0T3MzM"
+SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzYSIsInJlZiI6ImphZ3p6b2tmZm9xcXVuanZrZHlrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTE2NjY4NywiZXhwIjoyMDc0NzQyNjg3fQ.Iu0ski4A0-g4I9rBJkPGjGgE5jPEhFbuUvT8j0T3MzM"
 
 _supabase = None
 if create_client and SUPABASE_URL and SUPABASE_KEY:
@@ -1222,9 +1222,12 @@ elif st.session_state.page == "mensagens":
                     st.markdown(f"**Recebido em:** `{m.get('ts')}`")
                     st.markdown("---")
                     st.markdown(m.get("body"))
+
+                    # MARCAR COMO LIDA (sem forçar rerun imediato)
                     if not is_read:
                         mark_message_read(m_id, USERNAME)
-                        safe_rerun()
+                        # não chamar safe_rerun() aqui — evita perder o estado do expander/formulário
+
                     if m.get("attachment"):
                         att = m["attachment"]
                         st.markdown("---")
@@ -1241,6 +1244,8 @@ elif st.session_state.page == "mensagens":
                             except Exception:
                                 st.warning("Erro ao disponibilizar o anexo.")
                     st.markdown("<br>", unsafe_allow_html=True)
+
+                    # Responder (mantendo a UX estável)
                     if reply_message_id == m_id:
                         st.markdown("---")
                         st.subheader("Responder")
@@ -1255,6 +1260,7 @@ elif st.session_state.page == "mensagens":
                                     send_message(sender=USERNAME, recipient=m.get('from'), subject=f"Re: {m.get('subject')}", body=reply_body, attachment_file=reply_attachment)
                                     st.session_state.reply_message_id = None
                                     st.toast("Resposta enviada!")
+                                    # atualizar para refletir a nova mensagem nas Enviadas
                                     safe_rerun()
                             with c2_form:
                                 if st.form_submit_button("Cancelar", use_container_width=True):
@@ -1276,23 +1282,41 @@ elif st.session_state.page == "mensagens":
 
     with tab_compose:
         with st.form(key="compose_form", clear_on_submit=True):
-            all_usernames = list(load_users().keys())
-            if USERNAME in all_usernames:
-                all_usernames.remove(USERNAME)
-            to_user = st.selectbox("Para:", options=all_usernames)
+            users_dict = load_users() or {}
+            all_usernames = [u for u in users_dict.keys() if u != USERNAME]
+
+            # Se não houver outros usuários, permita entrada manual do destinatário
+            if not all_usernames:
+                st.info("Nenhum outro usuário cadastrado — digite o username do destinatário manualmente.")
+                to_user = st.text_input("Para (username):", key="compose_manual_to")
+            else:
+                to_user = st.selectbox("Para:", options=["(escolha)"] + all_usernames, index=0, key="compose_select_to")
+                if to_user == "(escolha)":
+                    to_user = None
+                # opção para override manual caso queira enviar para username externo
+                if st.checkbox("Enviar para username específico (digitar manualmente)", key="compose_manual_toggle"):
+                    manu = st.text_input("Username (manual):", key="compose_manual_to2")
+                    if manu:
+                        to_user = manu.strip()
+
             subj = st.text_input("Assunto:")
             body = st.text_area("Mensagem:", height=200)
             attachment = st.file_uploader("Anexar arquivo:", key="compose_attachment")
             submitted = st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True)
             if submitted:
                 if not to_user:
-                    st.error("Destinatário inválido.")
+                    st.error("Destinatário inválido. Informe um username existente ou digite manualmente.")
                 else:
-                    send_message(USERNAME, to_user, subj, body, attachment_file=attachment)
-                    st.success(f"Mensagem enviada para {to_user}.")
-                    if st.session_state.autosave:
-                        save_state_for_user(USERNAME)
-                    safe_rerun()
+                    # checar se destino existe (evita mensagens perdidas)
+                    if to_user not in users_dict:
+                        st.warning(f"Usuário '{to_user}' não encontrado. Verifique o username.")
+                    else:
+                        send_message(USERNAME, to_user, subj, body, attachment_file=attachment)
+                        st.success(f"Mensagem enviada para {to_user}.")
+                        if st.session_state.autosave:
+                            save_state_for_user(USERNAME)
+                        # forçar atualização para que "Enviadas" apareça imediatamente
+                        safe_rerun()
 
     with tab_sent:
         if not outbox:
