@@ -1,6 +1,3 @@
-# dashboard_consumidia_updated.py
-# CONSUMIDIA — Dashboard completo (versão corrigida)
-# Versão com PostgreSQL e Supabase integrados - PROBLEMAS DE LOGIN E PERFORMANCE SOLUCIONADOS
 
 import streamlit as st
 import pandas as pd
@@ -20,15 +17,6 @@ import joblib
 import numpy as np
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-
-# -------------------------
-# Configuração inicial e debug
-# -------------------------
-DEBUG_MODE = False  # Altere para True se precisar debuggar
-
-def debug_log(message):
-    if DEBUG_MODE:
-        print(f"DEBUG: {message}")
 
 # -------------------------
 # PostgreSQL Integration
@@ -193,13 +181,9 @@ st.markdown(
 # -------------------------
 
 # -------------------------
-# Helpers: users + auth (CORRIGIDO)
+# Helpers: users + auth
 # -------------------------
 USERS_FILE = "users.json"
-
-@st.cache_data(ttl=3600)  # Cache de 1 hora
-def load_users_cached():
-    return load_users()
 
 def load_users():
     if os.path.exists(USERS_FILE):
@@ -207,56 +191,17 @@ def load_users():
             with open(USERS_FILE, "r", encoding="utf-8") as f:
                 obj = json.load(f)
                 return obj if isinstance(obj, dict) else {}
-        except Exception as e:
-            debug_log(f"Erro ao carregar usuários: {e}")
+        except Exception:
             return {}
     return {}
 
 def save_users(users):
-    try:
-        # Garante que o arquivo seja salvo corretamente
-        with open(USERS_FILE, "w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
-        # Força a escrita imediata
-        f.flush()
-        os.fsync(f.fileno())
-        debug_log(f"Usuários salvos com sucesso. Total: {len(users)}")
-        return True
-    except Exception as e:
-        debug_log(f"Erro ao salvar usuários: {e}")
-        return False
+    with open(USERS_FILE, "w", encoding="utf-8") as f:
+        json.dump(users, f, ensure_ascii=False, indent=2)
 
 def gen_password(length=8):
     choices = string.ascii_letters + string.digits
     return ''.join(random.choice(choices) for _ in range(length))
-
-def clear_auth_session():
-    """Limpa completamente a sessão de autenticação"""
-    keys_to_clear = [
-        "ui_login_user", "ui_login_pass", "ui_reg_user", "ui_reg_name",
-        "ui_reg_bolsa", "authenticated", "username", "user_obj"
-    ]
-    
-    for key in keys_to_clear:
-        if key in st.session_state:
-            try:
-                del st.session_state[key]
-            except Exception:
-                st.session_state[key] = ""
-
-def check_users_file():
-    """Verifica e corrige permissões do arquivo de usuários"""
-    users_file = Path(USERS_FILE)
-    if users_file.exists():
-        try:
-            users_file.chmod(0o666)  # Permissões de leitura/escrita
-            return True
-        except Exception:
-            pass
-    return True
-
-# Verificação inicial do arquivo
-check_users_file()
 
 # -------------------------
 # Helpers: General purpose
@@ -337,8 +282,7 @@ def normalize_color(name_or_hex: str):
 for k, v in {
     "authenticated": False, "username": None, "user_obj": None, "df": None,
     "G": nx.Graph(), "notes": "", "autosave": False, "page": "planilha",
-    "restored_from_saved": False, "favorites": [], "reply_message_id": None,
-    "debug_auth": False
+    "restored_from_saved": False, "favorites": [], "reply_message_id": None
 }.items():
     if k not in st.session_state:
         st.session_state[k] = v
@@ -496,7 +440,7 @@ def graph_to_plotly_3d(G, show_labels=False, height=600):
     legend_items = []
     for label, cor in [("Autor", PALETA["verde"]), ("Título", PALETA["roxo"]), ("Ano", PALETA["azul"]), ("Tema", PALETA["laranja"])]:
         legend_items.append(go.Scatter3d(x=[None], y=[None], z=[None], mode="markers",
-                                         marker=dict(size=8, color=cor), name=label)
+                                         marker=dict(size=8, color=cor), name=label))
     fig = go.Figure(data=[edge_trace, node_trace] + legend_items)
     fig.update_layout(
         scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), bgcolor="rgba(0,0,0,0)"),
@@ -621,8 +565,12 @@ def action_button(label, icon_key, st_key, expanded_label=None, wide=False):
     return clicked
 
 # -------------------------
-# Authentication block (CORRIGIDO)
+# Authentication block (robust)
 # -------------------------
+# debug flag (desativar em produção)
+if "debug_auth" not in st.session_state:
+    st.session_state.debug_auth = False
+
 def ensure_users_file():
     users = load_users()
     if not users:
@@ -633,60 +581,48 @@ def ensure_users_file():
 # Show login/register card
 if not st.session_state.authenticated:
     st.markdown("<div class='glass-box auth' style='max-width:1100px;margin:0 auto; position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    
+    # note: title already shown above (outside box) to ensure visibility
     st.subheader("Acesso — Faça login ou cadastre-se")
     tabs = st.tabs(["Entrar", "Cadastrar"])
-    
     with tabs[0]:
         login_user = st.text_input("Usuário", key="ui_login_user")
         login_pass = st.text_input("Senha", type="password", key="ui_login_pass")
-        
-        if st.button("Entrar", key="btn_login_main"):
-            users = load_users_cached()
-            
-            # Se não há usuários, cria o admin padrão
+        if st.button("Entrar", "btn_login_main"):
+            users = load_users()
             if not users:
                 users = ensure_users_file()
                 st.warning("Nenhum usuário encontrado. Usuário de emergência criado: 'admin' / 'admin123' (troque a senha).")
-            
             lu = (login_user or "").strip()
             lp = (login_pass or "").strip()
-            
-            if DEBUG_MODE:
+            if st.session_state.debug_auth:
                 st.write("DEBUG: users keys:", list(users.keys()))
                 st.write("DEBUG: attempting login for:", repr(lu))
-            
             if not lu or not lp:
                 st.warning("Preencha usuário e senha.")
-            elif lu in users:
-                stored_password = users[lu].get("password", "")
-                if stored_password == lp:
-                    st.session_state.authenticated = True
-                    st.session_state.username = lu
-                    st.session_state.user_obj = users[lu]
-                    
-                    # Limpa campos sensíveis
-                    if "ui_login_pass" in st.session_state:
+            elif lu in users and users[lu].get("password", "") == lp:
+                st.session_state.authenticated = True
+                st.session_state.username = lu
+                st.session_state.user_obj = users[lu]
+                if "ui_login_pass" in st.session_state:
+                    try:
+                        del st.session_state["ui_login_pass"]
+                    except Exception:
                         st.session_state["ui_login_pass"] = ""
-                    
-                    st.success("Login efetuado com sucesso!")
-                    time.sleep(0.5)  # Pequeno delay para visualizar a mensagem
-                    safe_rerun()
+                st.success("Login efetuado.")
+                safe_rerun()
+            else:
+                if lu not in users:
+                    st.warning("Usuário não encontrado.")
                 else:
                     st.warning("Senha incorreta.")
-            else:
-                st.warning("Usuário não encontrado.")
-    
     with tabs[1]:
         reg_name = st.text_input("Nome completo", key="ui_reg_name")
         reg_bolsa = st.selectbox("Tipo de bolsa", ["IC - Iniciação Científica", "BIA - Bolsa de Incentivo Acadêmico", "Extensão", "Doutorado"], key="ui_reg_bolsa")
         reg_user = st.text_input("Escolha um username", key="ui_reg_user")
-        
-        if st.button("Cadastrar", key="btn_register_main"):
-            users = load_users_cached()
+        if st.button("Cadastrar", "btn_register_main"):
+            users = load_users()
             if users is None:
                 users = {}
-            
             new_user = (reg_user or "").strip()
             if not new_user:
                 st.warning("Escolha um username válido.")
@@ -694,42 +630,27 @@ if not st.session_state.authenticated:
                 st.warning("Username já existe.")
             else:
                 pwd = gen_password(8)
-                users[new_user] = {
-                    "name": reg_name or new_user, 
-                    "scholarship": reg_bolsa, 
-                    "password": pwd, 
-                    "created_at": datetime.utcnow().isoformat()
-                }
-                
-                if save_users(users):
-                    st.success(f"✅ Usuário criado com sucesso! Username: **{new_user}** — Senha gerada: **{pwd}**")
-                    st.info("💡 Anote a senha e troque-a depois se desejar.")
-                    
-                    # Limpa os campos após cadastro bem-sucedido
-                    st.session_state["ui_reg_name"] = ""
-                    st.session_state["ui_reg_user"] = ""
-                    st.session_state["ui_reg_bolsa"] = "IC - Iniciação Científica"
-                else:
-                    st.error("❌ Erro ao salvar usuário. Tente novamente.")
-    
+                users[new_user] = {"name": reg_name or new_user, "scholarship": reg_bolsa, "password": pwd, "created_at": datetime.utcnow().isoformat()}
+                save_users(users)
+                st.success(f"Usuário criado. Username: **{new_user}** — Senha gerada: **{pwd}**")
+                st.info("Anote a senha e troque-a depois.")
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
 # -------------------------
-# Post-auth setup and UI (CORRIGIDO)
+# Post-auth setup and UI
 # -------------------------
 USERNAME = st.session_state.username
-users = load_users_cached()
+users = load_users()
 USER_OBJ = st.session_state.user_obj or users.get(USERNAME, {})
 USER_STATE = user_state_file(USERNAME)
 
-# Restaura estado salvo se existir
 if not st.session_state.restored_from_saved and os.path.exists(USER_STATE):
     try:
-        if load_state_for_user(USERNAME):
-            st.success("Estado salvo do usuário restaurado automaticamente.")
-    except Exception as e:
-        debug_log(f"Erro ao restaurar estado: {e}")
+        load_state_for_user(USERNAME)
+        st.success("Estado salvo do usuário restaurado automaticamente.")
+    except Exception:
+        pass
 
 # Unread messages
 MESSAGES_PATH = Path("messages.json")
@@ -767,9 +688,16 @@ with top2:
             st.success("Progresso salvo.")
     with nav_right3:
         if st.button("🚪 Sair", key="btn_logout", use_container_width=True):
-            clear_auth_session()
-            st.success("Logout realizado.")
-            time.sleep(0.5)
+            st.session_state.authenticated = False
+            st.session_state.username = None
+            st.session_state.user_obj = None
+            st.session_state.reply_message_id = None
+            for k in ("ui_login_user", "ui_login_pass", "ui_reg_user", "ui_reg_name"):
+                if k in st.session_state:
+                    try:
+                        del st.session_state[k]
+                    except Exception:
+                        st.session_state[k] = ""
             safe_rerun()
 
 st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
@@ -921,8 +849,8 @@ elif st.session_state.page == "busca":
     with tab_busca:
         st.header("Busca Inteligente")
 
-        @st.cache_data(ttl=300)  # Cache de 5 minutos
-        def collect_latest_backups_cached():
+        @st.cache_data(ttl=300)
+        def collect_latest_backups():
             base = Path("backups")
             if not base.exists(): return None
             dfs = []
@@ -938,7 +866,7 @@ elif st.session_state.page == "busca":
                     continue
             return pd.concat(dfs, ignore_index=True) if dfs else None
 
-        backups_df = collect_latest_backups_cached()
+        backups_df = collect_latest_backups()
 
         if backups_df is None:
             st.warning("Nenhum backup de usuário encontrado para a busca. Salve seu progresso para criar um.")
@@ -1343,7 +1271,7 @@ with tab_inbox:
 
 with tab_compose:
     with st.form(key="compose_form", clear_on_submit=True):
-        all_usernames = list(load_users_cached().keys())
+        all_usernames = list(load_users().keys())
         if USERNAME in all_usernames:
             all_usernames.remove(USERNAME)
         to_user = st.selectbox("Para:", options=all_usernames)
