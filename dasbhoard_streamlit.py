@@ -33,26 +33,23 @@ try:
     load_dotenv()
 
     # String de conexão direta do Supabase - SUBSTITUA [YOUR-PASSWORD] pela sua senha real
-    DATABASE_URL = "postgresql://postgres.jagzzokffoqqunjvkdyk:[YOUR-PASSWORD]@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
+    DATABASE_URL = os.environ.get("DATABASE_URL") or "postgresql://postgres.jagzzokffoqqunjvkdyk:[YOUR-PASSWORD]@aws-1-us-east-1.pooler.supabase.com:6543/postgres"
     
-    # Connect to the database usando string de conexão
+    # Connect to the database usando string de conexão (checagem opcional)
     try:
-        connection = psycopg2.connect(DATABASE_URL)
-        print("PostgreSQL Connection successful!")
-        
-        # Create a cursor to execute SQL queries
-        cursor = connection.cursor()
-        
-        # Example query
-        cursor.execute("SELECT NOW();")
-        result = cursor.fetchone()
-        print("PostgreSQL Current Time:", result)
-
-        # Close the cursor and connection
-        cursor.close()
-        connection.close()
-        print("PostgreSQL Connection closed.")
-
+        connection = None
+        if DATABASE_URL and "[YOUR-PASSWORD]" not in DATABASE_URL:
+            connection = psycopg2.connect(DATABASE_URL)
+            print("PostgreSQL Connection successful!")
+            cursor = connection.cursor()
+            cursor.execute("SELECT NOW();")
+            result = cursor.fetchone()
+            print("PostgreSQL Current Time:", result)
+            cursor.close()
+            connection.close()
+            print("PostgreSQL Connection closed.")
+        else:
+            print("DATABASE_URL não configurado corretamente ou contém placeholder — pulando checagem de conexão.")
     except Exception as e:
         print(f"Failed to connect to PostgreSQL: {e}")
 
@@ -173,6 +170,108 @@ else:
     st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
 
 # -------------------------
+# Acessibilidade: fonte, tema (escuro/claro) e alto-contraste
+# Inserir ESTE BLOCO logo após carregar o CSS e ANTES do título/login
+# -------------------------
+# valores padrão persistidos na sessão
+if "acc_font_size" not in st.session_state:
+    st.session_state.acc_font_size = 16  # px
+if "acc_theme" not in st.session_state:
+    st.session_state.acc_theme = "dark"  # "dark" ou "light"
+if "acc_high_contrast" not in st.session_state:
+    st.session_state.acc_high_contrast = False
+
+def apply_accessibility_css():
+    """
+    Injeta CSS que sobrescreve variáveis principais: tamanho de fonte,
+    cores de fundo/texto e aparência das 'glass-box'. Chame sempre que
+    alterar os controles de acessibilidade.
+    """
+    size = int(st.session_state.get("acc_font_size", 16))
+    theme = st.session_state.get("acc_theme", "dark")
+    hc = bool(st.session_state.get("acc_high_contrast", False))
+
+    # cores base por tema
+    if theme == "dark":
+        page_bg = "#071428"
+        page_text = "#d6d9dc"
+        glass_bg = "rgba(255,255,255,0.05)"
+        glass_border = "rgba(255,255,255,0.10)"
+    else:
+        page_bg = "#ffffff"
+        page_text = "#111111"
+        glass_bg = "rgba(0,0,0,0.04)"
+        glass_border = "rgba(0,0,0,0.08)"
+
+    # alto contraste ajusta para contraste máximo
+    if hc:
+        page_bg = "#000000"
+        page_text = "#ffffff"
+        glass_bg = "rgba(255,255,255,0.06)"
+        glass_border = "rgba(255,255,255,0.18)"
+
+    # CSS dinâmico que sobrescreve regras (usa variáveis para facilitar)
+    css = f"""
+    :root {{
+        --base-font-size: {size}px;
+        --page-bg-color: {page_bg};
+        --page-text-color: {page_text};
+        --glass-bg: {glass_bg};
+        --glass-border: {glass_border};
+    }}
+
+    /* Aplica o tamanho base e cores principais */
+    body, .css-1d391kg, .stApp > div {{
+        font-size: var(--base-font-size) !important;
+        color: var(--page-text-color) !important;
+        background: linear-gradient(180deg, var(--page-bg-color) 0%, var(--page-bg-color) 100%) !important;
+    }}
+
+    /* Sobrescreve glass-box para manter contraste apropriado */
+    .glass-box {{
+        background: var(--glass-bg) !important;
+        border-color: var(--glass-border) !important;
+    }}
+
+    /* Ajustes menores para legibilidade */
+    .stTextInput>div>input, .stTextArea>div>textarea, .stSelectbox>div>div, .stSlider>div {{
+        font-size: calc(var(--base-font-size) - 1px) !important;
+    }}
+
+    /* Aumenta clique/áreas touch para acessibilidade */
+    .stButton>button, .stDownloadButton>button {{
+        padding: 10px 16px !important;
+        font-size: calc(var(--base-font-size) - 1px) !important;
+    }}
+
+    /* Torna dataframes mais legíveis com maior espaçamento */
+    [data-testid='stDataFrameContainer'] table td, [data-testid='stDataFrameContainer'] table th {{
+        padding: 8px 10px !important;
+    }}
+    """
+
+    # injetar
+    try:
+        st.markdown(f"<style>{css}</style>", unsafe_allow_html=True)
+    except Exception:
+        pass
+
+# Cria um painel de controle simples na sidebar para ajustar preferências
+with st.sidebar.expander("Acessibilidade", expanded=False):
+    fs = st.slider("Tamanho da fonte (px)", min_value=12, max_value=28, value=st.session_state.acc_font_size, key="ui_acc_font_size")
+    theme_choice = st.radio("Tema", options=["dark", "light"], index=0 if st.session_state.acc_theme == "dark" else 1, key="ui_acc_theme")
+    hc_flag = st.checkbox("Alto contraste", value=st.session_state.acc_high_contrast, key="ui_acc_hc")
+
+    # Atualiza sessão e reaplica CSS imediatamente
+    st.session_state.acc_font_size = fs
+    st.session_state.acc_theme = theme_choice
+    st.session_state.acc_high_contrast = hc_flag
+    apply_accessibility_css()
+
+# também aplica na primeira carga (garante que login recebe os ajustes)
+apply_accessibility_css()
+
+# -------------------------
 # Título visível na tela de login (fora do glass-box)
 # -------------------------
 st.markdown(
@@ -199,8 +298,12 @@ def load_users():
     return {}
 
 def save_users(users):
-    with open(USERS_FILE, "w", encoding="utf-8") as f:
-        json.dump(users, f, ensure_ascii=False, indent=2)
+    try:
+        with open(USERS_FILE, "w", encoding="utf-8") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
 
 def gen_password(length=8):
     choices = string.ascii_letters + string.digits
@@ -319,10 +422,18 @@ def save_state_for_user(username):
         "uploaded_name": st.session_state.get("uploaded_name", None),
         "backup_csv": backup_path,
         "saved_at": datetime.utcnow().isoformat(),
-        "favorites": st.session_state.get("favorites", [])
+        "favorites": st.session_state.get("favorites", []),
+        "accessibility": {
+            "font_size": st.session_state.get("acc_font_size"),
+            "theme": st.session_state.get("acc_theme"),
+            "high_contrast": st.session_state.get("acc_high_contrast")
+        }
     }
-    with open(path, "w", encoding="utf-8") as f:
-        json.dump(data, f, indent=2, ensure_ascii=False)
+    try:
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(data, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
     return path
 
 def load_state_for_user(username, load_backup_csv=True):
@@ -341,6 +452,17 @@ def load_state_for_user(username, load_backup_csv=True):
     st.session_state.notes = meta.get("notes", "")
     st.session_state.uploaded_name = meta.get("uploaded_name", None)
     st.session_state.favorites = meta.get("favorites", [])
+
+    # restaurar acessibilidade se presente
+    acc = meta.get("accessibility", {})
+    st.session_state.acc_font_size = acc.get("font_size", st.session_state.get("acc_font_size", 16))
+    st.session_state.acc_theme = acc.get("theme", st.session_state.get("acc_theme", "dark"))
+    st.session_state.acc_high_contrast = acc.get("high_contrast", st.session_state.get("acc_high_contrast", False))
+    try:
+        apply_accessibility_css()
+    except Exception:
+        pass
+
     backup_csv = meta.get("backup_csv")
     if load_backup_csv and backup_csv and os.path.exists(backup_csv):
         try:
@@ -349,7 +471,10 @@ def load_state_for_user(username, load_backup_csv=True):
             try:
                 st.session_state.df = pd.read_csv(backup_csv, encoding="latin1")
             except Exception:
-                st.session_state.df = None
+                try:
+                    st.session_state.df = pd.read_csv(backup_csv, engine="python", on_bad_lines="skip")
+                except Exception:
+                    st.session_state.df = None
     st.session_state.restored_from_saved = True
     return True
 
@@ -371,7 +496,14 @@ def read_spreadsheet(uploaded_file):
         return pd.read_csv(buf, engine="python", on_bad_lines="skip")
     else:
         buf.seek(0)
-        return pd.read_excel(buf)
+        try:
+            # prefer openpyxl when disponível
+            return pd.read_excel(buf, engine="openpyxl")
+        except Exception:
+            try:
+                return pd.read_excel(buf)
+            except Exception as e:
+                raise e
 
 # -------------------------
 # Graph creation + plotly 3D
@@ -422,9 +554,12 @@ def graph_to_plotly_3d(G, show_labels=False, height=600):
     z_nodes = [pos[n][2] for n in G.nodes()]
     x_edges, y_edges, z_edges = [], [], []
     for e in G.edges():
-        x_edges += [pos[e[0]][0], pos[e[1]][0], None]
-        y_edges += [pos[e[0]][1], pos[e[1]][1], None]
-        z_edges += [pos[e[0]][2], pos[e[1]][2], None]
+        try:
+            x_edges += [pos[e[0]][0], pos[e[1]][0], None]
+            y_edges += [pos[e[0]][1], pos[e[1]][1], None]
+            z_edges += [pos[e[0]][2], pos[e[1]][2], None]
+        except Exception:
+            continue
     color_map = {"Autor": PALETA["verde"], "Título": PALETA["roxo"], "Ano": PALETA["azul"], "Tema": PALETA["laranja"]}
     node_colors = [color_map.get(G.nodes[n].get("tipo", ""), PALETA["vermelho"]) for n in G.nodes()]
     labels = [G.nodes[n].get("label", str(n)) for n in G.nodes()]
@@ -725,9 +860,9 @@ try:
 except Exception:
     create_client = None
 
-# Configuração direta do Supabase - CREDENCIAIS COMPLETAS
-SUPABASE_URL = "https://jagzzokffoqqunjvkdyk.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzYSIsInJlZiI6ImphZ3p6b2tmZm9xcXVuanZrZHlrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTE2NjY4NywiZXhwIjoyMDc0NzQyNjg3fQ.Iu0ski4A0-g4I9rBJkPGjGgE5jPEhFbuUvT8j0T3MzM"
+# Configuração direta do Supabase - CREDENCIAIS COMPLETAS (pode também usar env vars)
+SUPABASE_URL = os.environ.get("SUPABASE_URL") or "https://jagzzokffoqqunjvkdyk.supabase.co"
+SUPABASE_KEY = os.environ.get("SUPABASE_KEY") or "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzYSIsInJlZiI6ImphZ3p6b2tmZm9xcXVuanZrZHlrIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc1OTE2NjY4NywiZXhwIjoyMDc0NzQyNjg3fQ.Iu0ski4A0-g4I9rBJkPGjGgE5jPEhFbuUvT8j0T3MzM"
 
 _supabase = None
 if create_client and SUPABASE_URL and SUPABASE_KEY:
@@ -810,16 +945,23 @@ def _local_load_all_messages():
     return []
 
 def _local_save_all_messages(msgs):
-    with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
-        json.dump(msgs, f, ensure_ascii=False, indent=2)
+    try:
+        with open(MESSAGES_FILE, "w", encoding="utf-8") as f:
+            json.dump(msgs, f, ensure_ascii=False, indent=2)
+        return True
+    except Exception:
+        return False
 
 def _local_upload_attachment(sender, attachment_file):
     safe_filename = re.sub(r'[^\w\.\-]', '_', attachment_file.name)
     unique_filename = f"{int(time.time())}_{sender}_{safe_filename}"
     save_path = ATTACHMENTS_DIR / unique_filename
-    with open(save_path, "wb") as f:
-        f.write(attachment_file.getbuffer())
-    return {"name": attachment_file.name, "path": str(save_path)}
+    try:
+        with open(save_path, "wb") as f:
+            f.write(attachment_file.getbuffer())
+        return {"name": attachment_file.name, "path": str(save_path)}
+    except Exception:
+        return None
 
 def _local_remove_attachment(path):
     try:
@@ -942,7 +1084,7 @@ def delete_message(message_id, username):
         if msg_to_delete.get("attachment"):
             try:
                 apath = msg_to_delete["attachment"].get("path")
-                if apath and apath.startswith(str(ATTACHMENTS_DIR)):
+                if apath and os.path.exists(apath):
                     _local_remove_attachment(apath)
             except Exception:
                 pass
@@ -973,8 +1115,11 @@ if st.session_state.page == "planilha":
         if meta and meta.get("backup_csv") and os.path.exists(meta.get("backup_csv")):
             st.write("Backup CSV encontrado:")
             st.text(meta.get("backup_csv"))
-            with open(meta.get("backup_csv"), "rb") as fp:
-                st.download_button("⬇ Baixar backup CSV", data=fp, file_name=os.path.basename(meta.get("backup_csv")), mime="text/csv")
+            try:
+                with open(meta.get("backup_csv"), "rb") as fp:
+                    st.download_button("⬇ Baixar backup CSV", data=fp, file_name=os.path.basename(meta.get("backup_csv")), mime="text/csv")
+            except Exception:
+                st.warning("Falha ao preparar o download do backup.")
         else:
             st.write("Nenhum backup CSV automático encontrado ainda.")
 
@@ -993,7 +1138,10 @@ if st.session_state.page == "planilha":
 
     if st.session_state.df is not None:
         st.write("Visualização da planilha:")
-        st.dataframe(st.session_state.df, use_container_width=True)
+        try:
+            st.dataframe(st.session_state.df, use_container_width=True)
+        except Exception:
+            st.write(st.session_state.df.head())
     st.markdown("</div>", unsafe_allow_html=True)
 
 elif st.session_state.page == "mapa":
