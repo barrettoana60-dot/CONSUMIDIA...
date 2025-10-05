@@ -1,5 +1,5 @@
-# dashboard_streamlit_fixed.py
-# CONSUMIDIA — Dashboard completo (versão corrigida: UnicodeEncodeError)
+# dashboard_streamlit_fixed_ui.py
+# CONSUMIDIA — Dashboard completo (corrigido: Unicode + UI melhorada nas seções Busca e Mensagens)
 import os
 import re
 import io
@@ -33,7 +33,6 @@ except Exception:
 # -------------------------
 st.set_page_config(page_title="CONSUMIDIA", layout="wide", initial_sidebar_state="expanded")
 
-# safe rerun helper
 def safe_rerun():
     try:
         if hasattr(st, "rerun") and callable(getattr(st, "rerun")):
@@ -51,7 +50,7 @@ def safe_rerun():
         raise RuntimeError("safe_rerun falhou e não foi possível chamar st.stop()")
 
 # -------------------------
-# CSS (same as original, kept compact)
+# CSS (compact)
 # -------------------------
 DEFAULT_CSS = r"""
 :root{ --glass-bg: rgba(255,255,255,0.05); --glass-border: rgba(255,255,255,0.1); --glass-highlight: rgba(255,255,255,0.06); --accent: #8e44ad; --muted-text: #d6d9dc; --icon-color: #ffffff; }
@@ -72,7 +71,7 @@ except Exception:
 st.markdown("<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'><h1 class='consumidia-title' style='font-size:40px;margin:0;line-height:1;'>CONSUMIDIA</h1></div>", unsafe_allow_html=True)
 
 # -------------------------
-# Supabase client (use st.secrets or env vars; NUNCA hardcode service_role in frontend)
+# Supabase client (use st.secrets or env vars)
 # -------------------------
 try:
     from supabase import create_client
@@ -107,7 +106,6 @@ else:
 USERS_FILE = "users.json"
 
 def load_users():
-    # only used for local fallback; when supabase is present we rely on auth/profiles
     if _supabase:
         return None
     if os.path.exists(USERS_FILE):
@@ -196,7 +194,7 @@ _defaults = {
     "authenticated": False, "username": None, "user_obj": None, "df": None,
     "G": nx.Graph(), "notes": "", "autosave": False, "page": "planilha",
     "restored_from_saved": False, "favorites": [], "reply_message_id": None,
-    "anim_ts_login": 0.0
+    "anim_ts_login": 0.0, "search_page": 1, "compose_open": False
 }
 for k, v in _defaults.items():
     if k not in st.session_state:
@@ -318,7 +316,6 @@ def criar_grafo(df):
             G.add_edge(f"Título: {titulo}", f"Tema: {tema}")
     return G
 
-
 def graph_to_plotly_3d(G, show_labels=False, height=600):
     if len(G.nodes()) == 0:
         fig = go.Figure(); fig.update_layout(height=height, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)")
@@ -420,9 +417,6 @@ def icon_html_svg(key, size=28, color=None):
     style = f"color:{col}; width:{size}px; height:{size}px; display:inline-block; vertical-align:middle;"
     return f'<span style="{style}">{svg}</span>'
 
-# -------------------------
-# Unified action button helper
-# -------------------------
 def action_button(label, icon_key, st_key, expanded_label=None, wide=False):
     c_icon, c_btn = st.columns([0.12, 0.88])
     with c_icon:
@@ -456,13 +450,12 @@ if _supabase:
         except Exception as e:
             return {"error": str(e)}
 else:
-    # stubs to avoid NameError
     def supa_signup(*a, **k): return {"error":"supabase_not_configured"}
     def supa_signin(*a, **k): return {"error":"supabase_not_configured"}
     def supa_create_profile(*a, **k): return {"error":"supabase_not_configured"}
 
 # -------------------------
-# Messages & attachments (supabase storage) with local fallback
+# Messages & attachments (storage) with local fallback
 # -------------------------
 MESSAGES_FILE = "messages.json"
 ATTACHMENTS_BUCKET = "user_files"
@@ -523,7 +516,6 @@ def _supabase_remove_file(path):
     except Exception:
         return False
 
-# Local message helpers
 def _local_load_all_messages():
     if os.path.exists(MESSAGES_FILE):
         try:
@@ -671,7 +663,6 @@ def delete_message(message_id, username):
 if "debug_auth" not in st.session_state:
     st.session_state.debug_auth = False
 
-# Authentication flow
 if not st.session_state.authenticated:
     st.markdown("<div class='glass-box auth' style='max-width:1100px;margin:0 auto; position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Acesso — Faça login ou cadastre-se")
@@ -686,7 +677,6 @@ if not st.session_state.authenticated:
                 if isinstance(out, dict) and out.get("error"):
                     st.warning("Erro no login: " + out.get("error"))
                 else:
-                    # extrai user defensivamente
                     user = None
                     if isinstance(out, dict):
                         user = out.get("user") or (out.get("data") or {}).get("user")
@@ -705,7 +695,6 @@ if not st.session_state.authenticated:
                 lu = (login_user or "").strip(); lp = (login_pass or "").strip()
                 users = load_users() or {}
                 if not users:
-                    # create default admin for local fallback
                     users = {"admin": {"name": "Administrador", "scholarship": "Admin", "password": "admin123", "created_at": datetime.utcnow().isoformat()}}
                     save_users(users)
                     st.warning("Nenhum usuário local encontrado. Usuário de emergência criado: 'admin' / 'admin123' (troque a senha).")
@@ -724,7 +713,6 @@ if not st.session_state.authenticated:
         reg_user = st.text_input("Email (ou username para modo local)", key="ui_reg_user")
         if st.button("Cadastrar", "btn_register_main"):
             if _supabase:
-                # Use a generated password then inform user to reset or use email flow
                 pw = gen_password(12)
                 out = supa_signup(reg_user.strip(), pw)
                 if isinstance(out, dict) and out.get("error"):
@@ -757,7 +745,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # -------------------------
-# Post-auth setup: context & UI
+# Post-auth setup
 # -------------------------
 USERNAME = st.session_state.username
 users_local = load_users() or {}
@@ -831,6 +819,31 @@ for i, (page_key, page_label) in enumerate(nav_buttons.items()):
             st.session_state.reply_message_id = None
             safe_rerun()
 st.markdown("</div></div><hr>", unsafe_allow_html=True)
+
+# -------------------------
+# Helper cached function for backups (kept same)
+# -------------------------
+@st.cache_data(ttl=300)
+def collect_latest_backups():
+    base = Path("backups")
+    if not base.exists(): return None
+    dfs = []
+    for user_dir in sorted(base.iterdir()):
+        if not user_dir.is_dir(): continue
+        csvs = sorted(user_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
+        if not csvs: continue
+        try:
+            df = pd.read_csv(csvs[0], encoding="utf-8", on_bad_lines='skip')
+            df["_artemis_username"] = user_dir.name
+            dfs.append(df)
+        except Exception:
+            try:
+                df = pd.read_csv(csvs[0], encoding="latin1", on_bad_lines='skip')
+                df["_artemis_username"] = user_dir.name
+                dfs.append(df)
+            except Exception:
+                continue
+    return pd.concat(dfs, ignore_index=True) if dfs else None
 
 # -------------------------
 # Page dispatcher
@@ -961,247 +974,275 @@ elif st.session_state.page == "graficos":
                 st.error(f"Erro ao gerar gráficos: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
+# -------------------------
+# Melhorias na seção 'busca' (UI)
+# -------------------------
 elif st.session_state.page == "busca":
-    st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
-    # corrected: use literal emoji (UTF-8) instead of surrogate escape sequences
-    tab_busca, tab_favoritos = st.tabs(["🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"])
+    st.markdown("<div class='glass-box' style='position:relative; padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.markdown("<style>"
+                ".card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.015)); border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.03);}"
+                ".small-muted{font-size:12px;color:#bfc6cc;} .result-title{font-weight:700;margin-bottom:6px;} .avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#fff;background:#6c5ce7;margin-right:8px}"
+                ".actions-row>button{margin-right:6px}</style>", unsafe_allow_html=True)
 
-    with tab_busca:
-        st.header("Busca Inteligente")
+    st.markdown("### 🔍 Busca Inteligente")
+    col_q, col_meta, col_actions = st.columns([0.6, 0.25, 0.15])
+    with col_q:
+        query = st.text_input("Termo de busca", key="ui_query_search", placeholder="Digite palavras-chave — ex: autor, título, tema...")
+    with col_meta:
+        backups_df_tmp = None
+        try:
+            backups_df_tmp = collect_latest_backups()
+        except Exception:
+            backups_df_tmp = None
+        all_cols = []
+        if backups_df_tmp is not None:
+            all_cols = [c for c in backups_df_tmp.columns if c.lower() not in ['_artemis_username', 'ano']]
+        search_col = st.selectbox("Buscar em", options=all_cols or ["(nenhuma planilha encontrada)"])
+    with col_actions:
+        per_page = st.selectbox("Por página", options=[5, 8, 12, 20], index=1, key="ui_search_pp")
+        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+        search_clicked = st.button("🔎 Buscar", use_container_width=True)
 
-        @st.cache_data(ttl=300)
-        def collect_latest_backups():
-            base = Path("backups")
-            if not base.exists(): return None
-            dfs = []
-            for user_dir in sorted(base.iterdir()):
-                if not user_dir.is_dir(): continue
-                csvs = sorted(user_dir.glob("*.csv"), key=lambda p: p.stat().st_mtime, reverse=True)
-                if not csvs: continue
-                try:
-                    df = pd.read_csv(csvs[0], encoding="utf-8", on_bad_lines='skip')
-                    df["_artemis_username"] = user_dir.name
-                    dfs.append(df)
-                except Exception:
-                    try:
-                        df = pd.read_csv(csvs[0], encoding="latin1", on_bad_lines='skip')
-                        df["_artemis_username"] = user_dir.name
-                        dfs.append(df)
-                    except Exception:
-                        continue
-            return pd.concat(dfs, ignore_index=True) if dfs else None
+    if 'search_results' not in st.session_state:
+        st.session_state.search_results = pd.DataFrame()
+        st.session_state.search_query_meta = {"col": None, "query": ""}
 
-        backups_df = collect_latest_backups()
-
-        if backups_df is None:
-            st.warning("Nenhum backup de usuário encontrado para a busca. Salve seu progresso para criar um.")
+    if search_clicked:
+        if (not query) or (not all_cols):
+            st.info("Digite um termo e assegure que existam backups (salve progresso).")
+            st.session_state.search_results = pd.DataFrame()
         else:
-            all_cols = [c for c in backups_df.columns if c.lower() not in ['_artemis_username', 'ano']]
-            col1, col2, col3 = st.columns([0.6, 0.25, 0.15])
-            with col1:
-                query = st.text_input("Termo de busca", key="ui_query_search", placeholder="Digite palavras-chave...")
-            with col2:
-                search_col = st.selectbox("Buscar em", options=all_cols)
-            with col3:
-                st.markdown("<div style='height: 28px;'></div>", unsafe_allow_html=True)
-                search_clicked = st.button("Buscar", use_container_width=True)
+            norm_query = normalize_text(query)
+            ser = backups_df_tmp[search_col].astype(str).apply(normalize_text)
+            hits = backups_df_tmp[ser.str.contains(norm_query, na=False)]
+            st.session_state.search_results = hits.reset_index(drop=True)
+            st.session_state.search_query_meta = {"col": search_col, "query": query}
+            st.session_state.search_page = 1
 
-            if 'search_results' not in st.session_state:
-                st.session_state.search_results = pd.DataFrame()
-
-            if search_clicked:
-                if query and search_col:
-                    norm_query = normalize_text(query)
-                    search_series = backups_df[search_col].astype(str).apply(normalize_text)
-                    results = backups_df[search_series.str.contains(norm_query, na=False)]
-                    st.session_state.search_results = results
-                else:
-                    st.session_state.search_results = pd.DataFrame()
-
-            results_df = st.session_state.search_results
-            if not results_df.empty:
-                st.markdown(f"**{len(results_df)} resultado(s) encontrado(s).** Exibindo os 20 primeiros.")
-                st.markdown("---")
-                for idx, row in results_df.head(20).iterrows():
-                    with st.container():
-                        result_data = row.to_dict()
-                        username_src = result_data.get('_artemis_username', 'N/A')
-                        col_info, col_action = st.columns([0.8, 0.2])
-                        with col_info:
-                            user_icon_svg = icon_html_svg('register', size=18, color='var(--muted-text)')
-                            st.markdown(f"""
-                            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--muted-text);">
-                                {user_icon_svg}
-                                <span>Encontrado no trabalho de <strong style="color: #e1e3e6;">{username_src}</strong></span>
-                            </div>
-                            """, unsafe_allow_html=True)
-                            display_data = {k:v for k,v in result_data.items() if k != '_artemis_username'}
-                            for k, v in display_data.items():
-                                st.markdown(f"**{str(k).capitalize()}:** {v}")
-                        with col_action:
-                            if action_button("Favoritar", "favoritos", f"fav_{idx}"):
-                                if add_to_favorites(result_data):
-                                    st.toast("Adicionado!", icon="⭐")
-                                    save_state_for_user(USERNAME)
-                                else:
-                                    st.toast("Já está nos favoritos.")
-            elif search_clicked:
-                st.info("Nenhum resultado encontrado para a sua busca.")
-
-    with tab_favoritos:
-        st.header("Seus Resultados Salvos")
-        favorites = get_session_favorites()
-        if not favorites:
-            st.info("Você ainda não favoritou nenhum resultado.")
+    results_df = st.session_state.search_results
+    if results_df is None or results_df.empty:
+        if search_clicked:
+            st.info("Nenhum resultado encontrado.")
         else:
-            _, col_clear = st.columns([0.7, 0.3])
-            with col_clear:
-                if action_button("Limpar Todos", "trash", "clear_favs"):
-                    clear_all_favorites()
-                    save_state_for_user(USERNAME)
-                    safe_rerun()
-            st.markdown("---")
-            sorted_favorites = sorted(favorites, key=lambda x: x['added_at'], reverse=True)
-            for fav in sorted_favorites:
-                with st.container():
-                    col_info, col_action = st.columns([0.8, 0.2])
-                    with col_info:
-                        fav_data = fav['data'].copy()
-                        source_user = fav_data.pop('_artemis_username', 'N/A')
-                        user_icon_svg = icon_html_svg('register', size=18, color='var(--muted-text)')
-                        st.markdown(f"""
-                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--muted-text);">
-                            {user_icon_svg}
-                            <span>Proveniente do trabalho de <strong style="color: #e1e3e6;">{source_user}</strong></span>
-                        </div>
-                        """, unsafe_allow_html=True)
-                        for k, v in fav_data.items():
-                            st.markdown(f"**{k.capitalize()}:** {v}")
-                    with col_action:
-                        if action_button("Remover", "trash", f"del_fav_{fav['id']}"):
-                            remove_from_favorites(fav['id'])
-                            save_state_for_user(USERNAME)
-                            safe_rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
+            st.markdown("<div class='small-muted'>Resultados aparecerão aqui. Salve backups para ativar a busca.</div>", unsafe_allow_html=True)
+        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        total = len(results_df)
+        page = st.session_state.get("search_page", 1)
+        max_pages = max(1, (total + per_page - 1) // per_page)
+        if page < 1: page = 1
+        if page > max_pages: page = max_pages
+        st.session_state.search_page = page
 
+        start = (page - 1) * per_page
+        end = start + per_page
+        page_df = results_df.iloc[start:end]
+
+        st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {min(end, total)}. (Página {page}/{max_pages})")
+        st.markdown("---")
+        for idx, row in page_df.iterrows():
+            result_data = row.to_dict()
+            user_src = result_data.get("_artemis_username", "N/A")
+            initials = "".join([p[0].upper() for p in str(user_src).split()[:2]])[:2] or "U"
+            display_html = f"""
+            <div class="card">
+              <div style="display:flex; gap:12px; align-items:center;">
+                <div class="avatar">{initials}</div>
+                <div style="flex:1;">
+                  <div class="result-title">{str(result_data.get('título') or result_data.get('titulo') or result_data.get('titulo','(Sem título)'))}</div>
+                  <div class="small-muted">Proveniente de <strong>{user_src}</strong> • {str(result_data.get('autor') or result_data.get('autor',''))}</div>
+                </div>
+                <div style="text-align:right;">
+                  <div class="small-muted">{str(result_data.get('ano') or '')}</div>
+                </div>
+              </div>
+              <div style="margin-top:8px;">
+            """
+            keys_show = [k for k in result_data.keys() if k not in ("_artemis_username",)][:6]
+            for k in keys_show:
+                v = result_data.get(k)
+                display_html += f"<div style='font-size:13px; margin-top:2px;'><strong>{str(k).capitalize()}:</strong> {str(v)}</div>"
+            display_html += "</div></div>"
+            st.markdown(display_html, unsafe_allow_html=True)
+
+            a1, a2, a3 = st.columns([0.22, 0.22, 0.56])
+            with a1:
+                if st.button("⭐ Favoritar", key=f"fav_{idx}", use_container_width=True):
+                    if add_to_favorites(result_data):
+                        st.toast("Adicionado aos favoritos!", icon="⭐")
+                        save_state_for_user(USERNAME)
+                    else:
+                        st.toast("Já está nos favoritos.")
+            with a2:
+                if st.button("🔗 Copiar", key=f"copy_{idx}", use_container_width=True):
+                    st.write("Copiado para a área de transferência (copiar manualmente):")
+                    st.code(json.dumps({k: result_data[k] for k in keys_show if k in result_data}, ensure_ascii=False, indent=2))
+            with a3:
+                if st.button("🔎 Ver detalhes", key=f"view_{idx}", use_container_width=True):
+                    st.markdown("---")
+                    st.markdown(f"**Detalhes do registro (origem: {user_src})**")
+                    for k, v in result_data.items():
+                        if k == "_artemis_username": continue
+                        st.markdown(f"- **{k}:** {v}")
+                    st.markdown("---")
+        col_prev, col_page, col_next = st.columns([0.33,0.34,0.33])
+        with col_prev:
+            if st.button("◀ Anterior") and st.session_state.search_page > 1:
+                st.session_state.search_page -= 1
+                safe_rerun()
+        with col_page:
+            st.markdown(f"**Página {st.session_state.search_page} / {max_pages}**", unsafe_allow_html=True)
+        with col_next:
+            if st.button("Próxima ▶") and st.session_state.search_page < max_pages:
+                st.session_state.search_page += 1
+                safe_rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+# -------------------------
+# Melhorias na seção 'mensagens' (UI)
+# -------------------------
 elif st.session_state.page == "mensagens":
-    st.markdown("<div class='glass-box' style='position:relative; padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("Central de Mensagens")
+    st.markdown("<div class='glass-box' style='position:relative; padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.markdown("<style>.msg-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:10px;margin-bottom:8px;background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.02)} .msg-meta{color:#bfc6cc;font-size:12px}.msg-sub{font-weight:700}</style>", unsafe_allow_html=True)
+
+    st.subheader("✉️ Central de Mensagens")
 
     inbox = get_user_messages(USERNAME, 'inbox')
     outbox = get_user_messages(USERNAME, 'outbox')
-    # corrected: use literal emoji (UTF-8)
-    tab_inbox, tab_compose, tab_sent = st.tabs([
-        f"📥 Caixa de Entrada ({sum(1 for m in inbox if not m.get('read'))})",
-        "✍️ Escrever Nova",
-        f"📤 Enviadas ({len(outbox)})"
-    ])
 
-    with tab_inbox:
-        if not inbox:
-            st.info("Sua caixa de entrada está vazia.")
+    c1, c2, c3 = st.columns([0.5, 0.3, 0.2])
+    with c1:
+        filter_text = st.text_input("🔎 Filtrar mensagens (assunto / remetente)", key="ui_msg_filter")
+    with c2:
+        show_unread_only = st.checkbox("Apenas não lidas", value=False, key="ui_unread_only")
+    with c3:
+        if st.button("✉️ Nova Mensagem", key="btn_quick_compose"):
+            st.session_state.compose_open = True
+            st.session_state.compose_to = ""
+            st.session_state.compose_subject = ""
+            st.session_state.compose_prefill = ""
+            safe_rerun()
+
+    def filter_msgs(msgs):
+        if not msgs: return []
+        res = msgs
+        if filter_text:
+            q = normalize_text(filter_text)
+            res = [m for m in res if q in normalize_text(str(m.get("subject",""))) or q in normalize_text(str(m.get("from","")))]
+        if show_unread_only:
+            res = [m for m in res if not m.get("read", False)]
+        return res
+
+    inbox_filtered = filter_msgs(inbox)
+    outbox_filtered = filter_msgs(outbox)
+
+    left, right = st.columns([0.6, 0.4])
+    with left:
+        st.markdown("#### 📥 Caixa de Entrada")
+        if not inbox_filtered:
+            st.info("Nenhuma mensagem encontrada (faça uma busca ou aguarde mensagens).")
         else:
-            reply_message_id = st.session_state.get('reply_message_id')
-            for m in inbox:
-                m_id = m.get('id')
-                is_read = m.get("read", False)
-                expander_label = f"{'✅' if is_read else '🔵'} De: **{m.get('from')}** | Assunto: **{m.get('subject')}**"
-                with st.expander(expander_label, expanded=(reply_message_id == m_id)):
-                    st.markdown(f"**Recebido em:** `{m.get('ts')}`")
-                    st.markdown("---")
-                    st.markdown(m.get("body"))
+            for m in inbox_filtered:
+                mid = m.get("id")
+                read = m.get("read", False)
+                badge = "✅" if read else "🔵"
+                subj = m.get("subject") or "(sem assunto)"
+                fromu = m.get("from") or "anônimo"
+                ts = m.get("ts") or ""
+                row_html = f"""
+                <div class="msg-row" id="{mid}">
+                  <div style="display:flex; gap:10px; align-items:center;">
+                    <div style="width:44px;height:44px;border-radius:8px;background:#6c5ce7;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">{(fromu[:2]).upper()}</div>
+                    <div>
+                      <div class="msg-sub">{badge} {subj}</div>
+                      <div class="msg-meta">De: <strong>{fromu}</strong> • {ts}</div>
+                    </div>
+                  </div>
+                  <div style="display:flex; gap:6px;">
+                    <form action=""><button class="stButton" id="btn_view_{mid}">Abrir</button></form>
+                  </div>
+                </div>
+                """
+                st.markdown(row_html, unsafe_allow_html=True)
+                if st.button("Abrir", key=f"open_{mid}"):
+                    st.session_state.reply_message_id = mid
+                    safe_rerun()
 
-                    if not is_read:
-                        mark_message_read(m_id, USERNAME)
-
-                    if m.get("attachment"):
-                        att = m["attachment"]
-                        st.markdown("---")
-                        if att.get("url"):
-                            st.markdown(f"[⬇️ Baixar Anexo: {att.get('name')}]({att.get('url')})")
-                        else:
-                            localp = att.get("path")
-                            try:
-                                if localp and os.path.exists(localp):
-                                    with open(localp, "rb") as fp:
-                                        st.download_button(label=f"⬇️ Baixar Anexo: {att.get('name')}", data=fp, file_name=att.get('name'), key=f"dl_{m_id}")
-                                else:
-                                    st.warning("O anexo não foi encontrado.")
-                            except Exception:
-                                st.warning("Erro ao disponibilizar o anexo.")
-                    st.markdown("<br>", unsafe_allow_html=True)
-
-                    if reply_message_id == m_id:
-                        st.markdown("---")
-                        st.subheader("Responder")
-                        with st.form(key=f"reply_form_{m_id}", clear_on_submit=True):
-                            original_body = m.get('body', '')
-                            quoted_text = f"\n\n---\nEm {m.get('ts')}, {m.get('from')} escreveu:\n> " + "\n> ".join(original_body.split('\n'))
-                            reply_body = st.text_area("Mensagem:", value=quoted_text, height=150, key=f"reply_body_{m_id}")
-                            reply_attachment = st.file_uploader("Anexar arquivo:", key=f"reply_attach_{m_id}")
-                            c1_form, c2_form = st.columns(2)
-                            with c1_form:
-                                if st.form_submit_button("✉️ Enviar Resposta", use_container_width=True):
-                                    send_message(sender=USERNAME, recipient=m.get('from'), subject=f"Re: {m.get('subject')}", body=reply_body, attachment_file=reply_attachment)
-                                    st.session_state.reply_message_id = None
-                                    st.toast("Resposta enviada!")
-                                    safe_rerun()
-                            with c2_form:
-                                if st.form_submit_button("Cancelar", use_container_width=True):
-                                    st.session_state.reply_message_id = None
-                                    safe_rerun()
+    with right:
+        st.markdown("#### Detalhes / Ações")
+        selected = st.session_state.get("reply_message_id")
+        if not selected:
+            st.markdown("<div class='small-muted'>Selecione uma mensagem para ver detalhes e responder.</div>", unsafe_allow_html=True)
+        else:
+            msg = next((m for m in inbox if m.get("id") == selected), None)
+            if not msg:
+                st.info("Mensagem não encontrada (talvez tenha sido apagada).")
+            else:
+                st.markdown(f"**Assunto:** {msg.get('subject')}")
+                st.markdown(f"**De:** {msg.get('from')} • **Recebido em:** `{msg.get('ts')}`")
+                st.markdown("---")
+                st.markdown(msg.get("body") or "(sem corpo)")
+                st.markdown("---")
+                if msg.get("attachment"):
+                    att = msg.get("attachment")
+                    if att.get("url"):
+                        st.markdown(f"[⬇️ Baixar Anexo: {att.get('name')}]({att.get('url')})")
                     else:
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            if st.button("Responder", key=f"reply_{m_id}", use_container_width=True):
-                                st.session_state.reply_message_id = m_id
-                                safe_rerun()
-                        with c2:
-                            if st.button("Apagar", key=f"del_inbox_{m_id}", use_container_width=True):
-                                delete_message(m_id, USERNAME)
-                                if st.session_state.reply_message_id == m_id:
-                                    st.session_state.reply_message_id = None
-                                st.toast("Mensagem apagada.")
-                                safe_rerun()
+                        localp = att.get("path")
+                        if localp and os.path.exists(localp):
+                            with open(localp, "rb") as fp:
+                                st.download_button(label=f"⬇️ Baixar Anexo: {att.get('name')}", data=fp, file_name=att.get('name'))
+                cA, cB, cC = st.columns([0.33,0.33,0.34])
+                with cA:
+                    if st.button("✉️ Responder", key=f"btn_reply_{selected}"):
+                        st.session_state.compose_to = msg.get("from")
+                        st.session_state.compose_subject = f"Re: {msg.get('subject')}"
+                        st.session_state.compose_prefill = f"\n\n---\nEm {msg.get('ts')}, {msg.get('from')} escreveu:\n> " + "\n> ".join(str(msg.get('body','')).split('\n'))
+                        st.session_state.compose_open = True
+                        safe_rerun()
+                with cB:
+                    if st.button("🗑️ Apagar", key=f"btn_del_{selected}"):
+                        delete_message(selected, USERNAME)
+                        st.toast("Mensagem apagada.")
+                        st.session_state.reply_message_id = None
+                        safe_rerun()
+                with cC:
+                    if not msg.get("read", False):
+                        if st.button("Marcar como lida", key=f"btn_markread_{selected}"):
+                            mark_message_read(selected, USERNAME)
+                            st.toast("Marcada como lida.")
+                            safe_rerun()
 
-    with tab_compose:
-        with st.form(key="compose_form", clear_on_submit=True):
+    st.markdown("---")
+    if st.session_state.get("compose_open"):
+        st.markdown("### ✍️ Nova Mensagem")
+        with st.form("compose_form", clear_on_submit=True):
+            to_default = st.session_state.pop("compose_to", None) or ""
+            subj_default = st.session_state.pop("compose_subject", "")
+            body_default = st.session_state.pop("compose_prefill", "")
             users_dict = load_users() or {}
             all_usernames = [u for u in users_dict.keys() if u != USERNAME]
-            if not all_usernames:
-                st.info("Nenhum outro usuário cadastrado — digite o username do destinatário manualmente.")
-                to_user = st.text_input("Para (username):", key="compose_manual_to")
+            if all_usernames:
+                to_user = st.selectbox("Para:", options=["(escolha)"] + all_usernames, index=0, key="compose_select_to2")
+                if to_user == "(escolha)": to_user = ""
             else:
-                to_user = st.selectbox("Para:", options=["(escolha)"] + all_usernames, index=0, key="compose_select_to")
-                if to_user == "(escolha)":
-                    to_user = None
-                if st.checkbox("Enviar para username específico (digitar manualmente)", key="compose_manual_toggle"):
-                    manu = st.text_input("Username (manual):", key="compose_manual_to2")
-                    if manu:
-                        to_user = manu.strip()
-            subj = st.text_input("Assunto:")
-            body = st.text_area("Mensagem:", height=200)
-            attachment = st.file_uploader("Anexar arquivo:", key="compose_attachment")
-            submitted = st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True)
-            if submitted:
+                to_user = st.text_input("Para (username):", value=to_default)
+            subj = st.text_input("Assunto:", value=subj_default)
+            body = st.text_area("Mensagem:", value=body_default, height=200)
+            attach = st.file_uploader("Anexar arquivo (opcional):", key="compose_attach2")
+            if st.form_submit_button("✉️ Enviar"):
                 if not to_user:
-                    st.error("Destinatário inválido. Informe um username existente ou digite manualmente.")
+                    st.error("Informe o destinatário.")
                 else:
-                    if to_user not in users_dict and _supabase is None:
-                        st.warning(f"Usuário '{to_user}' não encontrado. Verifique o username.")
-                    else:
-                        send_message(USERNAME, to_user, subj, body, attachment_file=attachment)
-                        st.success(f"Mensagem enviada para {to_user}.")
-                        if st.session_state.autosave:
-                            save_state_for_user(USERNAME)
-                        safe_rerun()
+                    send_message(USERNAME, to_user, subj, body, attachment_file=attach)
+                    st.success(f"Mensagem enviada para {to_user}.")
+                    st.session_state.compose_open = False
+                    if st.session_state.autosave:
+                        save_state_for_user(USERNAME)
+                    safe_rerun()
+        if st.button("Cancelar composição"):
+            st.session_state.compose_open = False
+            safe_rerun()
 
-    with tab_sent:
-        sent = get_user_messages(USERNAME, 'outbox')
-        if not sent:
-            st.info("Nenhuma mensagem enviada ainda.")
-        else:
-            for m in sent:
-                with st.expander(f"Para: {m.get('to')} | {m.get('subject')}"):
-                    st.markdown(m.get('body'))
     st.markdown("</div>", unsafe_allow_html=True)
