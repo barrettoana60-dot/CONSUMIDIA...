@@ -77,12 +77,11 @@ try:
 except Exception:
     create_client = None
 
-# ---- Credenciais fornecidas pelo usuário (inseridas diretamente) ----
-# Obs: é mais seguro definir essas variáveis no Streamlit Cloud (Settings → Secrets)
+# ---- Credenciais fornecidas pelo usuário (inseridas diretamente como fallback) ----
+# É mais seguro adicionar estes valores em Streamlit Cloud Secrets ou variáveis de ambiente.
 USER_PROVIDED_SUPABASE_URL = "https://sdfdeghaxbxqhornmdgu.supabase.co"
 USER_PROVIDED_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkZmRlZ2hheGJ4cWhvcm5tZGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MDI4NzAsImV4cCI6MjA3NTE3ODg3MH0.8vnMKvbJzCm2Wb6pjgNVTvpByrY_-6WNz8XqM5vuHkc"
 
-# First try to read from st.secrets (recommended), then from environment, then fall back to the user-provided values above.
 SUPABASE_URL = None
 SUPABASE_KEY = None
 if isinstance(st.secrets, dict):
@@ -700,7 +699,7 @@ if not st.session_state.authenticated:
                         st.session_state.authenticated = True
                         st.session_state.username = user.get("email")
                         st.session_state.user_obj = {"id": user.get("id"), "email": user.get("email")}
-                        st.success(f"Logado: {user.get("email")}")
+                        st.success(f"Logado: {user.get('email')}")
                         safe_rerun()
                     else:
                         st.info("Login efetuado — verifique retorno: ")
@@ -728,20 +727,58 @@ if not st.session_state.authenticated:
         reg_user = st.text_input("Email (ou username para modo local)", key="ui_reg_user")
         if st.button("Cadastrar", "btn_register_main"):
             if _supabase:
-                # Use a generated password then inform user to reset or use email flow
-                pw = gen_password(12)
-                out = supa_signup(reg_user.strip(), pw)
-                if isinstance(out, dict) and out.get("error"):
-                    st.error("Erro no cadastro: " + out.get("error"))
+                # fluxo robusto: gera senha temporária e trata casos onde session == null (email confirmation)
+                new_email = (reg_user or "").strip()
+                if not new_email:
+                    st.warning("Informe um email válido.")
                 else:
-                    user = out.get("user") or (out.get("data") or {}).get("user") if isinstance(out, dict) else None
-                    if user and user.get("id"):
-                        r = supa_create_profile(user.get("id"), reg_name or user.get("email"), role="user")
-                        st.success("Conta criada! Verifique seu email se a confirmação estiver habilitada.")
-                        st.write("user id:", user.get("id"))
+                    pw = gen_password(12)
+                    out = supa_signup(new_email, pw)
+                    if isinstance(out, dict) and out.get("error"):
+                        st.error("Erro no cadastro: " + str(out.get("error")))
                     else:
-                        st.info("Conta criada — verifique retorno:")
-                        st.write(out)
+                        # extrair user e session defensivamente
+                        user = None
+                        session = None
+                        if isinstance(out, dict):
+                            user = out.get("user") or (out.get("data") or {}).get("user")
+                            session = out.get("session") or (out.get("data") or {}).get("session")
+                        if not user and hasattr(out, "get"):
+                            user = out.get("user")
+                            session = out.get("session") if hasattr(out, "get") else None
+
+                        if user:
+                            uid = user.get("id") if isinstance(user, dict) else None
+                            st.success("Conta criada — verifique retorno:")
+                            st.write(out)  # mostra o objeto completo
+
+                            # tentar criar registro na tabela profiles (pode falhar por RLS)
+                            try:
+                                profile_row = {"id": uid, "full_name": reg_name or new_email, "role": "user"}
+                                res = _supabase.table("profiles").insert(profile_row).execute()
+                                if getattr(res, "error", None):
+                                    st.warning("Perfil não criado automaticamente: " + str(res.error))
+                                else:
+                                    st.info("Perfil criado na tabela 'profiles'.")
+                            except Exception as e:
+                                st.warning("Não foi possível inserir perfil automaticamente (provavelmente RLS). Erro: " + str(e))
+
+                            # se a sessão vier nula -> provavelmente precisa confirmar e-mail
+                            if session:
+                                try:
+                                    st.session_state.authenticated = True
+                                    st.session_state.username = user.get("email") or new_email
+                                    st.session_state.user_obj = {"id": uid, "email": st.session_state.username, "name": reg_name}
+                                    st.success(f"Logado automaticamente: {st.session_state.username}")
+                                    safe_rerun()
+                                except Exception:
+                                    st.info("Conta criada; faça login com seu email/senha.")
+                            else:
+                                st.info("Usuário criado mas sem sessão. Verifique seu email para confirmar (se aplicável).")
+                                st.info("Senha temporária gerada (não exibida por segurança). Se precisar da senha agora, ajuste o fluxo (ou verifique logs).")
+                        else:
+                            st.error("Resposta inesperada do Supabase — verifique logs e a resposta completa abaixo.")
+                            st.write(out)
             else:
                 new_user = (reg_user or "").strip()
                 if not new_user:
