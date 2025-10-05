@@ -975,13 +975,25 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# BUSCA (com Favoritos, contatar autor, sem botão copiar)
+# BUSCA (melhorada: paginação funcional, detalhes com explicação/keywords, contato inline)
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative; padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
 
-    # Tabs: Busca + Favoritos (restored)
+    # Tabs: Busca + Favoritos
     tab_busca, tab_favoritos = st.tabs([f"🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"])
+
+    # small helper: generate simple keywords
+    def extract_keywords(text, n=6):
+        if not text: return []
+        text = re.sub(r"[^\w\s]", " ", str(text or "")).lower()
+        stop = {"de","da","do","e","a","o","em","para","por","com","os","as","um","uma","que","na","no"}
+        words = [w for w in text.split() if len(w) > 2 and w not in stop]
+        freq = {}
+        for w in words:
+            freq[w] = freq.get(w, 0) + 1
+        sorted_words = sorted(freq.items(), key=lambda x: (-x[1], x[0]))
+        return [w for w, _ in sorted_words][:n]
 
     # --------------------
     # BUSCA
@@ -990,9 +1002,8 @@ elif st.session_state.page == "busca":
         st.markdown("<style>"
                     ".card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.015)); border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.03);}"
                     ".small-muted{font-size:12px;color:#bfc6cc;} .result-title{font-weight:700;margin-bottom:6px;} .avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#fff;background:#6c5ce7;margin-right:8px}"
-                    ".actions-row>button{margin-right:6px}</style>", unsafe_allow_html=True)
+                    "</style>", unsafe_allow_html=True)
 
-        st.markdown("### 🔍 Busca Inteligente")
         col_q, col_meta, col_actions = st.columns([0.6, 0.25, 0.15])
         with col_q:
             query = st.text_input("Termo de busca", key="ui_query_search", placeholder="Digite palavras-chave — ex: autor, título, tema...")
@@ -1005,17 +1016,26 @@ elif st.session_state.page == "busca":
             all_cols = []
             if backups_df_tmp is not None:
                 all_cols = [c for c in backups_df_tmp.columns if c.lower() not in ['_artemis_username', 'ano']]
-            search_col = st.selectbox("Buscar em", options=all_cols or ["(nenhuma planilha encontrada)"])
+            search_col = st.selectbox("Buscar em", options=all_cols or ["(nenhuma planilha encontrada)"], key="ui_search_col")
         with col_actions:
             per_page = st.selectbox("Por página", options=[5, 8, 12, 20], index=1, key="ui_search_pp")
             st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-            search_clicked = st.button("🔎 Buscar", use_container_width=True)
+            search_clicked = st.button("🔎 Buscar", use_container_width=True, key="ui_search_btn")
 
+        # init session keys
         if 'search_results' not in st.session_state:
             st.session_state.search_results = pd.DataFrame()
             st.session_state.search_query_meta = {"col": None, "query": ""}
+        if 'search_page' not in st.session_state:
+            st.session_state.search_page = 1
+        if 'search_view_index' not in st.session_state:
+            st.session_state.search_view_index = None
+        if 'compose_inline' not in st.session_state:
+            st.session_state.compose_inline = False
 
+        # perform search
         if search_clicked:
+            st.session_state.search_view_index = None
             if (not query) or (not all_cols):
                 st.info("Digite um termo e assegure que existam backups (salve progresso).")
                 st.session_state.search_results = pd.DataFrame()
@@ -1033,105 +1053,166 @@ elif st.session_state.page == "busca":
                 st.info("Nenhum resultado encontrado.")
             else:
                 st.markdown("<div class='small-muted'>Resultados aparecerão aqui. Salve backups para ativar a busca.</div>", unsafe_allow_html=True)
+            st.markdown("</div>", unsafe_allow_html=True)
         else:
             total = len(results_df)
-            page = st.session_state.get("search_page", 1)
+            page = int(st.session_state.get("search_page", 1))
             max_pages = max(1, (total + per_page - 1) // per_page)
+            # clamp page
             if page < 1: page = 1
             if page > max_pages: page = max_pages
             st.session_state.search_page = page
 
             start = (page - 1) * per_page
-            end = start + per_page
+            end = min(start + per_page, total)
             page_df = results_df.iloc[start:end]
 
-            st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {min(end, total)}. (Página {page}/{max_pages})")
+            st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {end}. (Página {page}/{max_pages})")
             st.markdown("---")
-            for idx, row in page_df.iterrows():
-                result_data = row.to_dict()
+
+            # show results
+            for local_idx, (idx, row) in enumerate(page_df.reset_index().iterrows()):
+                # idx is reset_index index; row['index'] is original results_df index
+                orig_index = row['index']
+                result_data = results_df.loc[orig_index].to_dict()
                 user_src = result_data.get("_artemis_username", "N/A")
                 initials = "".join([p[0].upper() for p in str(user_src).split()[:2]])[:2] or "U"
+                title = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
+                author = str(result_data.get('autor') or '')
+                year = str(result_data.get('ano') or '')
                 display_html = f"""
                 <div class="card">
                   <div style="display:flex; gap:12px; align-items:center;">
                     <div class="avatar">{initials}</div>
                     <div style="flex:1;">
-                      <div class="result-title">{str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')}</div>
-                      <div class="small-muted">Proveniente de <strong>{user_src}</strong> • {str(result_data.get('autor') or '')}</div>
+                      <div class="result-title">{title}</div>
+                      <div class="small-muted">Proveniente de <strong>{user_src}</strong> • {author}</div>
                     </div>
                     <div style="text-align:right;">
-                      <div class="small-muted">{str(result_data.get('ano') or '')}</div>
+                      <div class="small-muted">{year}</div>
                     </div>
                   </div>
-                  <div style="margin-top:8px;">
+                </div>
                 """
-                keys_show = [k for k in result_data.keys() if k not in ("_artemis_username",)][:6]
-                for k in keys_show:
-                    v = result_data.get(k)
-                    display_html += f"<div style='font-size:13px; margin-top:2px;'><strong>{str(k).capitalize()}:</strong> {str(v)}</div>"
-                display_html += "</div></div>"
                 st.markdown(display_html, unsafe_allow_html=True)
 
-                # ACTIONS: Favoritar + Ver detalhes (no detalhes: explicação + contatar autor)
-                a1, a2 = st.columns([0.28, 0.72])
-                with a1:
-                    if st.button("⭐ Favoritar", key=f"fav_{idx}", use_container_width=True):
+                bcol1, bcol2 = st.columns([0.28, 0.72])
+                with bcol1:
+                    if st.button("⭐ Favoritar", key=f"fav_{orig_index}", use_container_width=True):
                         if add_to_favorites(result_data):
                             st.toast("Adicionado aos favoritos!", icon="⭐")
                             save_state_for_user(USERNAME)
                         else:
                             st.toast("Já está nos favoritos.")
-                with a2:
-                    if st.button("🔎 Ver detalhes", key=f"view_{idx}", use_container_width=True):
-                        # show details + explanation + contact button
-                        st.markdown("---")
-                        st.markdown(f"### Detalhes do registro (origem: **{user_src}**)")
-                        # contextual explanation (simple heuristic):
-                        expl = []
-                        if result_data.get("título") or result_data.get("titulo"):
-                            expl.append("Este registro parece ser um trabalho (título) relacionado a pesquisa/obra indicada.")
-                        if result_data.get("autor"):
-                            expl.append("O campo 'autor' identifica o responsável ou autor principal do item.")
-                        if result_data.get("tema"):
-                            expl.append("O campo 'tema' pode ser usado para agrupar ou encontrar trabalhos similares.")
-                        if not expl:
-                            expl = ["Este é um registro importado de um backup; verifique os campos abaixo."]
-                        st.info(" ".join(expl))
+                with bcol2:
+                    if st.button("🔎 Ver detalhes", key=f"view_{orig_index}", use_container_width=True):
+                        # open detail view for this original index
+                        st.session_state.search_view_index = int(orig_index)
+                        st.session_state.compose_inline = False
+                        safe_rerun()
 
-                        # show all fields in a compact list
-                        for k, v in result_data.items():
-                            if k == "_artemis_username": continue
-                            st.markdown(f"- **{k}:** {v}")
+            # pagination controls (unique keys)
+            st.markdown("---")
+            pcol1, pcol2, pcol3 = st.columns([0.33, 0.34, 0.33])
+            with pcol1:
+                if st.button("◀ Anterior", key="search_prev") and st.session_state.search_page > 1:
+                    st.session_state.search_page = max(1, st.session_state.search_page - 1)
+                    st.session_state.search_view_index = None
+                    safe_rerun()
+            with pcol2:
+                st.markdown(f"**Página {st.session_state.search_page} / {max_pages}**", unsafe_allow_html=True)
+            with pcol3:
+                if st.button("Próxima ▶", key="search_next") and st.session_state.search_page < max_pages:
+                    st.session_state.search_page = min(max_pages, st.session_state.search_page + 1)
+                    st.session_state.search_view_index = None
+                    safe_rerun()
 
-                        st.markdown("---")
-                        # Contatar autor / usuário
-                        origin_user = result_data.get("_artemis_username") or user_src or ""
-                        if origin_user:
-                            if st.button(f"✉️ Contatar {origin_user}", key=f"contact_{idx}", use_container_width=True):
-                                # prefill compose form variables used on mensagens page
-                                st.session_state.compose_open = True
-                                st.session_state.compose_to = origin_user
-                                st.session_state.compose_subject = f"Sobre o registro: {result_data.get('título') or result_data.get('titulo') or '(Sem título)'}"
-                                st.session_state.compose_prefill = f"Olá {origin_user},\n\nEncontrei este registro nos backups da plataforma e gostaria de entrar em contato sobre: {result_data.get('título') or result_data.get('titulo') or ''}\n\n(Escreva sua mensagem aqui...)"
-                                # switch to messages page so user can finish/send
-                                st.session_state.page = "mensagens"
+            # DETAILS PANEL (outside loop) — shown when search_view_index is set
+            if st.session_state.get("search_view_index") is not None:
+                vi = int(st.session_state.search_view_index)
+                if vi >= 0 and vi < len(results_df):
+                    det = results_df.loc[vi].to_dict()
+                    origin_user = det.get("_artemis_username", "N/A")
+                    st.markdown("## Detalhes do Registro")
+                    st.markdown(f"**Título:** {det.get('título') or det.get('titulo') or '(Sem título)'}")
+                    st.markdown(f"**Autor:** {det.get('autor') or '(não informado)'} • **Origem:** {origin_user}")
+                    st.markdown(f"**Ano:** {det.get('ano') or ''}")
+                    st.markdown("---")
+
+                    # contextual explanation
+                    expl = []
+                    if det.get("título") or det.get("titulo"):
+                        expl.append("Este registro parece ser um trabalho (título) relacionado à pesquisa ou produção indicada.")
+                    if det.get("autor"):
+                        expl.append("O campo 'autor' identifica o responsável ou autor principal do item.")
+                    if det.get("tema"):
+                        expl.append("O campo 'tema' ajuda a categorizar o conteúdo e facilitar buscas similares.")
+                    if det.get("resumo") or det.get("abstract"):
+                        expl.append("Há um resumo/abstract — leia-o para entender melhor o conteúdo do trabalho.")
+                    if not expl:
+                        expl = ["Registro importado de backup — verifique os campos para confirmar informação."]
+                    st.info(" ".join(expl))
+
+                    # keywords (heuristic)
+                    title_text = str(det.get("título") or det.get("titulo") or "")
+                    tema_text = str(det.get("tema") or "")
+                    combined = f"{title_text} {tema_text}"
+                    keywords = extract_keywords(combined, n=8)
+                    if keywords:
+                        st.markdown("**Palavras-chave (sugeridas):** " + ", ".join(keywords))
+                    else:
+                        st.markdown("**Palavras-chave (sugeridas):** (não identificadas)")
+
+                    # show all fields compactly
+                    st.markdown("---")
+                    for k, v in det.items():
+                        if k == "_artemis_username": continue
+                        st.markdown(f"- **{k}:** {v}")
+
+                    st.markdown("---")
+                    # CONTACT INLINE: show a small form here to send message immediately
+                    st.markdown("### ✉️ Contatar autor / origem")
+                    if origin_user and origin_user != "N/A":
+                        st.markdown(f"Você pode enviar uma mensagem diretamente para **{origin_user}** sobre este registro.")
+                        if not st.session_state.get("compose_inline"):
+                            if st.button(f"✉️ Abrir formulário de contato (para {origin_user})", key=f"open_contact_{vi}"):
+                                st.session_state.compose_inline = True
+                                # prefill fields
+                                st.session_state.compose_inline_to = origin_user
+                                st.session_state.compose_inline_subject = f"Sobre o registro: {det.get('título') or det.get('titulo') or '(Sem título)'}"
+                                st.session_state.compose_inline_body = f"Olá {origin_user},\n\nEncontrei este registro na plataforma e gostaria de conversar sobre: {det.get('título') or det.get('titulo') or ''}\n\n[Escreva aqui sua mensagem...]\n"
                                 safe_rerun()
                         else:
-                            st.warning("Usuário/origem não disponível para contato.")
-                        st.markdown("---")
-
-            # pagination controls
-            col_prev, col_page, col_next = st.columns([0.33,0.34,0.33])
-            with col_prev:
-                if st.button("◀ Anterior") and st.session_state.search_page > 1:
-                    st.session_state.search_page -= 1
-                    safe_rerun()
-            with col_page:
-                st.markdown(f"**Página {st.session_state.search_page} / {max_pages}**", unsafe_allow_html=True)
-            with col_next:
-                if st.button("Próxima ▶") and st.session_state.search_page < max_pages:
-                    st.session_state.search_page += 1
-                    safe_rerun()
+                            # inline form
+                            to_pref = st.session_state.get("compose_inline_to", origin_user)
+                            subj_pref = st.session_state.get("compose_inline_subject", "")
+                            body_pref = st.session_state.get("compose_inline_body", "")
+                            with st.form(key=f"inline_compose_form_{vi}", clear_on_submit=False):
+                                to_fill = st.text_input("Para:", value=to_pref, key=f"inline_to_{vi}")
+                                subj_fill = st.text_input("Assunto:", value=subj_pref, key=f"inline_subj_{vi}")
+                                body_fill = st.text_area("Mensagem:", value=body_pref, height=180, key=f"inline_body_{vi}")
+                                attach_inline = st.file_uploader("Anexar arquivo (opcional):", key=f"inline_attach_{vi}")
+                                if st.form_submit_button("✉️ Enviar mensagem agora"):
+                                    # send immediately
+                                    try:
+                                        send_message(USERNAME, to_fill, subj_fill, body_fill, attachment_file=attach_inline)
+                                        st.success(f"Mensagem enviada para {to_fill}.")
+                                        # reset inline compose
+                                        st.session_state.compose_inline = False
+                                        st.session_state.compose_inline_to = ""
+                                        st.session_state.compose_inline_subject = ""
+                                        st.session_state.compose_inline_body = ""
+                                        # optionally also save state
+                                        if st.session_state.autosave:
+                                            save_state_for_user(USERNAME)
+                                        safe_rerun()
+                                    except Exception as e:
+                                        st.error(f"Erro ao enviar: {e}")
+                                if st.button("Cancelar envio inline", key=f"inline_cancel_{vi}"):
+                                    st.session_state.compose_inline = False
+                                    safe_rerun()
+                    else:
+                        st.warning("Origem/usuário não disponível para contato.")
 
     # --------------------
     # FAVORITOS (tab)
@@ -1171,153 +1252,5 @@ elif st.session_state.page == "busca":
                             remove_from_favorites(fav['id'])
                             save_state_for_user(USERNAME)
                             safe_rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# -------------------------
-# Mensagens (melhorada UI)
-# -------------------------
-elif st.session_state.page == "mensagens":
-    st.markdown("<div class='glass-box' style='position:relative; padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.markdown("<style>.msg-row{display:flex;align-items:center;justify-content:space-between;padding:10px;border-radius:10px;margin-bottom:8px;background:linear-gradient(180deg, rgba(255,255,255,0.015), rgba(255,255,255,0.01));border:1px solid rgba(255,255,255,0.02)} .msg-meta{color:#bfc6cc;font-size:12px}.msg-sub{font-weight:700}</style>", unsafe_allow_html=True)
-
-    st.subheader("✉️ Central de Mensagens")
-
-    inbox = get_user_messages(USERNAME, 'inbox')
-    outbox = get_user_messages(USERNAME, 'outbox')
-
-    c1, c2, c3 = st.columns([0.5, 0.3, 0.2])
-    with c1:
-        filter_text = st.text_input("🔎 Filtrar mensagens (assunto / remetente)", key="ui_msg_filter")
-    with c2:
-        show_unread_only = st.checkbox("Apenas não lidas", value=False, key="ui_unread_only")
-    with c3:
-        if st.button("✉️ Nova Mensagem", key="btn_quick_compose"):
-            st.session_state.compose_open = True
-            st.session_state.compose_to = ""
-            st.session_state.compose_subject = ""
-            st.session_state.compose_prefill = ""
-            safe_rerun()
-
-    def filter_msgs(msgs):
-        if not msgs: return []
-        res = msgs
-        if filter_text:
-            q = normalize_text(filter_text)
-            res = [m for m in res if q in normalize_text(str(m.get("subject",""))) or q in normalize_text(str(m.get("from","")))]
-        if show_unread_only:
-            res = [m for m in res if not m.get("read", False)]
-        return res
-
-    inbox_filtered = filter_msgs(inbox)
-    outbox_filtered = filter_msgs(outbox)
-
-    left, right = st.columns([0.6, 0.4])
-    with left:
-        st.markdown("#### 📥 Caixa de Entrada")
-        if not inbox_filtered:
-            st.info("Nenhuma mensagem encontrada (faça uma busca ou aguarde mensagens).")
-        else:
-            for m in inbox_filtered:
-                mid = m.get("id")
-                read = m.get("read", False)
-                badge = "✅" if read else "🔵"
-                subj = m.get("subject") or "(sem assunto)"
-                fromu = m.get("from") or "anônimo"
-                ts = m.get("ts") or ""
-                row_html = f"""
-                <div class="msg-row" id="{mid}">
-                  <div style="display:flex; gap:10px; align-items:center;">
-                    <div style="width:44px;height:44px;border-radius:8px;background:#6c5ce7;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">{(fromu[:2]).upper()}</div>
-                    <div>
-                      <div class="msg-sub">{badge} {subj}</div>
-                      <div class="msg-meta">De: <strong>{fromu}</strong> • {ts}</div>
-                    </div>
-                  </div>
-                  <div style="display:flex; gap:6px;">
-                    <form action=""><button class="stButton" id="btn_view_{mid}">Abrir</button></form>
-                  </div>
-                </div>
-                """
-                st.markdown(row_html, unsafe_allow_html=True)
-                if st.button("Abrir", key=f"open_{mid}"):
-                    st.session_state.reply_message_id = mid
-                    safe_rerun()
-
-    with right:
-        st.markdown("#### Detalhes / Ações")
-        selected = st.session_state.get("reply_message_id")
-        if not selected:
-            st.markdown("<div class='small-muted'>Selecione uma mensagem para ver detalhes e responder.</div>", unsafe_allow_html=True)
-        else:
-            msg = next((m for m in inbox if m.get("id") == selected), None)
-            if not msg:
-                st.info("Mensagem não encontrada (talvez tenha sido apagada).")
-            else:
-                st.markdown(f"**Assunto:** {msg.get('subject')}")
-                st.markdown(f"**De:** {msg.get('from')} • **Recebido em:** `{msg.get('ts')}`")
-                st.markdown("---")
-                st.markdown(msg.get("body") or "(sem corpo)")
-                st.markdown("---")
-                if msg.get("attachment"):
-                    att = msg.get("attachment")
-                    if att.get("url"):
-                        st.markdown(f"[⬇️ Baixar Anexo: {att.get('name')}]({att.get('url')})")
-                    else:
-                        localp = att.get("path")
-                        if localp and os.path.exists(localp):
-                            with open(localp, "rb") as fp:
-                                st.download_button(label=f"⬇️ Baixar Anexo: {att.get('name')}", data=fp, file_name=att.get('name'))
-                cA, cB, cC = st.columns([0.33,0.33,0.34])
-                with cA:
-                    if st.button("✉️ Responder", key=f"btn_reply_{selected}"):
-                        st.session_state.compose_to = msg.get("from")
-                        st.session_state.compose_subject = f"Re: {msg.get('subject')}"
-                        st.session_state.compose_prefill = f"\n\n---\nEm {msg.get('ts')}, {msg.get('from')} escreveu:\n> " + "\n> ".join(str(msg.get('body','')).split('\n'))
-                        st.session_state.compose_open = True
-                        safe_rerun()
-                with cB:
-                    if st.button("🗑️ Apagar", key=f"btn_del_{selected}"):
-                        delete_message(selected, USERNAME)
-                        st.toast("Mensagem apagada.")
-                        st.session_state.reply_message_id = None
-                        safe_rerun()
-                with cC:
-                    if not msg.get("read", False):
-                        if st.button("Marcar como lida", key=f"btn_markread_{selected}"):
-                            mark_message_read(selected, USERNAME)
-                            st.toast("Marcada como lida.")
-                            safe_rerun()
-
-    st.markdown("---")
-    if st.session_state.get("compose_open"):
-        st.markdown("### ✍️ Nova Mensagem")
-        with st.form("compose_form", clear_on_submit=True):
-            to_default = st.session_state.pop("compose_to", None) or ""
-            subj_default = st.session_state.pop("compose_subject", "")
-            body_default = st.session_state.pop("compose_prefill", "")
-            users_dict = load_users() or {}
-            all_usernames = [u for u in users_dict.keys() if u != USERNAME]
-            if all_usernames:
-                to_user = st.selectbox("Para:", options=["(escolha)"] + all_usernames, index=0, key="compose_select_to2")
-                if to_user == "(escolha)": to_user = ""
-            else:
-                to_user = st.text_input("Para (username):", value=to_default)
-            subj = st.text_input("Assunto:", value=subj_default)
-            body = st.text_area("Mensagem:", value=body_default, height=200)
-            attach = st.file_uploader("Anexar arquivo (opcional):", key="compose_attach2")
-            if st.form_submit_button("✉️ Enviar"):
-                if not to_user:
-                    st.error("Informe o destinatário.")
-                else:
-                    send_message(USERNAME, to_user, subj, body, attachment_file=attach)
-                    st.success(f"Mensagem enviada para {to_user}.")
-                    st.session_state.compose_open = False
-                    if st.session_state.autosave:
-                        save_state_for_user(USERNAME)
-                    safe_rerun()
-        if st.button("Cancelar composição"):
-            st.session_state.compose_open = False
-            safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
