@@ -975,132 +975,207 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Melhorias na seção 'busca' (UI)
+# BUSCA (com Favoritos, contatar autor, sem botão copiar)
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative; padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.markdown("<style>"
-                ".card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.015)); border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.03);}"
-                ".small-muted{font-size:12px;color:#bfc6cc;} .result-title{font-weight:700;margin-bottom:6px;} .avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#fff;background:#6c5ce7;margin-right:8px}"
-                ".actions-row>button{margin-right:6px}</style>", unsafe_allow_html=True)
 
-    st.markdown("### 🔍 Busca Inteligente")
-    col_q, col_meta, col_actions = st.columns([0.6, 0.25, 0.15])
-    with col_q:
-        query = st.text_input("Termo de busca", key="ui_query_search", placeholder="Digite palavras-chave — ex: autor, título, tema...")
-    with col_meta:
-        backups_df_tmp = None
-        try:
-            backups_df_tmp = collect_latest_backups()
-        except Exception:
+    # Tabs: Busca + Favoritos (restored)
+    tab_busca, tab_favoritos = st.tabs([f"🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"])
+
+    # --------------------
+    # BUSCA
+    # --------------------
+    with tab_busca:
+        st.markdown("<style>"
+                    ".card{background:linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.015)); border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.03);}"
+                    ".small-muted{font-size:12px;color:#bfc6cc;} .result-title{font-weight:700;margin-bottom:6px;} .avatar{width:36px;height:36px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#fff;background:#6c5ce7;margin-right:8px}"
+                    ".actions-row>button{margin-right:6px}</style>", unsafe_allow_html=True)
+
+        st.markdown("### 🔍 Busca Inteligente")
+        col_q, col_meta, col_actions = st.columns([0.6, 0.25, 0.15])
+        with col_q:
+            query = st.text_input("Termo de busca", key="ui_query_search", placeholder="Digite palavras-chave — ex: autor, título, tema...")
+        with col_meta:
             backups_df_tmp = None
-        all_cols = []
-        if backups_df_tmp is not None:
-            all_cols = [c for c in backups_df_tmp.columns if c.lower() not in ['_artemis_username', 'ano']]
-        search_col = st.selectbox("Buscar em", options=all_cols or ["(nenhuma planilha encontrada)"])
-    with col_actions:
-        per_page = st.selectbox("Por página", options=[5, 8, 12, 20], index=1, key="ui_search_pp")
-        st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
-        search_clicked = st.button("🔎 Buscar", use_container_width=True)
+            try:
+                backups_df_tmp = collect_latest_backups()
+            except Exception:
+                backups_df_tmp = None
+            all_cols = []
+            if backups_df_tmp is not None:
+                all_cols = [c for c in backups_df_tmp.columns if c.lower() not in ['_artemis_username', 'ano']]
+            search_col = st.selectbox("Buscar em", options=all_cols or ["(nenhuma planilha encontrada)"])
+        with col_actions:
+            per_page = st.selectbox("Por página", options=[5, 8, 12, 20], index=1, key="ui_search_pp")
+            st.markdown("<div style='height:6px'></div>", unsafe_allow_html=True)
+            search_clicked = st.button("🔎 Buscar", use_container_width=True)
 
-    if 'search_results' not in st.session_state:
-        st.session_state.search_results = pd.DataFrame()
-        st.session_state.search_query_meta = {"col": None, "query": ""}
-
-    if search_clicked:
-        if (not query) or (not all_cols):
-            st.info("Digite um termo e assegure que existam backups (salve progresso).")
+        if 'search_results' not in st.session_state:
             st.session_state.search_results = pd.DataFrame()
-        else:
-            norm_query = normalize_text(query)
-            ser = backups_df_tmp[search_col].astype(str).apply(normalize_text)
-            hits = backups_df_tmp[ser.str.contains(norm_query, na=False)]
-            st.session_state.search_results = hits.reset_index(drop=True)
-            st.session_state.search_query_meta = {"col": search_col, "query": query}
-            st.session_state.search_page = 1
+            st.session_state.search_query_meta = {"col": None, "query": ""}
 
-    results_df = st.session_state.search_results
-    if results_df is None or results_df.empty:
         if search_clicked:
-            st.info("Nenhum resultado encontrado.")
+            if (not query) or (not all_cols):
+                st.info("Digite um termo e assegure que existam backups (salve progresso).")
+                st.session_state.search_results = pd.DataFrame()
+            else:
+                norm_query = normalize_text(query)
+                ser = backups_df_tmp[search_col].astype(str).apply(normalize_text)
+                hits = backups_df_tmp[ser.str.contains(norm_query, na=False)]
+                st.session_state.search_results = hits.reset_index(drop=True)
+                st.session_state.search_query_meta = {"col": search_col, "query": query}
+                st.session_state.search_page = 1
+
+        results_df = st.session_state.search_results
+        if results_df is None or results_df.empty:
+            if search_clicked:
+                st.info("Nenhum resultado encontrado.")
+            else:
+                st.markdown("<div class='small-muted'>Resultados aparecerão aqui. Salve backups para ativar a busca.</div>", unsafe_allow_html=True)
         else:
-            st.markdown("<div class='small-muted'>Resultados aparecerão aqui. Salve backups para ativar a busca.</div>", unsafe_allow_html=True)
-        st.markdown("</div>", unsafe_allow_html=True)
-    else:
-        total = len(results_df)
-        page = st.session_state.get("search_page", 1)
-        max_pages = max(1, (total + per_page - 1) // per_page)
-        if page < 1: page = 1
-        if page > max_pages: page = max_pages
-        st.session_state.search_page = page
+            total = len(results_df)
+            page = st.session_state.get("search_page", 1)
+            max_pages = max(1, (total + per_page - 1) // per_page)
+            if page < 1: page = 1
+            if page > max_pages: page = max_pages
+            st.session_state.search_page = page
 
-        start = (page - 1) * per_page
-        end = start + per_page
-        page_df = results_df.iloc[start:end]
+            start = (page - 1) * per_page
+            end = start + per_page
+            page_df = results_df.iloc[start:end]
 
-        st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {min(end, total)}. (Página {page}/{max_pages})")
-        st.markdown("---")
-        for idx, row in page_df.iterrows():
-            result_data = row.to_dict()
-            user_src = result_data.get("_artemis_username", "N/A")
-            initials = "".join([p[0].upper() for p in str(user_src).split()[:2]])[:2] or "U"
-            display_html = f"""
-            <div class="card">
-              <div style="display:flex; gap:12px; align-items:center;">
-                <div class="avatar">{initials}</div>
-                <div style="flex:1;">
-                  <div class="result-title">{str(result_data.get('título') or result_data.get('titulo') or result_data.get('titulo','(Sem título)'))}</div>
-                  <div class="small-muted">Proveniente de <strong>{user_src}</strong> • {str(result_data.get('autor') or result_data.get('autor',''))}</div>
-                </div>
-                <div style="text-align:right;">
-                  <div class="small-muted">{str(result_data.get('ano') or '')}</div>
-                </div>
-              </div>
-              <div style="margin-top:8px;">
-            """
-            keys_show = [k for k in result_data.keys() if k not in ("_artemis_username",)][:6]
-            for k in keys_show:
-                v = result_data.get(k)
-                display_html += f"<div style='font-size:13px; margin-top:2px;'><strong>{str(k).capitalize()}:</strong> {str(v)}</div>"
-            display_html += "</div></div>"
-            st.markdown(display_html, unsafe_allow_html=True)
+            st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {min(end, total)}. (Página {page}/{max_pages})")
+            st.markdown("---")
+            for idx, row in page_df.iterrows():
+                result_data = row.to_dict()
+                user_src = result_data.get("_artemis_username", "N/A")
+                initials = "".join([p[0].upper() for p in str(user_src).split()[:2]])[:2] or "U"
+                display_html = f"""
+                <div class="card">
+                  <div style="display:flex; gap:12px; align-items:center;">
+                    <div class="avatar">{initials}</div>
+                    <div style="flex:1;">
+                      <div class="result-title">{str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')}</div>
+                      <div class="small-muted">Proveniente de <strong>{user_src}</strong> • {str(result_data.get('autor') or '')}</div>
+                    </div>
+                    <div style="text-align:right;">
+                      <div class="small-muted">{str(result_data.get('ano') or '')}</div>
+                    </div>
+                  </div>
+                  <div style="margin-top:8px;">
+                """
+                keys_show = [k for k in result_data.keys() if k not in ("_artemis_username",)][:6]
+                for k in keys_show:
+                    v = result_data.get(k)
+                    display_html += f"<div style='font-size:13px; margin-top:2px;'><strong>{str(k).capitalize()}:</strong> {str(v)}</div>"
+                display_html += "</div></div>"
+                st.markdown(display_html, unsafe_allow_html=True)
 
-            a1, a2, a3 = st.columns([0.22, 0.22, 0.56])
-            with a1:
-                if st.button("⭐ Favoritar", key=f"fav_{idx}", use_container_width=True):
-                    if add_to_favorites(result_data):
-                        st.toast("Adicionado aos favoritos!", icon="⭐")
-                        save_state_for_user(USERNAME)
-                    else:
-                        st.toast("Já está nos favoritos.")
-            with a2:
-                if st.button("🔗 Copiar", key=f"copy_{idx}", use_container_width=True):
-                    st.write("Copiado para a área de transferência (copiar manualmente):")
-                    st.code(json.dumps({k: result_data[k] for k in keys_show if k in result_data}, ensure_ascii=False, indent=2))
-            with a3:
-                if st.button("🔎 Ver detalhes", key=f"view_{idx}", use_container_width=True):
-                    st.markdown("---")
-                    st.markdown(f"**Detalhes do registro (origem: {user_src})**")
-                    for k, v in result_data.items():
-                        if k == "_artemis_username": continue
-                        st.markdown(f"- **{k}:** {v}")
-                    st.markdown("---")
-        col_prev, col_page, col_next = st.columns([0.33,0.34,0.33])
-        with col_prev:
-            if st.button("◀ Anterior") and st.session_state.search_page > 1:
-                st.session_state.search_page -= 1
-                safe_rerun()
-        with col_page:
-            st.markdown(f"**Página {st.session_state.search_page} / {max_pages}**", unsafe_allow_html=True)
-        with col_next:
-            if st.button("Próxima ▶") and st.session_state.search_page < max_pages:
-                st.session_state.search_page += 1
-                safe_rerun()
+                # ACTIONS: Favoritar + Ver detalhes (no detalhes: explicação + contatar autor)
+                a1, a2 = st.columns([0.28, 0.72])
+                with a1:
+                    if st.button("⭐ Favoritar", key=f"fav_{idx}", use_container_width=True):
+                        if add_to_favorites(result_data):
+                            st.toast("Adicionado aos favoritos!", icon="⭐")
+                            save_state_for_user(USERNAME)
+                        else:
+                            st.toast("Já está nos favoritos.")
+                with a2:
+                    if st.button("🔎 Ver detalhes", key=f"view_{idx}", use_container_width=True):
+                        # show details + explanation + contact button
+                        st.markdown("---")
+                        st.markdown(f"### Detalhes do registro (origem: **{user_src}**)")
+                        # contextual explanation (simple heuristic):
+                        expl = []
+                        if result_data.get("título") or result_data.get("titulo"):
+                            expl.append("Este registro parece ser um trabalho (título) relacionado a pesquisa/obra indicada.")
+                        if result_data.get("autor"):
+                            expl.append("O campo 'autor' identifica o responsável ou autor principal do item.")
+                        if result_data.get("tema"):
+                            expl.append("O campo 'tema' pode ser usado para agrupar ou encontrar trabalhos similares.")
+                        if not expl:
+                            expl = ["Este é um registro importado de um backup; verifique os campos abaixo."]
+                        st.info(" ".join(expl))
 
-        st.markdown("</div>", unsafe_allow_html=True)
+                        # show all fields in a compact list
+                        for k, v in result_data.items():
+                            if k == "_artemis_username": continue
+                            st.markdown(f"- **{k}:** {v}")
+
+                        st.markdown("---")
+                        # Contatar autor / usuário
+                        origin_user = result_data.get("_artemis_username") or user_src or ""
+                        if origin_user:
+                            if st.button(f"✉️ Contatar {origin_user}", key=f"contact_{idx}", use_container_width=True):
+                                # prefill compose form variables used on mensagens page
+                                st.session_state.compose_open = True
+                                st.session_state.compose_to = origin_user
+                                st.session_state.compose_subject = f"Sobre o registro: {result_data.get('título') or result_data.get('titulo') or '(Sem título)'}"
+                                st.session_state.compose_prefill = f"Olá {origin_user},\n\nEncontrei este registro nos backups da plataforma e gostaria de entrar em contato sobre: {result_data.get('título') or result_data.get('titulo') or ''}\n\n(Escreva sua mensagem aqui...)"
+                                # switch to messages page so user can finish/send
+                                st.session_state.page = "mensagens"
+                                safe_rerun()
+                        else:
+                            st.warning("Usuário/origem não disponível para contato.")
+                        st.markdown("---")
+
+            # pagination controls
+            col_prev, col_page, col_next = st.columns([0.33,0.34,0.33])
+            with col_prev:
+                if st.button("◀ Anterior") and st.session_state.search_page > 1:
+                    st.session_state.search_page -= 1
+                    safe_rerun()
+            with col_page:
+                st.markdown(f"**Página {st.session_state.search_page} / {max_pages}**", unsafe_allow_html=True)
+            with col_next:
+                if st.button("Próxima ▶") and st.session_state.search_page < max_pages:
+                    st.session_state.search_page += 1
+                    safe_rerun()
+
+    # --------------------
+    # FAVORITOS (tab)
+    # --------------------
+    with tab_favoritos:
+        st.header("Seus Resultados Salvos")
+        favorites = get_session_favorites()
+        if not favorites:
+            st.info("Você ainda não favoritou nenhum resultado.")
+        else:
+            _, col_clear = st.columns([0.75, 0.25])
+            with col_clear:
+                if action_button("Limpar Todos", "trash", "clear_favs"):
+                    clear_all_favorites()
+                    save_state_for_user(USERNAME)
+                    safe_rerun()
+            st.markdown("---")
+            sorted_favorites = sorted(favorites, key=lambda x: x['added_at'], reverse=True)
+            for fav in sorted_favorites:
+                with st.container():
+                    col_info, col_action = st.columns([0.8, 0.2])
+                    with col_info:
+                        fav_data = fav['data'].copy()
+                        source_user = fav_data.pop('_artemis_username', 'N/A')
+                        user_icon_svg = icon_html_svg('register', size=18, color='var(--muted-text)')
+                        st.markdown(f"""
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 10px; color: var(--muted-text);">
+                            {user_icon_svg}
+                            <span>Proveniente do trabalho de <strong style="color: #e1e3e6;">{source_user}</strong></span>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        # show a few fields
+                        for k, v in fav_data.items():
+                            st.markdown(f"**{str(k).capitalize()}:** {v}")
+                    with col_action:
+                        if action_button("Remover", "trash", f"del_fav_{fav['id']}"):
+                            remove_from_favorites(fav['id'])
+                            save_state_for_user(USERNAME)
+                            safe_rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Melhorias na seção 'mensagens' (UI)
+# Mensagens (melhorada UI)
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative; padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
