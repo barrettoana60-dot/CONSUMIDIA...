@@ -1,4 +1,4 @@
-# streamlit_app.py
+
 import os
 import re
 import io
@@ -32,6 +32,7 @@ except Exception:
 # -------------------------
 st.set_page_config(page_title="CONSUMIDIA", layout="wide", initial_sidebar_state="expanded")
 
+# safe rerun helper
 def safe_rerun():
     try:
         if hasattr(st, "rerun") and callable(getattr(st, "rerun")):
@@ -77,21 +78,16 @@ try:
 except Exception:
     create_client = None
 
-# ---------- YOUR SUPABASE CREDENTIALS ----------
-# You asked to include your Supabase URL and anon key directly here.
-# For production prefer Streamlit Secrets or env vars.
-SUPABASE_URL = "https://sdfdeghaxbxqhornmdgu.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkZmRlZ2hheGJ4cWhvcm5tZGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MDI4NzAsImV4cCI6MjA3NTE3ODg3MH0.8vnMKvbJzCm2Wb6pjgNVTvpByrY_-6WNz8XqM5vuHkc"
-# ------------------------------------------------
-
-# Allow override by streamlit secrets / env vars if you prefer:
+SUPABASE_URL = None
+SUPABASE_KEY = None
 if isinstance(st.secrets, dict):
-    SUPABASE_URL = st.secrets.get("SUPABASE_URL") or SUPABASE_URL
-    SUPABASE_KEY = st.secrets.get("SUPABASE_ANON_KEY") or st.secrets.get("SUPABASE_KEY") or SUPABASE_KEY
+    SUPABASE_URL = st.secrets.get("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
+    SUPABASE_KEY = st.secrets.get("SUPABASE_ANON_KEY") or st.secrets.get("SUPABASE_KEY")
+
 if not SUPABASE_URL:
-    SUPABASE_URL = os.getenv("SUPABASE_URL") or SUPABASE_URL
+    SUPABASE_URL = os.getenv("SUPABASE_URL")
 if not SUPABASE_KEY:
-    SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY") or SUPABASE_KEY
+    SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
 
 _supabase = None
 if create_client and SUPABASE_URL and SUPABASE_KEY:
@@ -423,6 +419,9 @@ def icon_html_svg(key, size=28, color=None):
     style = f"color:{col}; width:{size}px; height:{size}px; display:inline-block; vertical-align:middle;"
     return f'<span style="{style}">{svg}</span>'
 
+# -------------------------
+# Unified action button helper
+# -------------------------
 def action_button(label, icon_key, st_key, expanded_label=None, wide=False):
     c_icon, c_btn = st.columns([0.12, 0.88])
     with c_icon:
@@ -674,116 +673,84 @@ if "debug_auth" not in st.session_state:
 # Authentication flow
 if not st.session_state.authenticated:
     st.markdown("<div class='glass-box auth' style='max-width:1100px;margin:0 auto; position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("Acesso — Faça login ou cadastre-se (username)")
+    st.subheader("Acesso — Faça login ou cadastre-se")
     tabs = st.tabs(["Entrar", "Cadastrar"])
 
-    # --- Entrar (login by username) ---
     with tabs[0]:
-        login_user = st.text_input("Username", key="ui_login_user")
+        login_user = st.text_input("Usuário / Email", key="ui_login_user")
         login_pass = st.text_input("Senha", type="password", key="ui_login_pass")
         if st.button("Entrar", "btn_login_main"):
-            lu = (login_user or "").strip()
-            lp = (login_pass or "").strip()
-            if not lu or not lp:
-                st.warning("Informe username e senha.")
-            else:
-                if _supabase:
-                    # Supabase expects email -> map username to fake email domain
-                    email_for_login = f"{lu}@noemail.consumidia"
-                    out = supa_signin(email_for_login, lp)
-                    if isinstance(out, dict) and out.get("error"):
-                        st.warning("Erro no login: " + out.get("error"))
-                    else:
-                        user = None
-                        if isinstance(out, dict):
-                            user = out.get("user") or (out.get("data") or {}).get("user")
-                        elif hasattr(out, 'get'):
-                            user = out.get('user')
-                        # set session using username portion
-                        if user and (user.get("email") or user.get("id")):
-                            st.session_state.authenticated = True
-                            email = user.get("email") or ""
-                            username_display = lu
-                            st.session_state.username = username_display
-                            st.session_state.user_obj = {"id": user.get("id"), "email": email}
-                            st.success(f"Logado: {username_display}")
-                            safe_rerun()
-                        else:
-                            st.info("Login efetuado — verifique retorno:")
-                            st.write(out)
+            if _supabase:
+                out = supa_signin(login_user.strip(), login_pass.strip())
+                if isinstance(out, dict) and out.get("error"):
+                    st.warning("Erro no login: " + out.get("error"))
                 else:
-                    users = load_users() or {}
-                    if not users:
-                        # create default admin for local fallback
-                        users = {"admin": {"name": "Administrador", "scholarship": "Admin", "password": "admin123", "created_at": datetime.utcnow().isoformat()}}
-                        save_users(users)
-                        st.warning("Nenhum usuário local encontrado. Usuário de emergência criado: 'admin' / 'admin123' (troque a senha).")
-                    if lu in users and users[lu].get("password") == lp:
+                    # extrai user defensivamente
+                    user = None
+                    if isinstance(out, dict):
+                        user = out.get("user") or (out.get("data") or {}).get("user")
+                    elif hasattr(out, 'get'):
+                        user = out.get('user')
+                    if user and user.get("email"):
                         st.session_state.authenticated = True
-                        st.session_state.username = lu
-                        st.session_state.user_obj = users[lu]
-                        st.success("Login efetuado (local).")
+                        st.session_state.username = user.get("email")
+                        st.session_state.user_obj = {"id": user.get("id"), "email": user.get("email")}
+                        st.success(f"Logado: {user.get('email')}")
                         safe_rerun()
                     else:
-                        st.warning("Usuário/Senha inválidos (local).")
+                        st.info("Login efetuado — verifique retorno: ")
+                        st.write(out)
+            else:
+                lu = (login_user or "").strip(); lp = (login_pass or "").strip()
+                users = load_users() or {}
+                if not users:
+                    # create default admin for local fallback
+                    users = {"admin": {"name": "Administrador", "scholarship": "Admin", "password": "admin123", "created_at": datetime.utcnow().isoformat()}}
+                    save_users(users)
+                    st.warning("Nenhum usuário local encontrado. Usuário de emergência criado: 'admin' / 'admin123' (troque a senha).")
+                if lu in users and users[lu].get("password") == lp:
+                    st.session_state.authenticated = True
+                    st.session_state.username = lu
+                    st.session_state.user_obj = users[lu]
+                    st.success("Login efetuado (local).")
+                    safe_rerun()
+                else:
+                    st.warning("Usuário/Senha inválidos (local).")
 
-    # --- Cadastrar (username + generated password) ---
     with tabs[1]:
         reg_name = st.text_input("Nome completo", key="ui_reg_name")
         reg_bolsa = st.selectbox("Tipo de bolsa", ["IC - Iniciação Científica", "BIA - Bolsa de Incentivo Acadêmico", "Extensão", "Doutorado"], key="ui_reg_bolsa")
-        reg_user = st.text_input("Username (sem espaços)", key="ui_reg_user")
+        reg_user = st.text_input("Email (ou username para modo local)", key="ui_reg_user")
         if st.button("Cadastrar", "btn_register_main"):
-            reg_username = (reg_user or "").strip()
-            if not reg_username or " " in reg_username:
-                st.warning("Informe um username válido (sem espaços).")
-            else:
-                generated_pw = gen_password(10)
-                if _supabase:
-                    # map username -> email
-                    email_for_signup = f"{reg_username}@noemail.consumidia"
-                    out = supa_signup(email_for_signup, generated_pw)
-                    if isinstance(out, dict) and out.get("error"):
-                        st.error("Erro no cadastro: " + str(out.get("error")))
+            if _supabase:
+                # Use a generated password then inform user to reset or use email flow
+                pw = gen_password(12)
+                out = supa_signup(reg_user.strip(), pw)
+                if isinstance(out, dict) and out.get("error"):
+                    st.error("Erro no cadastro: " + out.get("error"))
+                else:
+                    user = out.get("user") or (out.get("data") or {}).get("user") if isinstance(out, dict) else None
+                    if user and user.get("id"):
+                        r = supa_create_profile(user.get("id"), reg_name or user.get("email"), role="user")
+                        st.success("Conta criada! Verifique seu email se a confirmação estiver habilitada.")
+                        st.write("user id:", user.get("id"))
                     else:
-                        user = None
-                        session = None
-                        if isinstance(out, dict):
-                            user = out.get("user") or (out.get("data") or {}).get("user")
-                            session = out.get("session") or (out.get("data") or {}).get("session")
-                        if user:
-                            uid = user.get("id") if isinstance(user, dict) else None
-                            st.success("Conta criada — anote os dados abaixo:")
-                            st.info(f"Username: **{reg_username}**")
-                            st.info(f"Senha: **{generated_pw}**")
-                            # optional: try create profile row
-                            try:
-                                profile_row = {"id": uid, "full_name": reg_name or reg_username, "role": "user"}
-                                res = _supabase.table("profiles").insert(profile_row).execute()
-                                # ignore errors (may be blocked by RLS)
-                            except Exception:
-                                pass
-                            # attempt automatic login (may succeed if signup returns session)
-                            try:
-                                st.session_state.authenticated = True
-                                st.session_state.username = reg_username
-                                st.session_state.user_obj = {"id": uid, "email": email_for_signup, "name": reg_name}
-                                st.success(f"Logado automaticamente: {reg_username}")
-                                safe_rerun()
-                            except Exception:
-                                st.info("Conta criada; faça login com seu username/senha.")
-                        else:
-                            st.error("Resposta inesperada do Supabase — verifique retorno:")
-                            st.write(out)
+                        st.info("Conta criada — verifique retorno:")
+                        st.write(out)
+            else:
+                new_user = (reg_user or "").strip()
+                if not new_user:
+                    st.warning("Informe um username/email válido")
                 else:
                     users = load_users() or {}
-                    if reg_username in users:
+                    if new_user in users:
                         st.warning("Username já existe (local).")
                     else:
-                        users[reg_username] = {"name": reg_name or reg_username, "scholarship": reg_bolsa, "password": generated_pw, "created_at": datetime.utcnow().isoformat()}
+                        pwd = gen_password(8)
+                        users[new_user] = {"name": reg_name or new_user, "scholarship": reg_bolsa, "password": pwd, "created_at": datetime.utcnow().isoformat()}
                         save_users(users)
-                        st.success("Usuário criado (local). Anote os dados abaixo:")
-                        st.info(f"Username: **{reg_username}**")
-                        st.info(f"Senha: **{generated_pw}**")
+                        st.success(f"Usuário criado. Username: {new_user} — Senha gerada: {pwd}")
+                        st.info("Anote a senha e troque depois")
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
@@ -865,7 +832,7 @@ for i, (page_key, page_label) in enumerate(nav_buttons.items()):
 st.markdown("</div></div><hr>", unsafe_allow_html=True)
 
 # -------------------------
-# Page dispatcher (the same as your original pages)
+# Page dispatcher
 # -------------------------
 if st.session_state.page == "planilha":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1230,4 +1197,4 @@ elif st.session_state.page == "mensagens":
             for m in sent:
                 with st.expander(f"Para: {m.get('to')} | {m.get('subject')}"):
                     st.markdown(m.get('body'))
-    st.markdown("</div>", unsafe_allow_html=True)
+    st.markdown("</div>", unsafe_allow_html=True)  
