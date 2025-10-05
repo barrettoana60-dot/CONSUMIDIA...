@@ -1,4 +1,3 @@
-
 import os
 import re
 import io
@@ -78,6 +77,12 @@ try:
 except Exception:
     create_client = None
 
+# ---- Credenciais fornecidas pelo usuário (inseridas diretamente) ----
+# Obs: é mais seguro definir essas variáveis no Streamlit Cloud (Settings → Secrets)
+USER_PROVIDED_SUPABASE_URL = "https://sdfdeghaxbxqhornmdgu.supabase.co"
+USER_PROVIDED_SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNkZmRlZ2hheGJ4cWhvcm5tZGd1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTk2MDI4NzAsImV4cCI6MjA3NTE3ODg3MH0.8vnMKvbJzCm2Wb6pjgNVTvpByrY_-6WNz8XqM5vuHkc"
+
+# First try to read from st.secrets (recommended), then from environment, then fall back to the user-provided values above.
 SUPABASE_URL = None
 SUPABASE_KEY = None
 if isinstance(st.secrets, dict):
@@ -85,9 +90,9 @@ if isinstance(st.secrets, dict):
     SUPABASE_KEY = st.secrets.get("SUPABASE_ANON_KEY") or st.secrets.get("SUPABASE_KEY")
 
 if not SUPABASE_URL:
-    SUPABASE_URL = os.getenv("SUPABASE_URL")
+    SUPABASE_URL = os.getenv("SUPABASE_URL") or USER_PROVIDED_SUPABASE_URL
 if not SUPABASE_KEY:
-    SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY")
+    SUPABASE_KEY = os.getenv("SUPABASE_ANON_KEY") or os.getenv("SUPABASE_KEY") or USER_PROVIDED_SUPABASE_ANON_KEY
 
 _supabase = None
 if create_client and SUPABASE_URL and SUPABASE_KEY:
@@ -695,7 +700,7 @@ if not st.session_state.authenticated:
                         st.session_state.authenticated = True
                         st.session_state.username = user.get("email")
                         st.session_state.user_obj = {"id": user.get("id"), "email": user.get("email")}
-                        st.success(f"Logado: {user.get('email')}")
+                        st.success(f"Logado: {user.get("email")}")
                         safe_rerun()
                     else:
                         st.info("Login efetuado — verifique retorno: ")
