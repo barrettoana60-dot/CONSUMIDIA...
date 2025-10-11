@@ -1,3 +1,6 @@
+# dashboard_nugep_pqr_final_complete.py
+# NUGEP-PQR — Versão final (login com CPF) + Mapa Mental 3D (separável/interativo)
+# Ajustado: Configurações simplificadas (Tema Claro/Escuro + Tamanho da fonte + Altura do gráfico)
 
 import os
 import re
@@ -62,6 +65,17 @@ body { transition: background-color .25s ease, color .25s ease; }
 .small-muted{font-size:12px;}
 .card-title{font-weight:700;font-size:15px}
 .card-mark{ background: rgba(255,255,0,0.12); padding: 0 2px; border-radius:2px; }
+/* Estilos para botões interativos */
+.stButton>button, .stDownloadButton>button {
+    transition: transform 0.1s ease, opacity 0.1s ease, background-color 0.15s ease !important;
+}
+.stButton>button:hover, .stDownloadButton>button:hover {
+    opacity: 0.9;
+}
+.stButton>button:active, .stDownloadButton>button:active {
+    transform: scale(0.97);
+    opacity: 0.8;
+}
 """
 
 # default dark CSS (will be overridden if user chooses light theme)
@@ -127,16 +141,20 @@ def gen_password(length=8):
     choices = string.ascii_letters + string.digits
     return ''.join(random.choice(choices) for _ in range(length))
 
-def apply_theme_css(theme):
-    """Apply theme-specific CSS overrides (light/dark)."""
+def apply_theme_css(theme, font_scale=1.0):
+    """Apply theme-specific CSS overrides (light/dark) and global font scale."""
     try:
         if theme == "light":
             st.markdown(f"<style>{LIGHT_CSS}</style>", unsafe_allow_html=True)
-            # small override for body bg text
             st.markdown("<style>body { background-color: #f6f8fa; color: #111; }</style>", unsafe_allow_html=True)
         else:
             st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
             st.markdown("<style>body { background-color: #071428; color: #d6d9dc; }</style>", unsafe_allow_html=True)
+
+        # Apply global font scale. Browser base font is usually 16px. Streamlit uses 'rem'.
+        # Changing the font-size on the root element (html) scales all 'rem' units.
+        font_css = f"html {{ font-size: {font_scale * 100}%; }}"
+        st.markdown(f"<style>{font_css}</style>", unsafe_allow_html=True)
     except Exception:
         pass
 
@@ -449,12 +467,9 @@ _defaults = {
     "restored_from_saved": False, "favorites": [], "reply_message_id": None,
     "search_results": pd.DataFrame(), "search_page": 1, "search_query_meta": {"col": None,"query":""},
     "search_view_index": None, "compose_inline": False, "compose_open": False,
-    # mapa-specific persistent state
-    "node_positions": {},  # node -> [x,y,z]
-    "saved_node_positions": {},  # persisted positions (restored)
     "settings": {
         "plot_height": 720,
-        "theme": "dark",  # "dark" or "light"
+        "theme": "dark",
         "font_scale": 1.0,
         "node_opacity": 0.95,
         "edge_opacity": 0.25,
@@ -470,7 +485,12 @@ def get_settings():
 
 def save_user_state_minimal(USER_STATE):
     try:
-        data = {"notes": st.session_state.get("notes",""), "uploaded_name": st.session_state.get("uploaded_name", None), "favorites": st.session_state.get("favorites", []), "saved_node_positions": st.session_state.get("saved_node_positions", {}), "settings": st.session_state.get("settings", {})}
+        data = {
+            "notes": st.session_state.get("notes",""),
+            "uploaded_name": st.session_state.get("uploaded_name", None),
+            "favorites": st.session_state.get("favorites", []),
+            "settings": st.session_state.get("settings", {})
+        }
         tmp = USER_STATE.with_suffix(".tmp")
         with tmp.open("w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -549,7 +569,7 @@ if not st.session_state.authenticated:
                     if ok:
                         st.success("Usuário cadastrado com sucesso! Você já pode fazer o login na aba 'Entrar'.")
                         if "new_user_created" in st.session_state:
-                           del st.session_state["new_user_created"]
+                            del st.session_state["new_user_created"]
                     else:
                         st.error("Falha ao salvar o usuário localmente. Verifique permissões do diretório.")
 
@@ -564,7 +584,7 @@ users_local = load_users() or {}
 USER_OBJ = st.session_state.user_obj or users_local.get(USERNAME, {})
 USER_STATE = Path.cwd() / f"artemis_state_{USERNAME}.json"
 
-# restore per-user saved positions / state
+# restore per-user saved state
 if not st.session_state.restored_from_saved and USER_STATE.exists():
     try:
         with USER_STATE.open("r", encoding="utf-8") as f:
@@ -572,17 +592,17 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
         st.session_state.notes = meta.get("notes", st.session_state.notes)
         st.session_state.uploaded_name = meta.get("uploaded_name", st.session_state.get("uploaded_name"))
         st.session_state.favorites = meta.get("favorites", st.session_state.favorites)
-        st.session_state.saved_node_positions = meta.get("saved_node_positions", st.session_state.saved_node_positions)
         # restore settings if present
         if "settings" in meta:
             st.session_state.settings.update(meta.get("settings", {}))
         st.session_state.restored_from_saved = True
-        st.success("Estado salvo do usuário restaurado automaticamente.")
+        st.toast("Estado salvo do usuário restaurado.", icon="👍")
     except Exception:
         pass
 
-# apply theme CSS based on settings immediately
-apply_theme_css(get_settings().get("theme", "dark"))
+# apply theme and font CSS based on settings immediately
+s = get_settings()
+apply_theme_css(s.get("theme", "dark"), s.get("font_scale", 1.0))
 
 # unread count
 UNREAD_COUNT = 0
@@ -707,11 +727,13 @@ if st.session_state.page == "planilha":
                     st.session_state.notes = meta.get("notes","")
                     st.session_state.uploaded_name = meta.get("uploaded_name", None)
                     st.session_state.favorites = meta.get("favorites", [])
-                    st.session_state.saved_node_positions = meta.get("saved_node_positions", st.session_state.get("saved_node_positions", {}))
                     if "settings" in meta:
                         st.session_state.settings.update(meta.get("settings", {}))
-                        apply_theme_css(st.session_state.settings.get("theme", "dark"))
+                        s_restored = get_settings()
+                        apply_theme_css(s_restored.get("theme", "dark"), s_restored.get("font_scale", 1.0))
                     st.success("Estado salvo restaurado.")
+                    time.sleep(1)
+                    safe_rerun()
                 except Exception:
                     st.info("Erro ao restaurar estado.")
             else:
@@ -776,148 +798,58 @@ if st.session_state.page == "planilha":
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("Mapa Mental 3D — Editor (interagir nos nós)")
+    st.subheader("Mapa Mental 3D")
 
-    # Editor tradicional (criar/excluir/renomear)
-    if st.session_state.G and st.session_state.G.number_of_nodes() > 0:
-        with st.expander("Editar Nós do Mapa"):
-            left, right = st.columns([2,1])
-            with left:
-                new_node = st.text_input("Nome do novo nó", key=f"nm_name_{USERNAME}")
-                new_tipo = st.selectbox("Tipo", ["Outro", "Autor", "Título", "Ano", "Tema"], key=f"nm_tipo_{USERNAME}")
-                connect_to = st.selectbox("Conectar a (opcional)", ["Nenhum"] + list(st.session_state.G.nodes), key=f"nm_connect_{USERNAME}")
-                if st.button("Adicionar nó", key=f"btn_add_{USERNAME}"):
-                    n = new_node.strip()
-                    if not n:
-                        st.warning("Nome inválido.")
-                    elif n in st.session_state.G.nodes:
-                        st.warning("Nó já existe.")
-                    else:
-                        st.session_state.G.add_node(n, tipo=new_tipo, label=n)
-                        if connect_to != "Nenhum":
-                            st.session_state.G.add_edge(n, connect_to)
-                        st.success(f"Nó '{n}' adicionado.")
-                        if st.session_state.autosave: safe_rerun()
-            with right:
-                del_n = st.selectbox("Excluir nó", [""] + list(st.session_state.G.nodes), key=f"del_{USERNAME}")
-                if st.button("Excluir nó", key=f"btn_del_{USERNAME}"):
-                    if del_n and del_n in st.session_state.G:
-                        st.session_state.G.remove_node(del_n)
-                        # also remove positions if present
-                        st.session_state.node_positions.pop(del_n, None)
-                        st.session_state.saved_node_positions.pop(del_n, None)
-                        st.success(f"Nó '{del_n}' removido.")
-                        if st.session_state.autosave: safe_rerun()
-                st.markdown("---")
-                r_old = st.selectbox("Renomear: selecione nó", [""] + list(st.session_state.G.nodes), key=f"r_old_{USERNAME}")
-                r_new = st.text_input("Novo nome", key=f"r_new_{USERNAME}")
-                if st.button("Renomear", key=f"btn_ren_{USERNAME}"):
-                    if r_old and r_new and r_old in st.session_state.G and r_new not in st.session_state.G:
-                        nx.relabel_nodes(st.session_state.G, {r_old: r_new}, copy=False)
-                        # adjust positions dicts
-                        if r_old in st.session_state.node_positions:
-                            st.session_state.node_positions[r_new] = st.session_state.node_positions.pop(r_old)
-                        if r_old in st.session_state.saved_node_positions:
-                            st.session_state.saved_node_positions[r_new] = st.session_state.saved_node_positions.pop(r_old)
-                        st.success(f"'{r_old}' → '{r_new}'")
-                        if st.session_state.autosave: safe_rerun()
-    else:
-        with st.expander("Criar primeiro nó"):
-            new_node = st.text_input("Nome do novo nó", key=f"nm_name_init_{USERNAME}")
-            new_tipo = st.selectbox("Tipo", ["Outro", "Autor", "Título", "Ano", "Tema"], key=f"nm_tipo_init_{USERNAME}")
-            if st.button("Adicionar nó inicial", key=f"btn_add_init_{USERNAME}"):
+    with st.expander("Editar Nós do Mapa"):
+        left, right = st.columns([2,1])
+        with left:
+            new_node = st.text_input("Nome do novo nó", key=f"nm_name_{USERNAME}")
+            new_tipo = st.selectbox("Tipo", ["Outro", "Autor", "Título", "Ano", "Tema"], key=f"nm_tipo_{USERNAME}")
+            connect_to = st.selectbox("Conectar a (opcional)", ["Nenhum"] + list(st.session_state.G.nodes), key=f"nm_connect_{USERNAME}")
+            if st.button("Adicionar nó", key=f"btn_add_{USERNAME}"):
                 n = new_node.strip()
-                if n:
+                if not n:
+                    st.warning("Nome inválido.")
+                elif n in st.session_state.G.nodes:
+                    st.warning("Nó já existe.")
+                else:
                     st.session_state.G.add_node(n, tipo=new_tipo, label=n)
+                    if connect_to != "Nenhum":
+                        st.session_state.G.add_edge(n, connect_to)
                     st.success(f"Nó '{n}' adicionado.")
                     if st.session_state.autosave: safe_rerun()
-                else:
-                    st.warning("Nome inválido.")
+        with right:
+            del_n = st.selectbox("Excluir nó", [""] + list(st.session_state.G.nodes), key=f"del_{USERNAME}")
+            if st.button("Excluir nó", key=f"btn_del_{USERNAME}"):
+                if del_n and del_n in st.session_state.G:
+                    st.session_state.G.remove_node(del_n)
+                    st.success(f"Nó '{del_n}' removido.")
+                    if st.session_state.autosave: safe_rerun()
+            st.markdown("---")
+            r_old = st.selectbox("Renomear: selecione nó", [""] + list(st.session_state.G.nodes), key=f"r_old_{USERNAME}")
+            r_new = st.text_input("Novo nome", key=f"r_new_{USERNAME}")
+            if st.button("Renomear", key=f"btn_ren_{USERNAME}"):
+                if r_old and r_new and r_old in st.session_state.G and r_new not in st.session_state.G:
+                    nx.relabel_nodes(st.session_state.G, {r_old: r_new}, copy=False)
+                    st.success(f"'{r_old}' → '{r_new}'")
+                    if st.session_state.autosave: safe_rerun()
 
-    st.markdown("### Visualização 3D (interação e separação)")
-    settings = get_settings()
-    # controls: separation factor, apply, reset, per-node editing, plot height from settings
-    c1, c2 = st.columns([0.6, 0.4])
-    with c1:
-        show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
-        node_size_factor = st.slider("Fator de tamanho dos nós", min_value=1, max_value=30, value=8, key=f"node_size_{USERNAME}")
-        separation_factor = st.slider("Fator de separação (multiplica distância ao centro)", min_value=1.0, max_value=4.0, value=1.0, step=0.1, key=f"sep_factor_{USERNAME}")
-        sep_apply = st.button("Separar nós (aplicar fator)", key="btn_sep_apply")
-        sep_reset = st.button("Resetar posições (layout padrão)", key="btn_sep_reset")
-        save_positions = st.button("Salvar posições (persistir)", key="btn_save_positions")
-    with c2:
-        st.markdown("<div style='color:var(--muted-text-dark)'>Interaja com nós selecionando o nome abaixo — atualize X/Y/Z ou use Separar/Resetar.</div>", unsafe_allow_html=True)
-        sel_node = st.selectbox("Selecionar nó para editar", options=[""] + list(st.session_state.G.nodes), key=f"sel_node_{USERNAME}")
-        if sel_node:
-            pass
-        st.markdown("---")
-        if st.button("Exportar posições (.json)"):
-            to_export = st.session_state.node_positions or {}
-            st.download_button("⬇️ Baixar posições", data=json.dumps(to_export, ensure_ascii=False, indent=2), file_name=f"posicoes_{USERNAME}.json", mime="application/json")
+    st.markdown("### Visualização 3D")
+    show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
 
     try:
         G = st.session_state.G or nx.Graph()
         if G.number_of_nodes() == 0:
-            st.info("Sem nós no grafo. Adicione nós (ou carregue uma planilha) para visualizar o mapa mental.")
+            st.info("Sem nós no grafo. Adicione nós ou carregue uma planilha para visualizar o mapa.")
         else:
-            # compute base layout (spring)
-            base_pos = nx.spring_layout(G, dim=3, seed=42, iterations=200)
+            # Layout is calculated on each render. Simpler, no persistence.
+            pos = nx.spring_layout(G, dim=3, seed=42, iterations=200)
 
-            # initialize node_positions from saved or from base_pos
-            if not st.session_state.node_positions:
-                # if there are saved positions, use them preferentially
-                if st.session_state.get("saved_node_positions"):
-                    for n in G.nodes():
-                        if n in st.session_state.saved_node_positions:
-                            st.session_state.node_positions[n] = list(st.session_state.saved_node_positions[n])
-                        else:
-                            st.session_state.node_positions[n] = list(base_pos[n])
-                else:
-                    for n in G.nodes():
-                        st.session_state.node_positions[n] = list(base_pos[n])
-
-            # apply separation factor if requested (single apply)
-            if sep_apply:
-                pts = np.array(list(st.session_state.node_positions.values()), dtype=float)
-                centroid = pts.mean(axis=0)
-                new_positions = {}
-                for n, coords in st.session_state.node_positions.items():
-                    vec = np.array(coords) - centroid
-                    new = centroid + vec * float(separation_factor)
-                    new_positions[n] = new.tolist()
-                st.session_state.node_positions = new_positions
-                st.success(f"Separação aplicada (fator {separation_factor}).")
-
-            if sep_reset:
-                st.session_state.node_positions = {n: list(base_pos[n]) for n in G.nodes()}
-                st.success("Posições resetadas ao layout padrão.")
-
-            if save_positions:
-                st.session_state.saved_node_positions = st.session_state.node_positions.copy()
-                # persist minimal user state
-                ok = save_user_state_minimal(USER_STATE)
-                if ok:
-                    st.success("Posições salvas no estado do usuário.")
-                else:
-                    st.error("Falha ao salvar posições.")
-
-            # per-node manual editing
-            if sel_node:
-                cur = st.session_state.node_positions.get(sel_node, list(base_pos.get(sel_node, [0.0,0.0,0.0])))
-                x_val = st.number_input("X", value=float(cur[0]), step=0.01, key=f"x_{sel_node}_{USERNAME}")
-                y_val = st.number_input("Y", value=float(cur[1]), step=0.01, key=f"y_{sel_node}_{USERNAME}")
-                z_val = st.number_input("Z", value=float(cur[2]), step=0.01, key=f"z_{sel_node}_{USERNAME}")
-                if st.button("Atualizar posição do nó", key=f"btn_update_node_{sel_node}"):
-                    st.session_state.node_positions[sel_node] = [float(x_val), float(y_val), float(z_val)]
-                    st.success(f"Posição de '{sel_node}' atualizada.")
-                    if st.session_state.autosave: safe_rerun()
-
-            # build edge traces from st.session_state.node_positions
-            pos_map = st.session_state.node_positions
+            # Build edge traces
             edge_x, edge_y, edge_z = [], [], []
             for u, v in G.edges():
-                xu, yu, zu = pos_map.get(u, [0,0,0])
-                xv, yv, zv = pos_map.get(v, [0,0,0])
+                xu, yu, zu = pos.get(u, [0,0,0])
+                xv, yv, zv = pos.get(v, [0,0,0])
                 edge_x += [xu, xv, None]
                 edge_y += [yu, yv, None]
                 edge_z += [zu, zv, None]
@@ -929,7 +861,7 @@ elif st.session_state.page == "mapa":
                 showlegend=False
             )
 
-            # node grouping by tipo and traces
+            # Node grouping by 'tipo' and traces
             tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
             palette_choice = get_settings().get("palette", "Plotly")
             palette = px.colors.qualitative.Plotly if palette_choice == "Plotly" else px.colors.qualitative.Alphabet
@@ -943,17 +875,16 @@ elif st.session_state.page == "mapa":
                     n_tipo = meta.get("tipo", "Outro")
                     if n_tipo != tipo:
                         continue
-                    x, y, z = pos_map.get(n, list(base_pos.get(n, [0,0,0])))
+                    x, y, z = pos.get(n, [0,0,0])
                     xs.append(x); ys.append(y); zs.append(z)
                     label = meta.get("label", str(n))
                     d = deg.get(n, 0)
-                    sizes.append(max(6, int((d + 1) * node_size_factor)))
+                    sizes.append(max(6, int((d + 1) * 8))) # Fixed node size factor
                     hovertexts.append(f"<b>{escape_html(label)}</b><br>Tipo: {escape_html(n_tipo)}<br>Grau: {d}")
                     texts.append(label if show_labels else "")
                     ids.append(n)
                 if not xs:
                     continue
-                text_mode = 'text' if show_labels else None
                 trace = go.Scatter3d(
                     x=xs, y=ys, z=zs,
                     mode='markers+text' if show_labels else 'markers',
@@ -972,10 +903,10 @@ elif st.session_state.page == "mapa":
                 )
                 node_traces.append(trace)
 
-            # assemble figure (edges below nodes)
+            # Assemble figure (edges below nodes)
             fig = go.Figure(data=[edge_trace] + node_traces)
 
-            # theme-aware colors
+            # Theme-aware colors
             theme = get_settings().get("theme", "dark")
             if theme == "light":
                 paper_bg = "#ffffff"
@@ -986,7 +917,7 @@ elif st.session_state.page == "mapa":
                 plot_bg = "rgba(0,0,0,0)"
                 font_color = "#d6d9dc"
 
-            # remove cube/axes (teia look)
+            # Remove cube/axes for a "web" look
             fig.update_layout(
                 height=int(get_settings().get("plot_height", 720)),
                 showlegend=True,
@@ -1002,10 +933,10 @@ elif st.session_state.page == "mapa":
                 ),
                 margin=dict(l=0, r=0, b=0, t=0),
                 legend=dict(itemsizing='constant', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-                font=dict(size=12 * float(get_settings().get("font_scale", 1.0)), color=font_color)
+                font=dict(size=12, color=font_color) # Font size here is relative to the global scale
             )
 
-            # show figure
+            # Show figure
             st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao renderizar grafo: {e}")
@@ -1165,14 +1096,14 @@ elif st.session_state.page == "busca":
             st.markdown("---")
             p1, p2, p3 = st.columns([0.33, 0.34, 0.33])
             with p1:
-                if st.button("◀ Anterior", key="search_prev") and st.session_state.search_page > 1:
+                if st.button("◀ Anterior", key="search_prev", disabled=(st.session_state.search_page <= 1)):
                     st.session_state.search_page -= 1
                     st.session_state.search_view_index = None
                     safe_rerun()
             with p2:
-                st.markdown(f"**Página {st.session_state.search_page} / {max_pages}**", unsafe_allow_html=True)
+                st.markdown(f"<div style='text-align:center; padding-top:8px'><b>Página {st.session_state.search_page} / {max_pages}</b></div>", unsafe_allow_html=True)
             with p3:
-                if st.button("Próxima ▶", key="search_next") and st.session_state.search_page < max_pages:
+                if st.button("Próxima ▶", key="search_next", disabled=(st.session_state.search_page >= max_pages)):
                     st.session_state.search_page += 1
                     st.session_state.search_view_index = None
                     safe_rerun()
@@ -1383,7 +1314,7 @@ elif st.session_state.page == "config":
     c1, c2 = st.columns([1,1])
     with c1:
         plot_height = st.number_input("Altura do gráfico (px)", value=int(s.get("plot_height",720)), step=10, key="cfg_plot_height")
-        font_scale = st.slider("Escala de fonte (aplicada ao mapa e gráficos)", min_value=0.7, max_value=2.0, value=float(s.get("font_scale",1.0)), step=0.1, key="cfg_font_scale")
+        font_scale = st.slider("Escala de fonte (aplicada a todo o programa)", min_value=0.7, max_value=2.0, value=float(s.get("font_scale",1.0)), step=0.1, key="cfg_font_scale")
     with c2:
         theme = st.selectbox("Tema", options=["dark", "light"], index=0 if s.get("theme","dark")=="dark" else 1, key="cfg_theme")
         palette = st.selectbox("Paleta de cores (nós)", options=["Plotly","Alphabet"], index=0 if s.get("palette","Plotly")=="Plotly" else 1, key="cfg_palette")
@@ -1392,18 +1323,27 @@ elif st.session_state.page == "config":
         st.session_state.settings["font_scale"] = float(font_scale)
         st.session_state.settings["theme"] = str(theme)
         st.session_state.settings["palette"] = str(palette)
-        # persist minimal state
+        
         ok = save_user_state_minimal(USER_STATE)
-        # apply theme immediately
-        apply_theme_css(theme)
+        
+        apply_theme_css(theme, font_scale)
+        
         if ok:
             st.success("Configurações aplicadas e salvas.")
         else:
             st.success("Configurações aplicadas (falha ao salvar localmente).")
+        
+        time.sleep(0.5)
         safe_rerun()
 
     st.markdown("---")
     st.markdown("**Acessibilidade**")
-    st.markdown("- Use *Escala de fonte* para aumentar o tamanho do texto no mapa e nos gráficos.")
-    st.markdown("- *Tema* alterna entre claro e escuro.")
+    st.markdown("- Use *Escala de fonte* para aumentar ou diminuir o tamanho do texto em todo o programa.")
+    st.markdown("- *Tema* alterna entre claro e escuro para melhor contraste.")
     st.markdown("</div>", unsafe_allow_html=True)
+
+# -------------------------
+# Fallback (should not happen)
+# -------------------------
+else:
+    st.info("Página não encontrada — selecione uma aba no topo.")
