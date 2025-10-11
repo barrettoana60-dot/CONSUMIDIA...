@@ -1,6 +1,6 @@
 # dashboard_nugep_pqr_final_complete.py
 # NUGEP-PQR — Versão final (login com CPF) + Mapa Mental 3D (separável/interativo)
-# Ajustado: Correção definitiva para criação de linhas no mapa e para a função de salvar.
+# Ajustado: Correção CRÍTICA na função de salvar/carregar e implementação de restauração automática da planilha.
 
 import os
 import re
@@ -363,7 +363,7 @@ def read_spreadsheet(uploaded_file):
         buf.seek(0)
         return pd.read_excel(buf)
 
-def criar_grafo(df):
+def criar_grafo(df, silent=False):
     """
     Função robusta para criar um grafo a partir de um DataFrame.
     Ela identifica colunas relevantes (autor, título, etc.) mesmo com nomes variados,
@@ -385,7 +385,8 @@ def criar_grafo(df):
     col_map = {k: v for k, v in col_map.items() if v} # Remove os que não foram encontrados
 
     if not col_map.get('título'):
-        st.warning("Aviso: Não foi possível encontrar uma coluna de 'Título' ou similar na planilha. As linhas de conexão podem não ser criadas corretamente.")
+        if not silent:
+            st.warning("Aviso: Não foi possível encontrar uma coluna de 'Título' ou similar na planilha. As linhas de conexão podem não ser criadas corretamente.")
         # Mesmo sem título, tentamos criar nós individuais
         for _, row in df.iterrows():
             for key, col_name in col_map.items():
@@ -417,10 +418,11 @@ def criar_grafo(df):
                 G.add_edge(central_node_id, node_id)
                 created_edges += 1
 
-    if created_edges > 0:
-        st.success(f"Grafo criado com sucesso, com {created_edges} linhas de conexão a partir da planilha.")
-    else:
-        st.info("Grafo criado, mas nenhuma conexão foi gerada. Verifique se as colunas da planilha (autor, ano, tema) contêm dados.")
+    if not silent:
+        if created_edges > 0:
+            st.success(f"Grafo criado com sucesso, com {created_edges} linhas de conexão a partir da planilha.")
+        else:
+            st.info("Grafo criado, mas nenhuma conexão foi gerada. Verifique se as colunas da planilha (autor, ano, tema) contêm dados.")
 
     return G
 
@@ -490,6 +492,7 @@ _defaults = {
     "restored_from_saved": False, "favorites": [], "reply_message_id": None,
     "search_results": pd.DataFrame(), "search_page": 1, "search_query_meta": {"col": None,"query":""},
     "search_view_index": None, "compose_inline": False, "compose_open": False,
+    "last_backup_path": None,
     "settings": {
         "plot_height": 720,
         "font_scale": 1.0,
@@ -532,7 +535,8 @@ def save_user_state_minimal(USER_STATE):
             "notes": st.session_state.get("notes",""),
             "uploaded_name": st.session_state.get("uploaded_name", None),
             "favorites": st.session_state.get("favorites", []),
-            "settings": st.session_state.get("settings", {})
+            "settings": st.session_state.get("settings", {}),
+            "last_backup_path": st.session_state.get("last_backup_path")
         }
         # Limpa os dados para garantir que são compatíveis com JSON
         clean_data = clean_for_json(data)
@@ -638,16 +642,35 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
     try:
         with USER_STATE.open("r", encoding="utf-8") as f:
             meta = json.load(f)
+
+        # Restore simple values
         st.session_state.notes = meta.get("notes", st.session_state.notes)
         st.session_state.uploaded_name = meta.get("uploaded_name", st.session_state.get("uploaded_name"))
         st.session_state.favorites = meta.get("favorites", st.session_state.favorites)
-        # restore settings if present
+        st.session_state.last_backup_path = meta.get("last_backup_path", st.session_state.last_backup_path)
+        
+        # Restore settings
         if "settings" in meta:
             st.session_state.settings.update(meta.get("settings", {}))
+        
+        # *** NEW: AUTOMATICALLY RESTORE SPREADSHEET AND GRAPH ***
+        backup_path = st.session_state.get("last_backup_path")
+        if backup_path and os.path.exists(backup_path):
+            try:
+                df = pd.read_csv(backup_path)
+                st.session_state.df = df
+                st.session_state.G = criar_grafo(df, silent=True) # silent=True to avoid messages on login
+                st.toast(f"Planilha '{os.path.basename(backup_path)}' restaurada automaticamente.", icon="📄")
+            except Exception as e:
+                st.error(f"Falha ao restaurar o backup da sua planilha: {e}")
+                st.session_state.last_backup_path = None # Invalidate bad path
+        
         st.session_state.restored_from_saved = True
-        st.toast("Estado salvo do usuário restaurado.", icon="👍")
-    except Exception:
-        pass
+        st.toast("Progresso anterior restaurado.", icon="👍")
+    except Exception as e:
+        # CRITICAL: Show error if loading fails
+        st.error(f"Erro ao restaurar seu progresso: o arquivo de estado pode estar corrompido. Erro: {e}")
+
 
 # apply theme and font CSS based on settings immediately
 s = get_settings()
@@ -683,8 +706,9 @@ with top2:
     with nav_right2:
         if st.button("💾 Salvar", key="btn_save_now", use_container_width=True):
             ok = save_user_state_minimal(USER_STATE)
-            if ok: st.success("Progresso salvo.")
-            # O erro já é mostrado dentro da função save_user_state_minimal
+            if ok: 
+                timestamp = datetime.now().strftime("%H:%M:%S")
+                st.success(f"Progresso salvo com sucesso às {timestamp}.")
     with nav_right3:
         if st.button("🚪 Sair", key="btn_logout", use_container_width=True):
             st.session_state.authenticated = False
@@ -714,10 +738,6 @@ for i, (page_key, page_label) in enumerate(nav_buttons.items()):
             safe_rerun()
 st.markdown("</div></div><hr>", unsafe_allow_html=True)
 
-# [O restante do código, das páginas Planilha, Mapa, etc., continua aqui]
-# O código para as outras páginas (Busca, Mensagens, etc.) não foi alterado e continua
-# idêntico ao da última versão que você recebeu.
-
 # -------------------------
 # Page: Planilha
 # -------------------------
@@ -726,76 +746,58 @@ if st.session_state.page == "planilha":
     st.subheader("Planilha / Backup")
     col1, col2 = st.columns([1,3])
     with col1:
+        # Este botão agora só restaura o estado que não inclui a planilha (que já carrega sozinha)
         if st.button("Restaurar estado salvo", key="btn_restore_state"):
             if USER_STATE.exists():
-                try:
-                    with USER_STATE.open("r", encoding="utf-8") as f:
-                        meta = json.load(f)
-                    st.session_state.notes = meta.get("notes","")
-                    st.session_state.uploaded_name = meta.get("uploaded_name", None)
-                    st.session_state.favorites = meta.get("favorites", [])
-                    if "settings" in meta:
-                        st.session_state.settings.update(meta.get("settings", {}))
-                        s_restored = get_settings()
-                        apply_global_styles(s_restored.get("font_scale", 1.0))
-                    st.success("Estado salvo restaurado.")
-                    time.sleep(1)
-                    safe_rerun()
-                except Exception as e:
-                    st.error(f"Erro ao restaurar estado: {e}")
+                st.info("O estado da sua planilha já é restaurado automaticamente ao entrar. Este botão recarrega outras informações como anotações e favoritos.")
+                # Força um re-run para garantir que o processo de load no topo da página seja re-executado.
+                st.session_state.restored_from_saved = False 
+                safe_rerun()
             else:
                 st.info("Nenhum estado salvo encontrado.")
     with col2:
-        meta = None
-        if USER_STATE.exists():
-            try:
-                with USER_STATE.open("r", encoding="utf-8") as f: meta = json.load(f)
-            except Exception: meta = None
-        if meta and meta.get("backup_csv") and os.path.exists(meta.get("backup_csv")):
-            st.write("Backup CSV encontrado:")
-            st.text(meta.get("backup_csv"))
-            with open(meta.get("backup_csv"), "rb") as fp:
-                st.download_button("⬇ Baixar backup CSV", data=fp, file_name=os.path.basename(meta.get("backup_csv")), mime="text/csv")
+        # Mostra o caminho do backup que está em uso no momento
+        current_backup_path = st.session_state.get("last_backup_path")
+        if current_backup_path and os.path.exists(current_backup_path):
+            st.write("Backup CSV em uso:")
+            st.text(os.path.basename(current_backup_path))
+            with open(current_backup_path, "rb") as fp:
+                st.download_button("⬇ Baixar backup CSV", data=fp, file_name=os.path.basename(current_backup_path), mime="text/csv")
         else:
-            st.write("Nenhum backup CSV automático encontrado ainda.")
+            st.write("Nenhum backup de planilha ativo. Carregue um arquivo para começar.")
 
-    uploaded = st.file_uploader("Carregue .csv ou .xlsx (cada linha será um nó)", type=["csv", "xlsx"], key=f"u_{USERNAME}")
+    uploaded = st.file_uploader("Carregue .csv ou .xlsx para criar um novo mapa ou substituir o atual", type=["csv", "xlsx"], key=f"u_{USERNAME}")
     if uploaded:
         try:
             df = read_spreadsheet(uploaded)
             st.session_state.df = df
             st.session_state.uploaded_name = uploaded.name
             st.session_state.G = criar_grafo(df) # Usa a nova função robusta
-            if st.session_state.autosave:
-                try:
-                    ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
-                    safe = re.sub(r"[^\w\-_.]", "_", st.session_state.get("uploaded_name") or "planilha")
-                    backup_filename = f"{safe}_{ts}.csv"
-                    p = BACKUPS_DIR / USERNAME
-                    p.mkdir(parents=True, exist_ok=True)
-                    path = p / backup_filename
-                    st.session_state.df.to_csv(path, index=False, encoding="utf-8")
-                    st.success("Backup salvo.")
-                    try:
-                        meta = {}
-                        if USER_STATE.exists():
-                            with USER_STATE.open("r", encoding="utf-8") as f:
-                                meta = json.load(f) or {}
-                        meta["backup_csv"] = str(path)
-                        tmp = USER_STATE.with_suffix(".tmp")
-                        with tmp.open("w", encoding="utf-8") as f:
-                            json.dump(meta, f, ensure_ascii=False, indent=2)
-                            f.flush(); os.fsync(f.fileno())
-                        tmp.replace(USER_STATE)
-                    except Exception:
-                        pass
-                except Exception as e:
-                    st.error(f"Erro ao salvar backup automático: {e}")
+            
+            # Cria o backup da planilha recém-carregada
+            try:
+                ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
+                safe_name = re.sub(r"[^\w\-_.]", "_", uploaded.name)
+                backup_filename = f"{safe_name}_{ts}.csv"
+                p = BACKUPS_DIR / USERNAME
+                p.mkdir(parents=True, exist_ok=True)
+                path = p / backup_filename
+                df.to_csv(path, index=False, encoding="utf-8")
+                
+                # ATUALIZA o caminho do backup em uso e salva o estado se autosave estiver ativo
+                st.session_state.last_backup_path = str(path)
+                st.success(f"Backup '{backup_filename}' criado com sucesso.")
+                if st.session_state.autosave:
+                    save_user_state_minimal(USER_STATE)
+
+            except Exception as e:
+                st.error(f"Erro ao salvar backup automático da planilha: {e}")
+
         except Exception as e:
-            st.error(f"Erro ao ler planilha: {e}")
+            st.error(f"Erro ao ler a planilha: {e}")
 
     if st.session_state.df is not None:
-        st.write("Visualização da planilha:")
+        st.write("Visualização da planilha em uso:")
         st.dataframe(st.session_state.df, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -823,14 +825,14 @@ elif st.session_state.page == "mapa":
                     if connect_to != "Nenhum":
                         st.session_state.G.add_edge(n, connect_to)
                     st.success(f"Nó '{n}' adicionado.")
-                    if st.session_state.autosave: safe_rerun()
+                    if st.session_state.autosave: save_user_state_minimal(USER_STATE)
         with right:
             del_n = st.selectbox("Excluir nó", [""] + list(st.session_state.G.nodes), key=f"del_{USERNAME}")
             if st.button("Excluir nó", key=f"btn_del_{USERNAME}"):
                 if del_n and del_n in st.session_state.G:
                     st.session_state.G.remove_node(del_n)
                     st.success(f"Nó '{del_n}' removido.")
-                    if st.session_state.autosave: safe_rerun()
+                    if st.session_state.autosave: save_user_state_minimal(USER_STATE)
             st.markdown("---")
             r_old = st.selectbox("Renomear: selecione nó", [""] + list(st.session_state.G.nodes), key=f"r_old_{USERNAME}")
             r_new = st.text_input("Novo nome", key=f"r_new_{USERNAME}")
@@ -838,7 +840,7 @@ elif st.session_state.page == "mapa":
                 if r_old and r_new and r_old in st.session_state.G and r_new not in st.session_state.G:
                     nx.relabel_nodes(st.session_state.G, {r_old: r_new}, copy=False)
                     st.success(f"'{r_old}' → '{r_new}'")
-                    if st.session_state.autosave: safe_rerun()
+                    if st.session_state.autosave: save_user_state_minimal(USER_STATE)
 
     st.markdown("### Visualização 3D")
 
@@ -867,104 +869,82 @@ elif st.session_state.page == "mapa":
         elif G.number_of_edges() == 0 and G.number_of_nodes() > 0:
             st.warning("O mapa não tem linhas porque nenhum nó está conectado. Conecte os nós ao criá-los ou carregue uma planilha com relações (autor, título, etc).")
 
-        # Mesmo com o aviso, tentamos renderizar o que existe.
-        # Calculate layout with adjusted separation (k value)
-        k_val = None
         if G.number_of_nodes() > 0:
-            k_val = 2.0 / math.sqrt(G.number_of_nodes()) # Increased k for more separation
-        pos = nx.spring_layout(G, dim=3, seed=42, iterations=200, k=k_val)
+            # 1. Calculate layout once
+            k_val = 2.0 / math.sqrt(G.number_of_nodes()) if G.number_of_nodes() > 0 else None
+            pos = nx.spring_layout(G, dim=3, seed=42, iterations=200, k=k_val)
 
-        # Build edge traces
-        edge_x, edge_y, edge_z = [], [], []
-        for u, v in G.edges():
-            xu, yu, zu = pos.get(u, [0,0,0])
-            xv, yv, zv = pos.get(v, [0,0,0])
-            edge_x += [xu, xv, None]
-            edge_y += [yu, yv, None]
-            edge_z += [zu, zv, None]
-        edge_trace = go.Scatter3d(
-            x=edge_x, y=edge_y, z=edge_z,
-            mode='lines',
-            hoverinfo='none',
-            line=dict(width=1.5, color='rgba(180,180,180,0.6)'), # More visible lines
-            showlegend=False
-        )
+            # 2. Prepare ONE trace for ALL edges
+            edge_x, edge_y, edge_z = [], [], []
+            for u, v in G.edges():
+                x0, y0, z0 = pos.get(u, (0,0,0))
+                x1, y1, z1 = pos.get(v, (0,0,0))
+                edge_x.extend([x0, x1, None])
+                edge_y.extend([y0, y1, None])
+                edge_z.extend([z0, z1, None])
 
-        # Node grouping by 'tipo' and traces
-        tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
-        palette = px.colors.qualitative.Plotly
-        tipo_color = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
-        deg = dict(G.degree())
-        node_traces = []
-        for tipo in tipo_order:
-            xs, ys, zs, texts, sizes, hovertexts, ids = [], [], [], [], [], [], []
-            for n in G.nodes():
-                meta = G.nodes[n]
-                n_tipo = meta.get("tipo", "Outro")
-                if n_tipo != tipo:
-                    continue
-                x, y, z = pos.get(n, [0,0,0])
-                xs.append(x); ys.append(y); zs.append(z)
-                label = meta.get("label", str(n))
-                d = deg.get(n, 0)
-                sizes.append(max(6, int((d + 1) * 8))) # Fixed node size factor
-                hovertexts.append(f"<b>{escape_html(label)}</b><br>Tipo: {escape_html(n_tipo)}<br>Grau: {d}")
-                texts.append(label if show_labels else "")
-                ids.append(n)
-            if not xs:
-                continue
-            trace = go.Scatter3d(
-                x=xs, y=ys, z=zs,
+            edge_trace = go.Scatter3d(x=edge_x, y=edge_y, z=edge_z, mode='lines', line=dict(color='#888', width=2), hoverinfo='none')
+
+            # 3. Prepare ONE trace for ALL nodes
+            node_x, node_y, node_z = [], [], []
+            node_colors, node_sizes, node_texts = [], [], []
+            
+            tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
+            palette = px.colors.qualitative.Plotly
+            tipo_color_map = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
+            
+            for node, data in G.nodes(data=True):
+                x, y, z = pos.get(node, (0,0,0))
+                node_x.append(x)
+                node_y.append(y)
+                node_z.append(z)
+                
+                node_tipo = data.get('tipo', 'Outro')
+                node_colors.append(tipo_color_map.get(node_tipo, '#cccccc'))
+                
+                degree = G.degree(node)
+                node_sizes.append(max(8, (degree + 1) * 8))
+                
+                label = data.get("label", node)
+                hover_text = f"<b>{escape_html(label)}</b><br>Tipo: {escape_html(node_tipo)}<br>Grau: {degree}"
+                node_texts.append(hover_text)
+                
+            node_trace = go.Scatter3d(
+                x=node_x, y=node_y, z=node_z,
                 mode='markers+text' if show_labels else 'markers',
-                text=texts,
-                textposition="top center" if show_labels else None,
-                hovertext=hovertexts,
-                hoverinfo="text",
-                name=tipo,
-                customdata=ids,
-                marker=dict(
-                    size=sizes,
-                    color=tipo_color.get(tipo),
-                    opacity=get_settings().get("node_opacity", 0.95),
-                    line=dict(width=0.6, color='rgba(0,0,0,0.12)')
-                )
+                text=[d.get('label', '') for n, d in G.nodes(data=True)] if show_labels else None,
+                textposition="top center",
+                hoverinfo='text',
+                hovertext=node_texts,
+                marker=dict(color=node_colors, size=node_sizes, line_width=0.5)
             )
-            node_traces.append(trace)
 
-        # Assemble figure (edges below nodes)
-        fig = go.Figure(data=[edge_trace] + node_traces)
+            # 4. Create figure with ONLY TWO traces: lines first, then nodes on top
+            fig = go.Figure(data=[edge_trace, node_trace])
 
-        # Fixed dark theme colors
-        paper_bg = "rgba(0,0,0,0)"
-        plot_bg = "rgba(0,0,0,0)"
-        font_color = "#d6d9dc"
+            # 5. Apply layout
+            fig.update_layout(
+                height=int(get_settings().get("plot_height", 720)),
+                showlegend=False,
+                paper_bgcolor="rgba(0,0,0,0)",
+                plot_bgcolor="rgba(0,0,0,0)",
+                scene=dict(
+                    xaxis=dict(visible=False),
+                    yaxis=dict(visible=False),
+                    zaxis=dict(visible=False),
+                    aspectmode='auto'
+                ),
+                margin=dict(l=0, r=0, b=0, t=0)
+            )
 
-        # Remove cube/axes for a "web" look
-        fig.update_layout(
-            height=int(get_settings().get("plot_height", 720)),
-            showlegend=True,
-            paper_bgcolor=paper_bg,
-            plot_bgcolor=plot_bg,
-            scene=dict(
-                xaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
-                yaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
-                zaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
-                aspectmode='auto',
-                camera=dict(eye=dict(x=1.4, y=1.4, z=1.0)),
-                dragmode='orbit'
-            ),
-            margin=dict(l=0, r=0, b=0, t=0),
-            legend=dict(itemsizing='constant', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-            font=dict(size=12, color=font_color) # Font size here is relative to the global scale
-        )
-
-        # Show figure
-        if G.number_of_nodes() > 0:
             st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
-        st.error(f"Erro ao renderizar grafo: {e}")
+        st.error(f"Ocorreu um erro inesperado ao renderizar o grafo: {e}")
+        st.exception(e)
+
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 # -------------------------
 # Page: Anotações
