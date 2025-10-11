@@ -1,5 +1,5 @@
-# dashboard_nugep_pqr_final.py
-# NUGEP-PQR — Versão final (ajustes: login com CPF)
+# dashboard_nugep_pqr_final_complete.py
+# NUGEP-PQR — Versão final (ajustes: login com CPF) + Mapa Mental 3D restaurado
 import os
 import re
 import io
@@ -688,8 +688,22 @@ if st.session_state.page == "planilha":
                     path = p / backup_filename
                     st.session_state.df.to_csv(path, index=False, encoding="utf-8")
                     st.success("Backup salvo.")
-                except Exception:
-                    pass
+                    # record in user state
+                    try:
+                        meta = {}
+                        if USER_STATE.exists():
+                            with USER_STATE.open("r", encoding="utf-8") as f:
+                                meta = json.load(f) or {}
+                        meta["backup_csv"] = str(path)
+                        tmp = USER_STATE.with_suffix(".tmp")
+                        with tmp.open("w", encoding="utf-8") as f:
+                            json.dump(meta, f, ensure_ascii=False, indent=2)
+                            f.flush(); os.fsync(f.fileno())
+                        tmp.replace(USER_STATE)
+                    except Exception:
+                        pass
+                except Exception as e:
+                    st.error(f"Erro ao salvar backup automático: {e}")
         except Exception as e:
             st.error(f"Erro ao ler planilha: {e}")
 
@@ -698,10 +712,13 @@ if st.session_state.page == "planilha":
         st.dataframe(st.session_state.df, use_container_width=True)
     st.markdown("</div>", unsafe_allow_html=True)
 
+# -------------------------
+# MAPA (restaurado)
+# -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Mapa Mental 3D — Editor")
-    if st.session_state.G.nodes():
+    if st.session_state.G and st.session_state.G.number_of_nodes() > 0:
         with st.expander("Editar Nós do Mapa"):
             left, right = st.columns([2,1])
             with left:
@@ -733,15 +750,94 @@ elif st.session_state.page == "mapa":
                         nx.relabel_nodes(st.session_state.G, {r_old: r_new}, copy=False)
                         st.success(f"'{r_old}' → '{r_new}'")
                         if st.session_state.autosave: safe_rerun()
+    else:
+        # Allow manual add when graph empty
+        with st.expander("Criar primeiro nó"):
+            new_node = st.text_input("Nome do novo nó", key=f"nm_name_init_{USERNAME}")
+            new_tipo = st.selectbox("Tipo", ["Outro", "Autor", "Título", "Ano", "Tema"], key=f"nm_tipo_init_{USERNAME}")
+            if st.button("Adicionar nó inicial", key=f"btn_add_init_{USERNAME}"):
+                n = new_node.strip()
+                if n:
+                    st.session_state.G.add_node(n, tipo=new_tipo, label=n)
+                    st.success(f"Nó '{n}' adicionado.")
+                    if st.session_state.autosave: safe_rerun()
+                else:
+                    st.warning("Nome inválido.")
+
     st.markdown("### Visualização 3D")
     try:
-        pos = nx.spring_layout(st.session_state.G, dim=3, seed=42)
-        fig = go.Figure(); fig.update_layout(height=600)
-        st.plotly_chart(fig, use_container_width=True)
+        G = st.session_state.G or nx.Graph()
+        if G.number_of_nodes() == 0:
+            st.info("Sem nós no grafo. Adicione nós (ou carregue uma planilha) para visualizar o mapa mental.")
+        else:
+            # compute 3D layout
+            pos = nx.spring_layout(G, dim=3, seed=42)
+            # prepare edge traces (lines)
+            edge_x = []
+            edge_y = []
+            edge_z = []
+            for u, v in G.edges():
+                xu, yu, zu = pos[u]
+                xv, yv, zv = pos[v]
+                edge_x += [xu, xv, None]
+                edge_y += [yu, yv, None]
+                edge_z += [zu, zv, None]
+            edge_trace = go.Scatter3d(
+                x=edge_x, y=edge_y, z=edge_z,
+                mode='lines',
+                hoverinfo='none',
+                line=dict(width=1, color='rgba(200,200,200,0.4)')
+            )
+            # prepare node traces
+            node_x = []
+            node_y = []
+            node_z = []
+            node_text = []
+            node_color = []
+            tipo_color_map = {"Autor": 0, "Título": 1, "Ano": 2, "Tema": 3, "Outro": 4}
+            for n in G.nodes():
+                x, y, z = pos[n]
+                node_x.append(x); node_y.append(y); node_z.append(z)
+                meta = G.nodes[n]
+                label = meta.get("label", str(n))
+                tipo = meta.get("tipo", "Outro")
+                node_text.append(f"{label} ({tipo})")
+                node_color.append(tipo_color_map.get(tipo, 4))
+            node_trace = go.Scatter3d(
+                x=node_x, y=node_y, z=node_z,
+                mode='markers+text',
+                text=[t.split(" (")[0] for t in node_text],
+                textposition="top center",
+                hovertext=node_text,
+                hoverinfo="text",
+                marker=dict(
+                    size=8,
+                    color=node_color,
+                    colorscale='Turbo',
+                    opacity=0.9,
+                    colorbar=dict(title="Tipo", tickvals=[0,1,2,3,4], ticktext=["Autor","Título","Ano","Tema","Outro"])
+                )
+            )
+            fig = go.Figure(data=[edge_trace, node_trace])
+            fig.update_layout(
+                height=700,
+                showlegend=False,
+                scene=dict(
+                    xaxis=dict(showbackground=False, showticklabels=False, title=""),
+                    yaxis=dict(showbackground=False, showticklabels=False, title=""),
+                    zaxis=dict(showbackground=False, showticklabels=False, title=""),
+                    aspectmode='auto'
+                ),
+                margin=dict(l=0, r=0, b=0, t=0),
+            )
+            st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao renderizar grafo: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
+# -------------------------
+# ANOTAÇÕES
+# -------------------------
 elif st.session_state.page == "anotacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Anotações com Marca-texto")
@@ -752,6 +848,9 @@ elif st.session_state.page == "anotacoes":
     st.download_button("Baixar Anotações (PDF)", data=pdf_bytes, file_name="anotacoes_nugep_pqr.pdf", mime="application/pdf")
     st.markdown("</div>", unsafe_allow_html=True)
 
+# -------------------------
+# GRÁFICOS
+# -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Gráficos Personalizados")
