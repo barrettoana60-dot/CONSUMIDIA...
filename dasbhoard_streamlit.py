@@ -1,5 +1,4 @@
-# dashboard_consumidia_final.py
-# CONSUMIDIA — Versão final (ajustes: mostrar senha gerada, copiar/baixar credenciais, evitar sair automático)
+
 import os
 import re
 import io
@@ -32,7 +31,7 @@ except Exception:
 # -------------------------
 # Config & helpers
 # -------------------------
-st.set_page_config(page_title="CONSUMIDIA", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="NUGEP-PQR", layout="wide", initial_sidebar_state="expanded")
 
 
 def safe_rerun():
@@ -74,7 +73,7 @@ try:
 except Exception:
     st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
 
-st.markdown("<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'><h1 style='font-weight:800;font-size:40px; background:linear-gradient(90deg,#8e44ad,#2979ff,#1abc9c,#ff8a00); -webkit-background-clip:text; color:transparent; margin:0;'>CONSUMIDIA</h1></div>", unsafe_allow_html=True)
+st.markdown("<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'><h1 style='font-weight:800;font-size:40px; background:linear-gradient(90deg,#8e44ad,#2979ff,#1abc9c,#ff8a00); -webkit-background-clip:text; color:transparent; margin:0;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
 
 # -------------------------
 # Storage & fallback paths
@@ -474,49 +473,36 @@ if not st.session_state.authenticated:
         reg_name = st.text_input("Nome completo", key="ui_reg_name")
         reg_bolsa = st.selectbox("Tipo de bolsa", ["IC - Iniciação Científica", "BIA - Bolsa de Incentivo Acadêmico", "Extensão", "Doutorado"], key="ui_reg_bolsa")
         reg_user = st.text_input("Email (ou username para modo local)", key="ui_reg_user")
+        reg_pass = st.text_input("Crie sua senha", type="password", key="ui_reg_pass")
+        reg_pass_confirm = st.text_input("Confirme sua senha", type="password", key="ui_reg_pass_confirm")
+        
         if st.button("Cadastrar", "btn_register_main"):
             # local flow (supabase path left intact earlier)
             new_user = (reg_user or "").strip()
+            new_pass = (reg_pass or "").strip()
+            
             if not new_user:
-                st.warning("Informe um username/email válido")
+                st.warning("Informe um username/email válido.")
+            elif not new_pass:
+                st.warning("A senha não pode estar em branco.")
+            elif len(new_pass) < 6:
+                st.warning("A senha deve ter pelo menos 6 caracteres.")
+            elif new_pass != reg_pass_confirm:
+                st.error("As senhas não coincidem. Tente novamente.")
             else:
                 users = load_users() or {}
                 if new_user in users:
                     st.warning("Username já existe (local).")
                 else:
-                    pwd = gen_password(8)
-                    users[new_user] = {"name": reg_name or new_user, "scholarship": reg_bolsa, "password": pwd, "created_at": datetime.utcnow().isoformat()}
+                    users[new_user] = {"name": reg_name or new_user, "scholarship": reg_bolsa, "password": new_pass, "created_at": datetime.utcnow().isoformat()}
                     ok = save_users(users)
                     if ok:
-                        # Instead of rerunning immediately, keep the generated credentials visible so user can copy/save
-                        st.session_state.new_user_created = {"user": new_user, "pwd": pwd, "note": "Anote a senha; você poderá alterar depois nas configurações."}
+                        st.success("Usuário cadastrado com sucesso! Você já pode fazer o login na aba 'Entrar'.")
+                        # Clear any temporary state if it exists
+                        if "new_user_created" in st.session_state:
+                           del st.session_state["new_user_created"]
                     else:
                         st.error("Falha ao salvar o usuário localmente. Verifique permissões do diretório.")
-
-        # If a new user was created in this session, show credentials and give options
-        if st.session_state.get("new_user_created"):
-            nu = st.session_state.get("new_user_created")
-            _render_credentials_box(nu["user"], nu["pwd"], note=nu.get("note",""), key_prefix="reg_new")
-            col_ok, col_cancel = st.columns([0.6, 0.4])
-            with col_ok:
-                if st.button("Copiei / Baixei — Continuar"):
-                    # clear the helper but do not auto-login; user can login manually with the shown credentials
-                    st.session_state.pop("new_user_created", None)
-                    st.success("Credenciais guardadas na sessão. Faça login com seu usuário.")
-                    safe_rerun()
-            with col_cancel:
-                if st.button("Apagar e cancelar cadastro"):
-                    # remove user from storage (safety) and clear session
-                    users = load_users() or {}
-                    try:
-                        if nu["user"] in users:
-                            users.pop(nu["user"], None)
-                            save_users(users)
-                    except Exception:
-                        pass
-                    st.session_state.pop("new_user_created", None)
-                    st.info("Cadastro cancelado.")
-                    safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
@@ -765,7 +751,7 @@ elif st.session_state.page == "anotacoes":
     notes = st.text_area("Digite suas anotações (use ==texto== para destacar)", value=st.session_state.notes, height=260, key=f"notes_{USERNAME}")
     st.session_state.notes = notes
     pdf_bytes = generate_pdf_with_highlights(st.session_state.notes)
-    st.download_button("Baixar Anotações (PDF)", data=pdf_bytes, file_name="anotacoes_consumidia.pdf", mime="application/pdf")
+    st.download_button("Baixar Anotações (PDF)", data=pdf_bytes, file_name="anotacoes_nugep_pqr.pdf", mime="application/pdf")
     st.markdown("</div>", unsafe_allow_html=True)
 
 elif st.session_state.page == "graficos":
@@ -887,17 +873,17 @@ elif st.session_state.page == "busca":
 
                 card_html = f"""
                 <div class="card">
-                  <div style="display:flex; gap:12px; align-items:center;">
-                    <div class="avatar">{escape_html(initials)}</div>
-                    <div style="flex:1;">
-                      <div class="card-title">{title_html}</div>
-                      <div class="small-muted">Proveniente de <strong>{escape_html(user_src)}</strong> • {escape_html(author)}</div>
-                      <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{resumo_html if resumo_raw else ''}</div>
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <div class="avatar">{escape_html(initials)}</div>
+                        <div style="flex:1;">
+                            <div class="card-title">{title_html}</div>
+                            <div class="small-muted">Proveniente de <strong>{escape_html(user_src)}</strong> • {escape_html(author)}</div>
+                            <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{resumo_html if resumo_raw else ''}</div>
+                        </div>
+                        <div style="text-align:right;">
+                            <div class="small-muted">{escape_html(year)}</div>
+                        </div>
                     </div>
-                    <div style="text-align:right;">
-                      <div class="small-muted">{escape_html(year)}</div>
-                    </div>
-                  </div>
                 </div>
                 """
                 st.markdown(card_html, unsafe_allow_html=True)
@@ -1029,14 +1015,14 @@ elif st.session_state.page == "busca":
                 initials = "".join([p[0].upper() for p in str(source_user).split()[:2]])[:2] or "U"
                 card_html = f"""
                 <div class="card">
-                  <div style="display:flex; gap:12px; align-items:center;">
-                    <div class="avatar">{escape_html(initials)}</div>
-                    <div style="flex:1;">
-                      <div class="card-title">{title_html}</div>
-                      <div class="small-muted">Proveniente de <strong>{escape_html(source_user)}</strong></div>
-                      <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{resumo_html if resumo_raw else ''}</div>
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <div class="avatar">{escape_html(initials)}</div>
+                        <div style="flex:1;">
+                            <div class="card-title">{title_html}</div>
+                            <div class="small-muted">Proveniente de <strong>{escape_html(source_user)}</strong></div>
+                            <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{resumo_html if resumo_raw else ''}</div>
+                        </div>
                     </div>
-                  </div>
                 </div>
                 """
                 st.markdown(card_html, unsafe_allow_html=True)
@@ -1097,16 +1083,16 @@ elif st.session_state.page == "mensagens":
                 preview = escape_html((m.get("body") or "")[:200])
                 card = f"""
                 <div class="msg-card">
-                  <div style="display:flex; gap:10px; align-items:center;">
-                    <div style="width:44px;height:44px;border-radius:8px;background:#6c5ce7;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">{fromu[:2].upper()}</div>
-                    <div style="flex:1;">
-                      <div class="msg-sub">{badge} {subj}</div>
-                      <div class="msg-meta">De: <strong>{fromu}</strong> • {ts}</div>
-                      <div style="margin-top:6px;color:#e6e8ea;font-size:13px;">{preview}{'...' if len(m.get('body',''))>200 else ''}</div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <div style="width:44px;height:44px;border-radius:8px;background:#6c5ce7;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">{fromu[:2].upper()}</div>
+                        <div style="flex:1;">
+                            <div class="msg-sub">{badge} {subj}</div>
+                            <div class="msg-meta">De: <strong>{fromu}</strong> • {ts}</div>
+                            <div style="margin-top:6px;color:#e6e8ea;font-size:13px;">{preview}{'...' if len(m.get('body',''))>200 else ''}</div>
+                        </div>
+                        <div style="width:120px;text-align:right;">
+                        </div>
                     </div>
-                    <div style="width:120px;text-align:right;">
-                    </div>
-                  </div>
                 </div>
                 """
                 st.markdown(card, unsafe_allow_html=True)
@@ -1161,16 +1147,16 @@ elif st.session_state.page == "mensagens":
                 preview = escape_html((m.get("body") or "")[:200])
                 card = f"""
                 <div class="msg-card">
-                  <div style="display:flex; gap:10px; align-items:center;">
-                    <div style="width:44px;height:44px;border-radius:8px;background:#1abc9c;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">{(to[:2]).upper()}</div>
-                    <div style="flex:1;">
-                      <div class="msg-sub">📤 {subj}</div>
-                      <div class="msg-meta">Para: <strong>{to}</strong> • {ts}</div>
-                      <div style="margin-top:6px;color:#e6e8ea;font-size:13px;">{preview}{'...' if len(m.get('body',''))>200 else ''}</div>
+                    <div style="display:flex; gap:10px; align-items:center;">
+                        <div style="width:44px;height:44px;border-radius:8px;background:#1abc9c;color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700">{(to[:2]).upper()}</div>
+                        <div style="flex:1;">
+                            <div class="msg-sub">📤 {subj}</div>
+                            <div class="msg-meta">Para: <strong>{to}</strong> • {ts}</div>
+                            <div style="margin-top:6px;color:#e6e8ea;font-size:13px;">{preview}{'...' if len(m.get('body',''))>200 else ''}</div>
+                        </div>
+                        <div style="width:120px;text-align:right;">
+                        </div>
                     </div>
-                    <div style="width:120px;text-align:right;">
-                    </div>
-                  </div>
                 </div>
                 """
                 st.markdown(card, unsafe_allow_html=True)
