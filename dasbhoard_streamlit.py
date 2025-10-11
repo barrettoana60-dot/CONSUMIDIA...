@@ -1,5 +1,5 @@
 # dashboard_nugep_pqr_final_complete.py
-# NUGEP-PQR — Versão final (ajustes: login com CPF) + Mapa Mental 3D restaurado
+# NUGEP-PQR — Versão final (ajustes: login com CPF) + Mapa Mental 3D melhorado
 import os
 import re
 import io
@@ -713,11 +713,13 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# MAPA (restaurado)
+# MAPA (substituído pela versão melhorada)
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Mapa Mental 3D — Editor")
+
+    # Editor / criação de nós (mesma lógica)
     if st.session_state.G and st.session_state.G.number_of_nodes() > 0:
         with st.expander("Editar Nós do Mapa"):
             left, right = st.columns([2,1])
@@ -727,8 +729,10 @@ elif st.session_state.page == "mapa":
                 connect_to = st.selectbox("Conectar a (opcional)", ["Nenhum"] + list(st.session_state.G.nodes), key=f"nm_connect_{USERNAME}")
                 if st.button("Adicionar nó", key=f"btn_add_{USERNAME}"):
                     n = new_node.strip()
-                    if not n: st.warning("Nome inválido.")
-                    elif n in st.session_state.G.nodes: st.warning("Nó já existe.")
+                    if not n:
+                        st.warning("Nome inválido.")
+                    elif n in st.session_state.G.nodes:
+                        st.warning("Nó já existe.")
                     else:
                         st.session_state.G.add_node(n, tipo=new_tipo, label=n)
                         if connect_to != "Nenhum":
@@ -764,18 +768,25 @@ elif st.session_state.page == "mapa":
                 else:
                     st.warning("Nome inválido.")
 
+    # Controls for visualization
     st.markdown("### Visualização 3D")
+    vis_col1, vis_col2 = st.columns([0.6, 0.4])
+    with vis_col1:
+        show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
+        node_size_factor = st.slider("Fator de tamanho dos nós", min_value=1, max_value=30, value=8, key=f"node_size_{USERNAME}")
+    with vis_col2:
+        layout_iter = st.slider("Força do layout (iterações)", min_value=20, max_value=500, value=200, key=f"layout_iter_{USERNAME}")
+        seed_val = st.number_input("Seed do layout", value=42, step=1, key=f"layout_seed_{USERNAME}")
+
     try:
         G = st.session_state.G or nx.Graph()
         if G.number_of_nodes() == 0:
             st.info("Sem nós no grafo. Adicione nós (ou carregue uma planilha) para visualizar o mapa mental.")
         else:
-            # compute 3D layout
-            pos = nx.spring_layout(G, dim=3, seed=42)
-            # prepare edge traces (lines)
-            edge_x = []
-            edge_y = []
-            edge_z = []
+            # compute 3D layout (spring)
+            pos = nx.spring_layout(G, dim=3, seed=int(seed_val), k=None, iterations=int(layout_iter))
+            # build edge trace
+            edge_x, edge_y, edge_z = [], [], []
             for u, v in G.edges():
                 xu, yu, zu = pos[u]
                 xv, yv, zv = pos[v]
@@ -786,50 +797,71 @@ elif st.session_state.page == "mapa":
                 x=edge_x, y=edge_y, z=edge_z,
                 mode='lines',
                 hoverinfo='none',
-                line=dict(width=1, color='rgba(200,200,200,0.4)')
+                line=dict(width=1, color='rgba(180,180,180,0.3)')
             )
-            # prepare node traces
-            node_x = []
-            node_y = []
-            node_z = []
-            node_text = []
-            node_color = []
-            tipo_color_map = {"Autor": 0, "Título": 1, "Ano": 2, "Tema": 3, "Outro": 4}
-            for n in G.nodes():
-                x, y, z = pos[n]
-                node_x.append(x); node_y.append(y); node_z.append(z)
-                meta = G.nodes[n]
-                label = meta.get("label", str(n))
-                tipo = meta.get("tipo", "Outro")
-                node_text.append(f"{label} ({tipo})")
-                node_color.append(tipo_color_map.get(tipo, 4))
-            node_trace = go.Scatter3d(
-                x=node_x, y=node_y, z=node_z,
-                mode='markers+text',
-                text=[t.split(" (")[0] for t in node_text],
-                textposition="top center",
-                hovertext=node_text,
-                hoverinfo="text",
-                marker=dict(
-                    size=8,
-                    color=node_color,
-                    colorscale='Turbo',
-                    opacity=0.9,
-                    colorbar=dict(title="Tipo", tickvals=[0,1,2,3,4], ticktext=["Autor","Título","Ano","Tema","Outro"])
+
+            # node grouping by tipo to create legend + separate colors
+            tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
+            # a palette from plotly
+            palette = px.colors.qualitative.Plotly
+            tipo_color = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
+
+            # compute degrees for sizing
+            deg = dict(G.degree())
+            node_traces = []
+            for tipo in tipo_order:
+                xs, ys, zs, texts, sizes, hovertexts = [], [], [], [], [], []
+                for n in G.nodes():
+                    meta = G.nodes[n]
+                    n_tipo = meta.get("tipo", "Outro")
+                    if n_tipo != tipo:
+                        continue
+                    x, y, z = pos[n]
+                    xs.append(x); ys.append(y); zs.append(z)
+                    label = meta.get("label", str(n))
+                    d = deg.get(n, 0)
+                    sizes.append(max(6, int((d + 1) * node_size_factor)))
+                    hovertexts.append(f"<b>{escape_html(label)}</b><br>Tipo: {escape_html(n_tipo)}<br>Grau: {d}")
+                    texts.append(label if show_labels else "")  # text visible only if checkbox on
+
+                if not xs:
+                    continue
+                trace = go.Scatter3d(
+                    x=xs, y=ys, z=zs,
+                    mode='markers+text' if show_labels else 'markers',
+                    text=texts,
+                    textposition="top center" if show_labels else None,
+                    hovertext=hovertexts,
+                    hoverinfo="text",
+                    name=tipo,
+                    marker=dict(
+                        size=sizes,
+                        color=tipo_color.get(tipo),
+                        opacity=0.95,
+                        line=dict(width=0.5, color='rgba(0,0,0,0.2)')
+                    )
                 )
-            )
-            fig = go.Figure(data=[edge_trace, node_trace])
+                node_traces.append(trace)
+
+            # assemble figure: edges first (below), then nodes
+            fig = go.Figure(data=[edge_trace] + node_traces)
             fig.update_layout(
-                height=700,
-                showlegend=False,
+                height=720,
+                showlegend=True,
                 scene=dict(
                     xaxis=dict(showbackground=False, showticklabels=False, title=""),
                     yaxis=dict(showbackground=False, showticklabels=False, title=""),
                     zaxis=dict(showbackground=False, showticklabels=False, title=""),
-                    aspectmode='auto'
+                    aspectmode='auto',
+                    camera=dict(
+                        eye=dict(x=1.5, y=1.5, z=1.2)
+                    )
                 ),
                 margin=dict(l=0, r=0, b=0, t=0),
+                legend=dict(itemsizing='constant', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
             )
+
+            # nicer hover template for nodes (applies per-trace via hovertext already)
             st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao renderizar grafo: {e}")
