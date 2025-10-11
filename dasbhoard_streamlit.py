@@ -1,5 +1,7 @@
 # dashboard_nugep_pqr_final_complete.py
-# NUGEP-PQR — Versão final (login com CPF) + Mapa Mental 3D (separável/interativo) + Configurações/Acessibilidade
+# NUGEP-PQR — Versão final (login com CPF) + Mapa Mental 3D (separável/interativo)
+# Ajustado: Configurações simplificadas (Tema Claro/Escuro + Tamanho da fonte + Altura do gráfico)
+
 import os
 import re
 import io
@@ -52,28 +54,46 @@ def safe_rerun():
         raise RuntimeError("safe_rerun falhou e não foi possível chamar st.stop()")
 
 # -------------------------
-# CSS (visual uniforme)
+# Base CSS
 # -------------------------
-DEFAULT_CSS = r"""
-:root{ --glass-bg: rgba(255,255,255,0.03); --muted-text: #bfc6cc; --icon-color:#fff; }
-.css-1d391kg { background: linear-gradient(180deg,#071428 0%, #031926 100%) !important; }
-.glass-box{ background: var(--glass-bg); border:1px solid rgba(255,255,255,0.04); border-radius:14px; padding:16px; box-shadow:0 8px 32px rgba(4,9,20,0.5); }
-.stButton>button, .stDownloadButton>button{ background:transparent !important; color:var(--muted-text) !important; border:1px solid rgba(255,255,255,0.06) !important; padding:8px 12px !important; border-radius:10px !important; }
-.card, .msg-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.03); }
-.avatar{width:40px;height:40px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;color:#fff;background:#6c5ce7;margin-right:8px}
-.small-muted{font-size:12px;color:#bfc6cc;}
+BASE_CSS = r"""
+:root{ --glass-bg-dark: rgba(255,255,255,0.03); --muted-text-dark:#bfc6cc; --glass-bg-light:#ffffff; --muted-text-light:#222; }
+body { transition: background-color .25s ease, color .25s ease; }
+.glass-box{ border-radius:12px; padding:16px; box-shadow:0 8px 32px rgba(4,9,20,0.15); }
+.card, .msg-card { border-radius:10px; padding:12px; margin-bottom:10px; }
+.avatar{width:40px;height:40px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;margin-right:8px}
+.small-muted{font-size:12px;}
 .card-title{font-weight:700;font-size:15px}
 .card-mark{ background: rgba(255,255,0,0.12); padding: 0 2px; border-radius:2px; }
 """
 
-try:
-    css_path = Path("style.css")
-    if not css_path.exists():
-        css_path.write_text(DEFAULT_CSS, encoding='utf-8')
-    st.markdown(f"<style>{css_path.read_text(encoding='utf-8')}</style>", unsafe_allow_html=True)
-except Exception:
-    st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
+# default dark CSS (will be overridden if user chooses light theme)
+DEFAULT_CSS = r"""
+.css-1d391kg { background: linear-gradient(180deg,#071428 0%, #031926 100%) !important; }
+.glass-box{ background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.04); box-shadow:0 8px 32px rgba(4,9,20,0.5); }
+.stButton>button, .stDownloadButton>button{ background:transparent !important; color:#bfc6cc !important; border:1px solid rgba(255,255,255,0.06) !important; padding:8px 12px !important; border-radius:10px !important; }
+.card, .msg-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.03); }
+.avatar{color:#fff;background:#6c5ce7}
+.small-muted{color:#bfc6cc;}
+.card-title{color:#fff}
+"""
 
+LIGHT_CSS = r"""
+.css-1d391kg { background: linear-gradient(180deg,#ffffff 0%, #f6f8fa 100%) !important; }
+.glass-box{ background: rgba(0,0,0,0.02); border:1px solid rgba(0,0,0,0.06); box-shadow:0 4px 12px rgba(0,0,0,0.05); }
+.stButton>button, .stDownloadButton>button{ background:transparent !important; color:#222 !important; border:1px solid rgba(0,0,0,0.06) !important; padding:8px 12px !important; border-radius:10px !important; }
+.card, .msg-card { background: #fff; border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(0,0,0,0.06); }
+.avatar{color:#fff;background:#4b8bf4}
+.small-muted{color:#444;}
+.card-title{color:#111}
+"""
+
+# inject base CSS
+st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
+# inject dark default; we will override dynamically according to settings later
+st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
+
+# header
 st.markdown("<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'><h1 style='font-weight:800;font-size:40px; background:linear-gradient(90deg,#8e44ad,#2979ff,#1abc9c,#ff8a00); -webkit-background-clip:text; color:transparent; margin:0;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
 
 # -------------------------
@@ -110,6 +130,19 @@ def gen_password(length=8):
     choices = string.ascii_letters + string.digits
     return ''.join(random.choice(choices) for _ in range(length))
 
+def apply_theme_css(theme):
+    """Apply theme-specific CSS overrides (light/dark)."""
+    try:
+        if theme == "light":
+            st.markdown(f"<style>{LIGHT_CSS}</style>", unsafe_allow_html=True)
+            # small override for body bg text
+            st.markdown("<style>body { background-color: #f6f8fa; color: #111; }</style>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
+            st.markdown("<style>body { background-color: #071428; color: #d6d9dc; }</style>", unsafe_allow_html=True)
+    except Exception:
+        pass
+
 # helper: render credential box with copy & download
 def _render_credentials_box(username, password, note=None, key_prefix="cred"):
     st.markdown("---")
@@ -136,6 +169,7 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
         """
         st.markdown(js, unsafe_allow_html=True)
     st.markdown("---")
+
 
 # -------------------------
 # load/save users (atomic)
@@ -423,11 +457,11 @@ _defaults = {
     "saved_node_positions": {},  # persisted positions (restored)
     "settings": {
         "plot_height": 720,
-        "palette": "Plotly",
+        "theme": "dark",  # "dark" or "light"
         "font_scale": 1.0,
         "node_opacity": 0.95,
         "edge_opacity": 0.25,
-        "high_contrast": False
+        "palette": "Plotly"
     }
 }
 for k, v in _defaults.items():
@@ -439,7 +473,7 @@ def get_settings():
 
 def save_user_state_minimal(USER_STATE):
     try:
-        data = {"notes": st.session_state.get("notes",""), "uploaded_name": st.session_state.get("uploaded_name", None), "favorites": st.session_state.get("favorites", []), "saved_node_positions": st.session_state.get("saved_node_positions", {})}
+        data = {"notes": st.session_state.get("notes",""), "uploaded_name": st.session_state.get("uploaded_name", None), "favorites": st.session_state.get("favorites", []), "saved_node_positions": st.session_state.get("saved_node_positions", {}), "settings": st.session_state.get("settings", {})}
         tmp = USER_STATE.with_suffix(".tmp")
         with tmp.open("w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
@@ -542,10 +576,16 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
         st.session_state.uploaded_name = meta.get("uploaded_name", st.session_state.get("uploaded_name"))
         st.session_state.favorites = meta.get("favorites", st.session_state.favorites)
         st.session_state.saved_node_positions = meta.get("saved_node_positions", st.session_state.saved_node_positions)
+        # restore settings if present
+        if "settings" in meta:
+            st.session_state.settings.update(meta.get("settings", {}))
         st.session_state.restored_from_saved = True
         st.success("Estado salvo do usuário restaurado automaticamente.")
     except Exception:
         pass
+
+# apply theme CSS based on settings immediately
+apply_theme_css(get_settings().get("theme", "dark"))
 
 # unread count
 UNREAD_COUNT = 0
@@ -569,7 +609,7 @@ mens_label = f"✉️ Mensagens ({UNREAD_COUNT})" if UNREAD_COUNT > 0 else "✉�
 st.markdown("<div class='glass-box' style='padding-top:10px; padding-bottom:10px;'><div class='specular'></div>", unsafe_allow_html=True)
 top1, top2 = st.columns([0.6, 0.4])
 with top1:
-    st.markdown(f"<div style='color:var(--muted-text);font-weight:700;padding-top:8px;'>Usuário: {USER_OBJ.get('name','')} — {USER_OBJ.get('scholarship','')}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div style='color:var(--muted-text-dark);font-weight:700;padding-top:8px;'>Usuário: {USER_OBJ.get('name','')} — {USER_OBJ.get('scholarship','')}</div>", unsafe_allow_html=True)
 with top2:
     nav_right1, nav_right2, nav_right3 = st.columns([1,1,1])
     with nav_right1:
@@ -671,6 +711,9 @@ if st.session_state.page == "planilha":
                     st.session_state.uploaded_name = meta.get("uploaded_name", None)
                     st.session_state.favorites = meta.get("favorites", [])
                     st.session_state.saved_node_positions = meta.get("saved_node_positions", st.session_state.get("saved_node_positions", {}))
+                    if "settings" in meta:
+                        st.session_state.settings.update(meta.get("settings", {}))
+                        apply_theme_css(st.session_state.settings.get("theme", "dark"))
                     st.success("Estado salvo restaurado.")
                 except Exception:
                     st.info("Erro ao restaurar estado.")
@@ -806,10 +849,9 @@ elif st.session_state.page == "mapa":
         sep_reset = st.button("Resetar posições (layout padrão)", key="btn_sep_reset")
         save_positions = st.button("Salvar posições (persistir)", key="btn_save_positions")
     with c2:
-        st.markdown("<div style='color:#bfc6cc'>Interaja com nós selecionando o nome abaixo — atualize X/Y/Z ou use Separar/Resetar.</div>", unsafe_allow_html=True)
+        st.markdown("<div style='color:var(--muted-text-dark)'>Interaja com nós selecionando o nome abaixo — atualize X/Y/Z ou use Separar/Resetar.</div>", unsafe_allow_html=True)
         sel_node = st.selectbox("Selecionar nó para editar", options=[""] + list(st.session_state.G.nodes), key=f"sel_node_{USERNAME}")
         if sel_node:
-            # position inputs (will be filled later after pos computed)
             pass
         st.markdown("---")
         if st.button("Exportar posições (.json)"):
@@ -828,7 +870,6 @@ elif st.session_state.page == "mapa":
             if not st.session_state.node_positions:
                 # if there are saved positions, use them preferentially
                 if st.session_state.get("saved_node_positions"):
-                    # saved_node_positions format: node -> [x,y,z]
                     for n in G.nodes():
                         if n in st.session_state.saved_node_positions:
                             st.session_state.node_positions[n] = list(st.session_state.saved_node_positions[n])
@@ -840,7 +881,6 @@ elif st.session_state.page == "mapa":
 
             # apply separation factor if requested (single apply)
             if sep_apply:
-                # compute centroid of current positions
                 pts = np.array(list(st.session_state.node_positions.values()), dtype=float)
                 centroid = pts.mean(axis=0)
                 new_positions = {}
@@ -852,7 +892,6 @@ elif st.session_state.page == "mapa":
                 st.success(f"Separação aplicada (fator {separation_factor}).")
 
             if sep_reset:
-                # reset to base layout
                 st.session_state.node_positions = {n: list(base_pos[n]) for n in G.nodes()}
                 st.success("Posições resetadas ao layout padrão.")
 
@@ -889,13 +928,14 @@ elif st.session_state.page == "mapa":
                 x=edge_x, y=edge_y, z=edge_z,
                 mode='lines',
                 hoverinfo='none',
-                line=dict(width=0.8, color=f'rgba(120,120,120,{get_settings().get("edge_opacity",0.25)})'),
+                line=dict(width=1.2, color=f'rgba(120,120,120,{get_settings().get("edge_opacity",0.25)})'),
                 showlegend=False
             )
 
             # node grouping by tipo and traces
             tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
-            palette = px.colors.qualitative.Plotly if get_settings().get("palette","Plotly") == "Plotly" else px.colors.qualitative.Alphabet
+            palette_choice = get_settings().get("palette", "Plotly")
+            palette = px.colors.qualitative.Plotly if palette_choice == "Plotly" else px.colors.qualitative.Alphabet
             tipo_color = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
             deg = dict(G.degree())
             node_traces = []
@@ -916,6 +956,7 @@ elif st.session_state.page == "mapa":
                     ids.append(n)
                 if not xs:
                     continue
+                text_mode = 'text' if show_labels else None
                 trace = go.Scatter3d(
                     x=xs, y=ys, z=zs,
                     mode='markers+text' if show_labels else 'markers',
@@ -929,19 +970,31 @@ elif st.session_state.page == "mapa":
                         size=sizes,
                         color=tipo_color.get(tipo),
                         opacity=get_settings().get("node_opacity", 0.95),
-                        line=dict(width=0.4, color='rgba(0,0,0,0.15)')
+                        line=dict(width=0.6, color='rgba(0,0,0,0.12)')
                     )
                 )
                 node_traces.append(trace)
 
             # assemble figure (edges below nodes)
             fig = go.Figure(data=[edge_trace] + node_traces)
+
+            # theme-aware colors
+            theme = get_settings().get("theme", "dark")
+            if theme == "light":
+                paper_bg = "#ffffff"
+                plot_bg = "#ffffff"
+                font_color = "#111111"
+            else:
+                paper_bg = "rgba(0,0,0,0)"
+                plot_bg = "rgba(0,0,0,0)"
+                font_color = "#d6d9dc"
+
             # remove cube/axes (teia look)
             fig.update_layout(
                 height=int(get_settings().get("plot_height", 720)),
                 showlegend=True,
-                paper_bgcolor='rgba(0,0,0,0)',
-                plot_bgcolor='rgba(0,0,0,0)',
+                paper_bgcolor=paper_bg,
+                plot_bgcolor=plot_bg,
                 scene=dict(
                     xaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
                     yaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
@@ -952,9 +1005,10 @@ elif st.session_state.page == "mapa":
                 ),
                 margin=dict(l=0, r=0, b=0, t=0),
                 legend=dict(itemsizing='constant', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-                font=dict(size=12 * float(get_settings().get("font_scale", 1.0)))
+                font=dict(size=12 * float(get_settings().get("font_scale", 1.0)), color=font_color)
             )
-            # show
+
+            # show figure
             st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao renderizar grafo: {e}")
@@ -995,14 +1049,18 @@ elif st.session_state.page == "graficos":
                     fig = px.bar(df, x=eixo_x, y=eixo_y, title=f"{eixo_y} por {eixo_x}")
                 else:
                     fig = px.histogram(df, x=eixo_x, title=f"Contagem por {eixo_x}")
-                fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#d6d9dc"))
+                theme = get_settings().get("theme", "dark")
+                if theme == "light":
+                    fig.update_layout(plot_bgcolor="#ffffff", paper_bgcolor="#ffffff", font=dict(color="#111111"))
+                else:
+                    fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#d6d9dc"))
                 st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                 st.error(f"Erro ao gerar gráficos: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Busca
+# Page: Busca (mantido)
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1226,7 +1284,7 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Mensagens
+# Page: Mensagens (mantido)
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1319,38 +1377,38 @@ elif st.session_state.page == "mensagens":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Configurações / Acessibilidade
+# Page: Configurações / Acessibilidade (SIMPLIFICADO)
 # -------------------------
 elif st.session_state.page == "config":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("⚙️ Configurações & Acessibilidade")
+    st.subheader("⚙️ Configurações")
     s = get_settings()
     c1, c2 = st.columns([1,1])
     with c1:
         plot_height = st.number_input("Altura do gráfico (px)", value=int(s.get("plot_height",720)), step=10, key="cfg_plot_height")
-        font_scale = st.slider("Escala de fonte", min_value=0.7, max_value=2.0, value=float(s.get("font_scale",1.0)), step=0.1, key="cfg_font_scale")
-        palette = st.selectbox("Paleta de cores", options=["Plotly","Alphabet"], index=0 if s.get("palette","Plotly")=="Plotly" else 1, key="cfg_palette")
+        font_scale = st.slider("Escala de fonte (aplicada ao mapa e gráficos)", min_value=0.7, max_value=2.0, value=float(s.get("font_scale",1.0)), step=0.1, key="cfg_font_scale")
     with c2:
-        node_opacity = st.slider("Opacidade dos nós", min_value=0.1, max_value=1.0, value=float(s.get("node_opacity",0.95)), step=0.05, key="cfg_node_opacity")
-        edge_opacity = st.slider("Opacidade das arestas", min_value=0.0, max_value=1.0, value=float(s.get("edge_opacity",0.25)), step=0.05, key="cfg_edge_opacity")
-        high_contrast = st.checkbox("Alto contraste (toggle)", value=bool(s.get("high_contrast",False)), key="cfg_high_contrast")
-
+        theme = st.selectbox("Tema", options=["dark", "light"], index=0 if s.get("theme","dark")=="dark" else 1, key="cfg_theme")
+        palette = st.selectbox("Paleta de cores (nós)", options=["Plotly","Alphabet"], index=0 if s.get("palette","Plotly")=="Plotly" else 1, key="cfg_palette")
     if st.button("Aplicar configurações"):
         st.session_state.settings["plot_height"] = int(plot_height)
         st.session_state.settings["font_scale"] = float(font_scale)
-        st.session_state.settings["palette"] = palette
-        st.session_state.settings["node_opacity"] = float(node_opacity)
-        st.session_state.settings["edge_opacity"] = float(edge_opacity)
-        st.session_state.settings["high_contrast"] = bool(high_contrast)
+        st.session_state.settings["theme"] = str(theme)
+        st.session_state.settings["palette"] = str(palette)
         # persist minimal state
-        save_user_state_minimal(USER_STATE)
-        st.success("Configurações aplicadas e salvas.")
+        ok = save_user_state_minimal(USER_STATE)
+        # apply theme immediately
+        apply_theme_css(theme)
+        if ok:
+            st.success("Configurações aplicadas e salvas.")
+        else:
+            st.success("Configurações aplicadas (falha ao salvar localmente).")
         safe_rerun()
 
     st.markdown("---")
     st.markdown("**Acessibilidade**")
-    st.markdown("- Use *Escala de fonte* para aumentar o tamanho do texto no mapa e UI (onde aplicável).")
-    st.markdown("- *Alto contraste* troca para paleta com contraste maior nas visualizações (se selecionado).")
+    st.markdown("- Use *Escala de fonte* para aumentar o tamanho do texto no mapa e nos gráficos.")
+    st.markdown("- *Tema* alterna entre claro e escuro.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
