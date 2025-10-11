@@ -1,5 +1,5 @@
 # dashboard_nugep_pqr_final_complete.py
-# NUGEP-PQR — Versão final (ajustes: login com CPF) + Mapa Mental 3D melhorado
+# NUGEP-PQR — Versão final (ajustes: login com CPF) + Mapa Mental 3D (visualização ajustada)
 import os
 import re
 import io
@@ -713,7 +713,7 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# MAPA (substituído pela versão melhorada)
+# MAPA (visualização ajustada: hover nas bolinhas, "teia", sem cubo, sem controle de layout)
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -768,24 +768,24 @@ elif st.session_state.page == "mapa":
                 else:
                     st.warning("Nome inválido.")
 
-    # Controls for visualization
+    # Controls for visualization (reduzidos: só label e tamanho)
     st.markdown("### Visualização 3D")
     vis_col1, vis_col2 = st.columns([0.6, 0.4])
     with vis_col1:
         show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
         node_size_factor = st.slider("Fator de tamanho dos nós", min_value=1, max_value=30, value=8, key=f"node_size_{USERNAME}")
     with vis_col2:
-        layout_iter = st.slider("Força do layout (iterações)", min_value=20, max_value=500, value=200, key=f"layout_iter_{USERNAME}")
-        seed_val = st.number_input("Seed do layout", value=42, step=1, key=f"layout_seed_{USERNAME}")
+        st.markdown("<div style='color:#bfc6cc'>Layout spring 3D fixo (sem controle de força/seed).</div>", unsafe_allow_html=True)
 
     try:
         G = st.session_state.G or nx.Graph()
         if G.number_of_nodes() == 0:
             st.info("Sem nós no grafo. Adicione nós (ou carregue uma planilha) para visualizar o mapa mental.")
         else:
-            # compute 3D layout (spring)
-            pos = nx.spring_layout(G, dim=3, seed=int(seed_val), k=None, iterations=int(layout_iter))
-            # build edge trace
+            # compute 3D layout (spring) — fixo, sem controles expostos
+            pos = nx.spring_layout(G, dim=3, seed=42, iterations=200)
+
+            # build edge trace — finas linhas semi-transparentes (efeito 'teia')
             edge_x, edge_y, edge_z = [], [], []
             for u, v in G.edges():
                 xu, yu, zu = pos[u]
@@ -797,12 +797,12 @@ elif st.session_state.page == "mapa":
                 x=edge_x, y=edge_y, z=edge_z,
                 mode='lines',
                 hoverinfo='none',
-                line=dict(width=1, color='rgba(180,180,180,0.3)')
+                line=dict(width=0.8, color='rgba(160,160,160,0.25)'),
+                showlegend=False
             )
 
             # node grouping by tipo to create legend + separate colors
             tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
-            # a palette from plotly
             palette = px.colors.qualitative.Plotly
             tipo_color = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
 
@@ -821,8 +821,9 @@ elif st.session_state.page == "mapa":
                     label = meta.get("label", str(n))
                     d = deg.get(n, 0)
                     sizes.append(max(6, int((d + 1) * node_size_factor)))
+                    # hover info shown ao passar o mouse sobre a bolinha
                     hovertexts.append(f"<b>{escape_html(label)}</b><br>Tipo: {escape_html(n_tipo)}<br>Grau: {d}")
-                    texts.append(label if show_labels else "")  # text visible only if checkbox on
+                    texts.append(label if show_labels else "")
 
                 if not xs:
                     continue
@@ -838,30 +839,33 @@ elif st.session_state.page == "mapa":
                         size=sizes,
                         color=tipo_color.get(tipo),
                         opacity=0.95,
-                        line=dict(width=0.5, color='rgba(0,0,0,0.2)')
+                        line=dict(width=0.4, color='rgba(0,0,0,0.15)')
                     )
                 )
                 node_traces.append(trace)
 
             # assemble figure: edges first (below), then nodes
             fig = go.Figure(data=[edge_trace] + node_traces)
+
+            # remove cube / axes / ticks / background -> deixa só a teia
             fig.update_layout(
                 height=720,
                 showlegend=True,
+                paper_bgcolor='rgba(0,0,0,0)',
+                plot_bgcolor='rgba(0,0,0,0)',
                 scene=dict(
-                    xaxis=dict(showbackground=False, showticklabels=False, title=""),
-                    yaxis=dict(showbackground=False, showticklabels=False, title=""),
-                    zaxis=dict(showbackground=False, showticklabels=False, title=""),
+                    xaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
+                    yaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
+                    zaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
                     aspectmode='auto',
-                    camera=dict(
-                        eye=dict(x=1.5, y=1.5, z=1.2)
-                    )
+                    camera=dict(eye=dict(x=1.4, y=1.4, z=1.0)),
+                    dragmode='orbit'
                 ),
                 margin=dict(l=0, r=0, b=0, t=0),
                 legend=dict(itemsizing='constant', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
             )
 
-            # nicer hover template for nodes (applies per-trace via hovertext already)
+            # exibição: hover nas bolinhas já configurado via hovertext
             st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao renderizar grafo: {e}")
