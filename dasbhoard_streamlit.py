@@ -1,5 +1,5 @@
 # dashboard_nugep_pqr_final_complete.py
-# NUGEP-PQR — Versão final (ajustes: login com CPF) + Mapa Mental 3D (visualização ajustada)
+# NUGEP-PQR — Versão final (login com CPF) + Mapa Mental 3D (separável/interativo) + Configurações/Acessibilidade
 import os
 import re
 import io
@@ -94,8 +94,6 @@ try:
 except Exception:
     create_client = None
 _supabase = None
-# (se usares supabase, podes configurar em st.secrets ou variáveis de ambiente)
-# por simplicidade esse arquivo usa fallback local quando _supabase for None
 
 # -------------------------
 # Utilidades gerais
@@ -123,10 +121,8 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
         if note:
             st.info(note)
     with col2:
-        # download button
         creds_txt = f"cpf: {username}\npassword: {password}\n"
         st.download_button("⬇️ Baixar credenciais", data=creds_txt, file_name=f"credenciais_{username}.txt", mime="text/plain")
-        
         js = f"""
         <script>
         function copyToClipboard_{key_prefix}(){{
@@ -139,12 +135,10 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
         <div id='copy_hint_{key_prefix}' style='margin-top:6px;font-size:13px;color:#bfc6cc'></div>
         """
         st.markdown(js, unsafe_allow_html=True)
-        
     st.markdown("---")
 
-
 # -------------------------
-# load/save users (corrigido: atomic + Path.cwd())
+# load/save users (atomic)
 # -------------------------
 def load_users():
     if _supabase:
@@ -171,8 +165,7 @@ def save_users(users: dict):
         tmp_path = users_path.with_suffix(".tmp")
         with tmp_path.open("w", encoding="utf-8") as f:
             json.dump(users, f, ensure_ascii=False, indent=2)
-            f.flush()
-            os.fsync(f.fileno())
+            f.flush(); os.fsync(f.fileno())
         tmp_path.replace(users_path)
         return True
     except Exception as e:
@@ -417,18 +410,45 @@ def action_button(label, icon_key, st_key, expanded_label=None):
     return clicked
 
 # -------------------------
-# Session defaults
+# Session defaults & settings
 # -------------------------
 _defaults = {
     "authenticated": False, "username": None, "user_obj": None, "df": None,
     "G": nx.Graph(), "notes": "", "autosave": False, "page": "planilha",
     "restored_from_saved": False, "favorites": [], "reply_message_id": None,
     "search_results": pd.DataFrame(), "search_page": 1, "search_query_meta": {"col": None,"query":""},
-    "search_view_index": None, "compose_inline": False, "compose_open": False
+    "search_view_index": None, "compose_inline": False, "compose_open": False,
+    # mapa-specific persistent state
+    "node_positions": {},  # node -> [x,y,z]
+    "saved_node_positions": {},  # persisted positions (restored)
+    "settings": {
+        "plot_height": 720,
+        "palette": "Plotly",
+        "font_scale": 1.0,
+        "node_opacity": 0.95,
+        "edge_opacity": 0.25,
+        "high_contrast": False
+    }
 }
 for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
+
+def get_settings():
+    return st.session_state.get("settings", _defaults["settings"])
+
+def save_user_state_minimal(USER_STATE):
+    try:
+        data = {"notes": st.session_state.get("notes",""), "uploaded_name": st.session_state.get("uploaded_name", None), "favorites": st.session_state.get("favorites", []), "saved_node_positions": st.session_state.get("saved_node_positions", {})}
+        tmp = USER_STATE.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+            f.flush(); os.fsync(f.fileno())
+        tmp.replace(USER_STATE)
+        return True
+    except Exception as e:
+        print(f"Erro ao salvar estado do usuário: {e}")
+        return False
 
 # -------------------------
 # Authentication UI (local fallback)
@@ -513,15 +533,15 @@ users_local = load_users() or {}
 USER_OBJ = st.session_state.user_obj or users_local.get(USERNAME, {})
 USER_STATE = Path.cwd() / f"artemis_state_{USERNAME}.json"
 
-# restore per-user
+# restore per-user saved positions / state
 if not st.session_state.restored_from_saved and USER_STATE.exists():
     try:
         with USER_STATE.open("r", encoding="utf-8") as f:
             meta = json.load(f)
-        # attempt restore
-        st.session_state.notes = meta.get("notes", "")
-        st.session_state.uploaded_name = meta.get("uploaded_name", None)
-        st.session_state.favorites = meta.get("favorites", [])
+        st.session_state.notes = meta.get("notes", st.session_state.notes)
+        st.session_state.uploaded_name = meta.get("uploaded_name", st.session_state.get("uploaded_name"))
+        st.session_state.favorites = meta.get("favorites", st.session_state.favorites)
+        st.session_state.saved_node_positions = meta.get("saved_node_positions", st.session_state.saved_node_positions)
         st.session_state.restored_from_saved = True
         st.success("Estado salvo do usuário restaurado automaticamente.")
     except Exception:
@@ -556,17 +576,9 @@ with top2:
         st.session_state.autosave = st.checkbox("Auto-save", value=st.session_state.autosave, key="ui_autosave")
     with nav_right2:
         if st.button("💾 Salvar", key="btn_save_now", use_container_width=True):
-            # salva estado mínimo
-            try:
-                data = {"notes": st.session_state.get("notes",""), "uploaded_name": st.session_state.get("uploaded_name", None), "favorites": st.session_state.get("favorites", [])}
-                tmp = USER_STATE.with_suffix(".tmp")
-                with tmp.open("w", encoding="utf-8") as f:
-                    json.dump(data, f, ensure_ascii=False, indent=2)
-                    f.flush(); os.fsync(f.fileno())
-                tmp.replace(USER_STATE)
-                st.success("Progresso salvo.")
-            except Exception as e:
-                st.error(f"Erro ao salvar estado: {e}")
+            ok = save_user_state_minimal(USER_STATE)
+            if ok: st.success("Progresso salvo.")
+            else: st.error("Falha ao salvar o progresso.")
     with nav_right3:
         if st.button("🚪 Sair", key="btn_logout", use_container_width=True):
             st.session_state.authenticated = False
@@ -576,10 +588,18 @@ with top2:
             safe_rerun()
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Navigation buttons
+# Navigation buttons (inclui Configurações)
 st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
-nav_cols = st.columns(6)
-nav_buttons = {"planilha": "📄 Planilha", "mapa": "🞠 Mapa", "anotacoes": "📝 Anotações", "graficos": "📊 Gráficos", "busca": "🔍 Busca", "mensagens": mens_label}
+nav_buttons = {
+    "planilha": "📄 Planilha",
+    "mapa": "🞠 Mapa",
+    "anotacoes": "📝 Anotações",
+    "graficos": "📊 Gráficos",
+    "busca": "🔍 Busca",
+    "mensagens": mens_label,
+    "config": "⚙️ Configurações"
+}
+nav_cols = st.columns(len(nav_buttons))
 for i, (page_key, page_label) in enumerate(nav_buttons.items()):
     with nav_cols[i]:
         if st.button(page_label, key=f"nav_{page_key}", use_container_width=True):
@@ -635,7 +655,7 @@ def highlight_search_terms(text, query, mark_class="card-mark"):
     return safe_text
 
 # -------------------------
-# Page dispatcher
+# Page: Planilha
 # -------------------------
 if st.session_state.page == "planilha":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -650,6 +670,7 @@ if st.session_state.page == "planilha":
                     st.session_state.notes = meta.get("notes","")
                     st.session_state.uploaded_name = meta.get("uploaded_name", None)
                     st.session_state.favorites = meta.get("favorites", [])
+                    st.session_state.saved_node_positions = meta.get("saved_node_positions", st.session_state.get("saved_node_positions", {}))
                     st.success("Estado salvo restaurado.")
                 except Exception:
                     st.info("Erro ao restaurar estado.")
@@ -678,7 +699,6 @@ if st.session_state.page == "planilha":
             st.session_state.G = criar_grafo(df)
             st.success("Planilha carregada com sucesso.")
             if st.session_state.autosave:
-                # gravar backup csv
                 try:
                     ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
                     safe = re.sub(r"[^\w\-_.]", "_", st.session_state.get("uploaded_name") or "planilha")
@@ -688,7 +708,6 @@ if st.session_state.page == "planilha":
                     path = p / backup_filename
                     st.session_state.df.to_csv(path, index=False, encoding="utf-8")
                     st.success("Backup salvo.")
-                    # record in user state
                     try:
                         meta = {}
                         if USER_STATE.exists():
@@ -713,13 +732,13 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# MAPA (visualização ajustada: hover nas bolinhas, "teia", sem cubo, sem controle de layout)
+# Page: Mapa (3D interativo, separável, edições por nó)
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("Mapa Mental 3D — Editor")
+    st.subheader("Mapa Mental 3D — Editor (interagir nos nós)")
 
-    # Editor / criação de nós (mesma lógica)
+    # Editor tradicional (criar/excluir/renomear)
     if st.session_state.G and st.session_state.G.number_of_nodes() > 0:
         with st.expander("Editar Nós do Mapa"):
             left, right = st.columns([2,1])
@@ -744,6 +763,9 @@ elif st.session_state.page == "mapa":
                 if st.button("Excluir nó", key=f"btn_del_{USERNAME}"):
                     if del_n and del_n in st.session_state.G:
                         st.session_state.G.remove_node(del_n)
+                        # also remove positions if present
+                        st.session_state.node_positions.pop(del_n, None)
+                        st.session_state.saved_node_positions.pop(del_n, None)
                         st.success(f"Nó '{del_n}' removido.")
                         if st.session_state.autosave: safe_rerun()
                 st.markdown("---")
@@ -752,10 +774,14 @@ elif st.session_state.page == "mapa":
                 if st.button("Renomear", key=f"btn_ren_{USERNAME}"):
                     if r_old and r_new and r_old in st.session_state.G and r_new not in st.session_state.G:
                         nx.relabel_nodes(st.session_state.G, {r_old: r_new}, copy=False)
+                        # adjust positions dicts
+                        if r_old in st.session_state.node_positions:
+                            st.session_state.node_positions[r_new] = st.session_state.node_positions.pop(r_old)
+                        if r_old in st.session_state.saved_node_positions:
+                            st.session_state.saved_node_positions[r_new] = st.session_state.saved_node_positions.pop(r_old)
                         st.success(f"'{r_old}' → '{r_new}'")
                         if st.session_state.autosave: safe_rerun()
     else:
-        # Allow manual add when graph empty
         with st.expander("Criar primeiro nó"):
             new_node = st.text_input("Nome do novo nó", key=f"nm_name_init_{USERNAME}")
             new_tipo = st.selectbox("Tipo", ["Outro", "Autor", "Título", "Ano", "Tema"], key=f"nm_tipo_init_{USERNAME}")
@@ -768,28 +794,94 @@ elif st.session_state.page == "mapa":
                 else:
                     st.warning("Nome inválido.")
 
-    # Controls for visualization (reduzidos: só label e tamanho)
-    st.markdown("### Visualização 3D")
-    vis_col1, vis_col2 = st.columns([0.6, 0.4])
-    with vis_col1:
+    st.markdown("### Visualização 3D (interação e separação)")
+    settings = get_settings()
+    # controls: separation factor, apply, reset, per-node editing, plot height from settings
+    c1, c2 = st.columns([0.6, 0.4])
+    with c1:
         show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
         node_size_factor = st.slider("Fator de tamanho dos nós", min_value=1, max_value=30, value=8, key=f"node_size_{USERNAME}")
-    with vis_col2:
-        st.markdown("<div style='color:#bfc6cc'>Layout spring 3D fixo (sem controle de força/seed).</div>", unsafe_allow_html=True)
+        separation_factor = st.slider("Fator de separação (multiplica distância ao centro)", min_value=1.0, max_value=4.0, value=1.0, step=0.1, key=f"sep_factor_{USERNAME}")
+        sep_apply = st.button("Separar nós (aplicar fator)", key="btn_sep_apply")
+        sep_reset = st.button("Resetar posições (layout padrão)", key="btn_sep_reset")
+        save_positions = st.button("Salvar posições (persistir)", key="btn_save_positions")
+    with c2:
+        st.markdown("<div style='color:#bfc6cc'>Interaja com nós selecionando o nome abaixo — atualize X/Y/Z ou use Separar/Resetar.</div>", unsafe_allow_html=True)
+        sel_node = st.selectbox("Selecionar nó para editar", options=[""] + list(st.session_state.G.nodes), key=f"sel_node_{USERNAME}")
+        if sel_node:
+            # position inputs (will be filled later after pos computed)
+            pass
+        st.markdown("---")
+        if st.button("Exportar posições (.json)"):
+            to_export = st.session_state.node_positions or {}
+            st.download_button("⬇️ Baixar posições", data=json.dumps(to_export, ensure_ascii=False, indent=2), file_name=f"posicoes_{USERNAME}.json", mime="application/json")
 
     try:
         G = st.session_state.G or nx.Graph()
         if G.number_of_nodes() == 0:
             st.info("Sem nós no grafo. Adicione nós (ou carregue uma planilha) para visualizar o mapa mental.")
         else:
-            # compute 3D layout (spring) — fixo, sem controles expostos
-            pos = nx.spring_layout(G, dim=3, seed=42, iterations=200)
+            # compute base layout (spring)
+            base_pos = nx.spring_layout(G, dim=3, seed=42, iterations=200)
 
-            # build edge trace — finas linhas semi-transparentes (efeito 'teia')
+            # initialize node_positions from saved or from base_pos
+            if not st.session_state.node_positions:
+                # if there are saved positions, use them preferentially
+                if st.session_state.get("saved_node_positions"):
+                    # saved_node_positions format: node -> [x,y,z]
+                    for n in G.nodes():
+                        if n in st.session_state.saved_node_positions:
+                            st.session_state.node_positions[n] = list(st.session_state.saved_node_positions[n])
+                        else:
+                            st.session_state.node_positions[n] = list(base_pos[n])
+                else:
+                    for n in G.nodes():
+                        st.session_state.node_positions[n] = list(base_pos[n])
+
+            # apply separation factor if requested (single apply)
+            if sep_apply:
+                # compute centroid of current positions
+                pts = np.array(list(st.session_state.node_positions.values()), dtype=float)
+                centroid = pts.mean(axis=0)
+                new_positions = {}
+                for n, coords in st.session_state.node_positions.items():
+                    vec = np.array(coords) - centroid
+                    new = centroid + vec * float(separation_factor)
+                    new_positions[n] = new.tolist()
+                st.session_state.node_positions = new_positions
+                st.success(f"Separação aplicada (fator {separation_factor}).")
+
+            if sep_reset:
+                # reset to base layout
+                st.session_state.node_positions = {n: list(base_pos[n]) for n in G.nodes()}
+                st.success("Posições resetadas ao layout padrão.")
+
+            if save_positions:
+                st.session_state.saved_node_positions = st.session_state.node_positions.copy()
+                # persist minimal user state
+                ok = save_user_state_minimal(USER_STATE)
+                if ok:
+                    st.success("Posições salvas no estado do usuário.")
+                else:
+                    st.error("Falha ao salvar posições.")
+
+            # per-node manual editing
+            if sel_node:
+                cur = st.session_state.node_positions.get(sel_node, list(base_pos.get(sel_node, [0.0,0.0,0.0])))
+                x_val = st.number_input("X", value=float(cur[0]), step=0.01, key=f"x_{sel_node}_{USERNAME}")
+                y_val = st.number_input("Y", value=float(cur[1]), step=0.01, key=f"y_{sel_node}_{USERNAME}")
+                z_val = st.number_input("Z", value=float(cur[2]), step=0.01, key=f"z_{sel_node}_{USERNAME}")
+                if st.button("Atualizar posição do nó", key=f"btn_update_node_{sel_node}"):
+                    st.session_state.node_positions[sel_node] = [float(x_val), float(y_val), float(z_val)]
+                    st.success(f"Posição de '{sel_node}' atualizada.")
+                    if st.session_state.autosave: safe_rerun()
+
+            # build edge traces from st.session_state.node_positions
+            pos_map = st.session_state.node_positions
             edge_x, edge_y, edge_z = [], [], []
             for u, v in G.edges():
-                xu, yu, zu = pos[u]
-                xv, yv, zv = pos[v]
+                xu, yu, zu = pos_map.get(u, [0,0,0])
+                xv, yv, zv = pos_map.get(v, [0,0,0])
                 edge_x += [xu, xv, None]
                 edge_y += [yu, yv, None]
                 edge_z += [zu, zv, None]
@@ -797,34 +889,31 @@ elif st.session_state.page == "mapa":
                 x=edge_x, y=edge_y, z=edge_z,
                 mode='lines',
                 hoverinfo='none',
-                line=dict(width=0.8, color='rgba(160,160,160,0.25)'),
+                line=dict(width=0.8, color=f'rgba(120,120,120,{get_settings().get("edge_opacity",0.25)})'),
                 showlegend=False
             )
 
-            # node grouping by tipo to create legend + separate colors
+            # node grouping by tipo and traces
             tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
-            palette = px.colors.qualitative.Plotly
+            palette = px.colors.qualitative.Plotly if get_settings().get("palette","Plotly") == "Plotly" else px.colors.qualitative.Alphabet
             tipo_color = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
-
-            # compute degrees for sizing
             deg = dict(G.degree())
             node_traces = []
             for tipo in tipo_order:
-                xs, ys, zs, texts, sizes, hovertexts = [], [], [], [], [], []
+                xs, ys, zs, texts, sizes, hovertexts, ids = [], [], [], [], [], [], []
                 for n in G.nodes():
                     meta = G.nodes[n]
                     n_tipo = meta.get("tipo", "Outro")
                     if n_tipo != tipo:
                         continue
-                    x, y, z = pos[n]
+                    x, y, z = pos_map.get(n, list(base_pos.get(n, [0,0,0])))
                     xs.append(x); ys.append(y); zs.append(z)
                     label = meta.get("label", str(n))
                     d = deg.get(n, 0)
                     sizes.append(max(6, int((d + 1) * node_size_factor)))
-                    # hover info shown ao passar o mouse sobre a bolinha
                     hovertexts.append(f"<b>{escape_html(label)}</b><br>Tipo: {escape_html(n_tipo)}<br>Grau: {d}")
                     texts.append(label if show_labels else "")
-
+                    ids.append(n)
                 if not xs:
                     continue
                 trace = go.Scatter3d(
@@ -835,21 +924,21 @@ elif st.session_state.page == "mapa":
                     hovertext=hovertexts,
                     hoverinfo="text",
                     name=tipo,
+                    customdata=ids,
                     marker=dict(
                         size=sizes,
                         color=tipo_color.get(tipo),
-                        opacity=0.95,
+                        opacity=get_settings().get("node_opacity", 0.95),
                         line=dict(width=0.4, color='rgba(0,0,0,0.15)')
                     )
                 )
                 node_traces.append(trace)
 
-            # assemble figure: edges first (below), then nodes
+            # assemble figure (edges below nodes)
             fig = go.Figure(data=[edge_trace] + node_traces)
-
-            # remove cube / axes / ticks / background -> deixa só a teia
+            # remove cube/axes (teia look)
             fig.update_layout(
-                height=720,
+                height=int(get_settings().get("plot_height", 720)),
                 showlegend=True,
                 paper_bgcolor='rgba(0,0,0,0)',
                 plot_bgcolor='rgba(0,0,0,0)',
@@ -862,17 +951,17 @@ elif st.session_state.page == "mapa":
                     dragmode='orbit'
                 ),
                 margin=dict(l=0, r=0, b=0, t=0),
-                legend=dict(itemsizing='constant', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1)
+                legend=dict(itemsizing='constant', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+                font=dict(size=12 * float(get_settings().get("font_scale", 1.0)))
             )
-
-            # exibição: hover nas bolinhas já configurado via hovertext
+            # show
             st.plotly_chart(fig, use_container_width=True)
     except Exception as e:
         st.error(f"Erro ao renderizar grafo: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# ANOTAÇÕES
+# Page: Anotações
 # -------------------------
 elif st.session_state.page == "anotacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -885,7 +974,7 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# GRÁFICOS
+# Page: Gráficos
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -913,7 +1002,7 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# BUSCA
+# Page: Busca
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1137,7 +1226,7 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# MENSAGENS
+# Page: Mensagens
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1214,7 +1303,7 @@ elif st.session_state.page == "mensagens":
                     if st.button("Responder", key=f"detail_reply_{selected_id}"):
                         st.session_state.compose_subject = f"Re: {msg.get('subject')}"
                         st.session_state.compose_prefill = f"\n\n---\nEm {msg.get('ts')}, {msg.get('from')} escreveu:\n> " + "\n> ".join(str(msg.get('body','')).split('\n'))
-                        st.session_state.page = "mensagens" # Force reload on message tab
+                        st.session_state.page = "mensagens"
                         safe_rerun()
             with c2:
                 if st.button("🗑️ Apagar", key=f"detail_del_{selected_id}"):
@@ -1228,3 +1317,44 @@ elif st.session_state.page == "mensagens":
                     safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
+
+# -------------------------
+# Page: Configurações / Acessibilidade
+# -------------------------
+elif st.session_state.page == "config":
+    st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.subheader("⚙️ Configurações & Acessibilidade")
+    s = get_settings()
+    c1, c2 = st.columns([1,1])
+    with c1:
+        plot_height = st.number_input("Altura do gráfico (px)", value=int(s.get("plot_height",720)), step=10, key="cfg_plot_height")
+        font_scale = st.slider("Escala de fonte", min_value=0.7, max_value=2.0, value=float(s.get("font_scale",1.0)), step=0.1, key="cfg_font_scale")
+        palette = st.selectbox("Paleta de cores", options=["Plotly","Alphabet"], index=0 if s.get("palette","Plotly")=="Plotly" else 1, key="cfg_palette")
+    with c2:
+        node_opacity = st.slider("Opacidade dos nós", min_value=0.1, max_value=1.0, value=float(s.get("node_opacity",0.95)), step=0.05, key="cfg_node_opacity")
+        edge_opacity = st.slider("Opacidade das arestas", min_value=0.0, max_value=1.0, value=float(s.get("edge_opacity",0.25)), step=0.05, key="cfg_edge_opacity")
+        high_contrast = st.checkbox("Alto contraste (toggle)", value=bool(s.get("high_contrast",False)), key="cfg_high_contrast")
+
+    if st.button("Aplicar configurações"):
+        st.session_state.settings["plot_height"] = int(plot_height)
+        st.session_state.settings["font_scale"] = float(font_scale)
+        st.session_state.settings["palette"] = palette
+        st.session_state.settings["node_opacity"] = float(node_opacity)
+        st.session_state.settings["edge_opacity"] = float(edge_opacity)
+        st.session_state.settings["high_contrast"] = bool(high_contrast)
+        # persist minimal state
+        save_user_state_minimal(USER_STATE)
+        st.success("Configurações aplicadas e salvas.")
+        safe_rerun()
+
+    st.markdown("---")
+    st.markdown("**Acessibilidade**")
+    st.markdown("- Use *Escala de fonte* para aumentar o tamanho do texto no mapa e UI (onde aplicável).")
+    st.markdown("- *Alto contraste* troca para paleta com contraste maior nas visualizações (se selecionado).")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# -------------------------
+# Fallback (should not happen)
+# -------------------------
+else:
+    st.info("Página não encontrada — selecione uma aba no topo.")
