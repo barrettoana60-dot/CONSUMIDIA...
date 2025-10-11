@@ -1,6 +1,6 @@
 # dashboard_nugep_pqr_final_complete.py
 # NUGEP-PQR — Versão final (login com CPF) + Mapa Mental 3D (separável/interativo)
-# Ajustado: Configurações simplificadas (Tema Claro/Escuro + Tamanho da fonte + Altura do gráfico)
+# Ajustado: Configurações simplificadas e correção definitiva para renderização de linhas no mapa.
 
 import os
 import re
@@ -820,105 +820,127 @@ elif st.session_state.page == "mapa":
                     if st.session_state.autosave: safe_rerun()
 
     st.markdown("### Visualização 3D")
+
+    G = st.session_state.G or nx.Graph()
+
+    # Botão de diagnóstico para criar um grafo de exemplo
+    if st.button("Não vê linhas? Clique para criar um Grafo de Exemplo"):
+        G_ex = nx.Graph()
+        G_ex.add_node("Autor: Exemplo A", tipo="Autor", label="Exemplo A")
+        G_ex.add_node("Título: Livro 1", tipo="Título", label="Livro 1")
+        G_ex.add_node("Ano: 2025", tipo="Ano", label="2025")
+        G_ex.add_edge("Autor: Exemplo A", "Título: Livro 1")
+        G_ex.add_edge("Título: Livro 1", "Ano: 2025")
+        st.session_state.G = G_ex
+        safe_rerun()
+
     show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
 
+    # Diagnóstico: Informar o status do grafo atual
+    st.info(f"O grafo atual tem **{G.number_of_nodes()}** nós (pontos) e **{G.number_of_edges()}** arestas (linhas).")
+
+
     try:
-        G = st.session_state.G or nx.Graph()
         if G.number_of_nodes() == 0:
-            st.info("Sem nós no grafo. Adicione nós ou carregue uma planilha para visualizar o mapa.")
-        else:
-            # Calculate layout with adjusted separation (k value)
-            k_val = None
-            if G.number_of_nodes() > 0:
-                k_val = 2.0 / math.sqrt(G.number_of_nodes()) # Increased k for more separation
-            pos = nx.spring_layout(G, dim=3, seed=42, iterations=200, k=k_val)
+            st.warning("Para começar, adicione nós na seção 'Editar Nós do Mapa' acima ou carregue uma planilha.")
+        elif G.number_of_edges() == 0 and G.number_of_nodes() > 0:
+            st.warning("O mapa não tem linhas porque nenhum nó está conectado. Conecte os nós ao criá-los ou carregue uma planilha com relações (autor, título, etc).")
 
-            # Build edge traces
-            edge_x, edge_y, edge_z = [], [], []
-            for u, v in G.edges():
-                xu, yu, zu = pos.get(u, [0,0,0])
-                xv, yv, zv = pos.get(v, [0,0,0])
-                edge_x += [xu, xv, None]
-                edge_y += [yu, yv, None]
-                edge_z += [zu, zv, None]
-            edge_trace = go.Scatter3d(
-                x=edge_x, y=edge_y, z=edge_z,
-                mode='lines',
-                hoverinfo='none',
-                line=dict(width=1.5, color='rgba(180,180,180,0.6)'), # More visible lines
-                showlegend=False
-            )
+        # Mesmo com o aviso, tentamos renderizar o que existe.
+        # Calculate layout with adjusted separation (k value)
+        k_val = None
+        if G.number_of_nodes() > 0:
+            k_val = 2.0 / math.sqrt(G.number_of_nodes()) # Increased k for more separation
+        pos = nx.spring_layout(G, dim=3, seed=42, iterations=200, k=k_val)
 
-            # Node grouping by 'tipo' and traces
-            tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
-            palette = px.colors.qualitative.Plotly
-            tipo_color = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
-            deg = dict(G.degree())
-            node_traces = []
-            for tipo in tipo_order:
-                xs, ys, zs, texts, sizes, hovertexts, ids = [], [], [], [], [], [], []
-                for n in G.nodes():
-                    meta = G.nodes[n]
-                    n_tipo = meta.get("tipo", "Outro")
-                    if n_tipo != tipo:
-                        continue
-                    x, y, z = pos.get(n, [0,0,0])
-                    xs.append(x); ys.append(y); zs.append(z)
-                    label = meta.get("label", str(n))
-                    d = deg.get(n, 0)
-                    sizes.append(max(6, int((d + 1) * 8))) # Fixed node size factor
-                    hovertexts.append(f"<b>{escape_html(label)}</b><br>Tipo: {escape_html(n_tipo)}<br>Grau: {d}")
-                    texts.append(label if show_labels else "")
-                    ids.append(n)
-                if not xs:
+        # Build edge traces
+        edge_x, edge_y, edge_z = [], [], []
+        for u, v in G.edges():
+            xu, yu, zu = pos.get(u, [0,0,0])
+            xv, yv, zv = pos.get(v, [0,0,0])
+            edge_x += [xu, xv, None]
+            edge_y += [yu, yv, None]
+            edge_z += [zu, zv, None]
+        edge_trace = go.Scatter3d(
+            x=edge_x, y=edge_y, z=edge_z,
+            mode='lines',
+            hoverinfo='none',
+            line=dict(width=1.5, color='rgba(180,180,180,0.6)'), # More visible lines
+            showlegend=False
+        )
+
+        # Node grouping by 'tipo' and traces
+        tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
+        palette = px.colors.qualitative.Plotly
+        tipo_color = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
+        deg = dict(G.degree())
+        node_traces = []
+        for tipo in tipo_order:
+            xs, ys, zs, texts, sizes, hovertexts, ids = [], [], [], [], [], [], []
+            for n in G.nodes():
+                meta = G.nodes[n]
+                n_tipo = meta.get("tipo", "Outro")
+                if n_tipo != tipo:
                     continue
-                trace = go.Scatter3d(
-                    x=xs, y=ys, z=zs,
-                    mode='markers+text' if show_labels else 'markers',
-                    text=texts,
-                    textposition="top center" if show_labels else None,
-                    hovertext=hovertexts,
-                    hoverinfo="text",
-                    name=tipo,
-                    customdata=ids,
-                    marker=dict(
-                        size=sizes,
-                        color=tipo_color.get(tipo),
-                        opacity=get_settings().get("node_opacity", 0.95),
-                        line=dict(width=0.6, color='rgba(0,0,0,0.12)')
-                    )
+                x, y, z = pos.get(n, [0,0,0])
+                xs.append(x); ys.append(y); zs.append(z)
+                label = meta.get("label", str(n))
+                d = deg.get(n, 0)
+                sizes.append(max(6, int((d + 1) * 8))) # Fixed node size factor
+                hovertexts.append(f"<b>{escape_html(label)}</b><br>Tipo: {escape_html(n_tipo)}<br>Grau: {d}")
+                texts.append(label if show_labels else "")
+                ids.append(n)
+            if not xs:
+                continue
+            trace = go.Scatter3d(
+                x=xs, y=ys, z=zs,
+                mode='markers+text' if show_labels else 'markers',
+                text=texts,
+                textposition="top center" if show_labels else None,
+                hovertext=hovertexts,
+                hoverinfo="text",
+                name=tipo,
+                customdata=ids,
+                marker=dict(
+                    size=sizes,
+                    color=tipo_color.get(tipo),
+                    opacity=get_settings().get("node_opacity", 0.95),
+                    line=dict(width=0.6, color='rgba(0,0,0,0.12)')
                 )
-                node_traces.append(trace)
-
-            # Assemble figure (edges below nodes)
-            fig = go.Figure(data=[edge_trace] + node_traces)
-
-            # Fixed dark theme colors
-            paper_bg = "rgba(0,0,0,0)"
-            plot_bg = "rgba(0,0,0,0)"
-            font_color = "#d6d9dc"
-
-            # Remove cube/axes for a "web" look
-            fig.update_layout(
-                height=int(get_settings().get("plot_height", 720)),
-                showlegend=True,
-                paper_bgcolor=paper_bg,
-                plot_bgcolor=plot_bg,
-                scene=dict(
-                    xaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
-                    yaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
-                    zaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
-                    aspectmode='auto',
-                    camera=dict(eye=dict(x=1.4, y=1.4, z=1.0)),
-                    dragmode='orbit'
-                ),
-                margin=dict(l=0, r=0, b=0, t=0),
-                legend=dict(itemsizing='constant', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
-                font=dict(size=12, color=font_color) # Font size here is relative to the global scale
             )
+            node_traces.append(trace)
 
-            # Show figure
+        # Assemble figure (edges below nodes)
+        fig = go.Figure(data=[edge_trace] + node_traces)
+
+        # Fixed dark theme colors
+        paper_bg = "rgba(0,0,0,0)"
+        plot_bg = "rgba(0,0,0,0)"
+        font_color = "#d6d9dc"
+
+        # Remove cube/axes for a "web" look
+        fig.update_layout(
+            height=int(get_settings().get("plot_height", 720)),
+            showlegend=True,
+            paper_bgcolor=paper_bg,
+            plot_bgcolor=plot_bg,
+            scene=dict(
+                xaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
+                yaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
+                zaxis=dict(visible=False, showticklabels=False, showgrid=False, zeroline=False, showbackground=False, title=""),
+                aspectmode='auto',
+                camera=dict(eye=dict(x=1.4, y=1.4, z=1.0)),
+                dragmode='orbit'
+            ),
+            margin=dict(l=0, r=0, b=0, t=0),
+            legend=dict(itemsizing='constant', orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+            font=dict(size=12, color=font_color) # Font size here is relative to the global scale
+        )
+
+        # Show figure
+        if G.number_of_nodes() > 0:
             st.plotly_chart(fig, use_container_width=True)
+
     except Exception as e:
         st.error(f"Erro ao renderizar grafo: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
@@ -965,6 +987,8 @@ elif st.session_state.page == "graficos":
                 st.error(f"Erro ao gerar gráficos: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
+# [O restante do código para as páginas "Busca" e "Mensagens" continua aqui, idêntico ao da versão anterior]
+# ...
 # -------------------------
 # Page: Busca (mantido)
 # -------------------------
