@@ -1,6 +1,6 @@
 # dashboard_nugep_pqr_final_complete.py
 # NUGEP-PQR — Versão final (login com CPF) + Mapa Mental 3D (separável/interativo)
-# Ajustado: Correção CRÍTICA na função de salvar/carregar e implementação de restauração automática da planilha.
+# Ajustado: Lógica de criação de grafo refeita para GARANTIR a criação de linhas a partir de qualquer planilha.
 
 import os
 import re
@@ -365,65 +365,40 @@ def read_spreadsheet(uploaded_file):
 
 def criar_grafo(df, silent=False):
     """
-    Função robusta para criar um grafo a partir de um DataFrame.
-    Ela identifica colunas relevantes (autor, título, etc.) mesmo com nomes variados,
-    e cria conexões automaticamente, usando o título como nó central para cada linha.
+    Função à prova de falhas para criar um grafo a partir de um DataFrame.
+    Cria um nó central para cada LINHA da planilha e conecta todas as células
+    daquela linha a este nó central. GARANTE a criação de linhas.
     """
     G = nx.Graph()
-    if df is None: return G
-
-    # Normaliza nomes de colunas para busca flexível (ex: 'Autor', 'ANO' -> 'autor', 'ano')
-    df_cols = {c.lower().strip(): c for c in df.columns}
-
-    # Mapeia nomes-padrão para as colunas encontradas, testando variações
-    col_map = {
-        'autor': df_cols.get('autor', df_cols.get('autores', df_cols.get('author', ''))),
-        'título': df_cols.get('título', df_cols.get('titulo', df_cols.get('title', ''))),
-        'ano': df_cols.get('ano', df_cols.get('year', '')),
-        'tema': df_cols.get('tema', df_cols.get('theme', df_cols.get('topico', '')))
-    }
-    col_map = {k: v for k, v in col_map.items() if v} # Remove os que não foram encontrados
-
-    if not col_map.get('título'):
-        if not silent:
-            st.warning("Aviso: Não foi possível encontrar uma coluna de 'Título' ou similar na planilha. As linhas de conexão podem não ser criadas corretamente.")
-        # Mesmo sem título, tentamos criar nós individuais
-        for _, row in df.iterrows():
-            for key, col_name in col_map.items():
-                 val = str(row.get(col_name, '') or '').strip()
-                 if val:
-                     node_id = f"{key.capitalize()}: {val}"
-                     G.add_node(node_id, tipo=key.capitalize(), label=val)
+    if df is None:
         return G
 
     created_edges = 0
-    for _, row in df.iterrows():
-        # O título é o nó central de cada entrada da planilha
-        titulo_val = str(row.get(col_map['título'], '') or '').strip()
-        if not titulo_val:
-            continue  # Pula linhas sem um título
+    # Itera em cada linha da planilha
+    for index, row in df.iterrows():
+        # Cria um nó central para representar a linha (ex: "Registro 1")
+        row_node_id = f"Registro {index + 1}"
+        G.add_node(row_node_id, tipo="Registro", label=f"Registro {index + 1}")
 
-        central_node_id = f"Título: {titulo_val}"
-        G.add_node(central_node_id, tipo="Título", label=titulo_val)
-
-        # Conecta todos os outros atributos da linha ao título
-        for key, col_name in col_map.items():
-            if key == 'título':
-                continue
-
-            val = str(row.get(col_name, '') or '').strip()
+        # Itera em cada célula da linha
+        for col_name, cell_value in row.items():
+            val = str(cell_value or '').strip()
             if val:
-                node_id = f"{key.capitalize()}: {val}"
-                G.add_node(node_id, tipo=key.capitalize(), label=val)
-                G.add_edge(central_node_id, node_id)
+                # Cria um nó para o conteúdo da célula
+                tipo = str(col_name).strip().capitalize()
+                node_id = f"{tipo}: {val}"
+                G.add_node(node_id, tipo=tipo, label=val)
+                
+                # Conecta o nó da célula ao nó central da linha
+                G.add_edge(row_node_id, node_id)
                 created_edges += 1
 
     if not silent:
         if created_edges > 0:
-            st.success(f"Grafo criado com sucesso, com {created_edges} linhas de conexão a partir da planilha.")
+            st.success(f"Grafo criado com sucesso, com {created_edges} linhas de conexão.")
         else:
-            st.info("Grafo criado, mas nenhuma conexão foi gerada. Verifique se as colunas da planilha (autor, ano, tema) contêm dados.")
-
+            st.info("Grafo de pontos criado, mas a planilha parece estar vazia ou não gerou conexões.")
+            
     return G
 
 def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
@@ -846,17 +821,6 @@ elif st.session_state.page == "mapa":
 
     G = st.session_state.G or nx.Graph()
 
-    # Botão de diagnóstico para criar um grafo de exemplo
-    if st.button("Não vê linhas? Clique para criar um Grafo de Exemplo"):
-        G_ex = nx.Graph()
-        G_ex.add_node("Autor: Exemplo A", tipo="Autor", label="Exemplo A")
-        G_ex.add_node("Título: Livro 1", tipo="Título", label="Livro 1")
-        G_ex.add_node("Ano: 2025", tipo="Ano", label="2025")
-        G_ex.add_edge("Autor: Exemplo A", "Título: Livro 1")
-        G_ex.add_edge("Título: Livro 1", "Ano: 2025")
-        st.session_state.G = G_ex
-        safe_rerun()
-
     show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
 
     # Diagnóstico: Informar o status do grafo atual
@@ -867,7 +831,7 @@ elif st.session_state.page == "mapa":
         if G.number_of_nodes() == 0:
             st.warning("Para começar, adicione nós na seção 'Editar Nós do Mapa' acima ou carregue uma planilha.")
         elif G.number_of_edges() == 0 and G.number_of_nodes() > 0:
-            st.warning("O mapa não tem linhas porque nenhum nó está conectado. Conecte os nós ao criá-los ou carregue uma planilha com relações (autor, título, etc).")
+            st.warning("O mapa não tem linhas porque nenhum nó está conectado. Conecte os nós ao criá-los ou carregue uma planilha com dados.")
 
         if G.number_of_nodes() > 0:
             # 1. Calculate layout once
@@ -889,7 +853,7 @@ elif st.session_state.page == "mapa":
             node_x, node_y, node_z = [], [], []
             node_colors, node_sizes, node_texts = [], [], []
             
-            tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
+            tipo_order = ["Registro", "Autor", "Título", "Ano", "Tema", "Outro"]
             palette = px.colors.qualitative.Plotly
             tipo_color_map = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
             
