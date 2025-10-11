@@ -11,6 +11,7 @@ import random
 import string
 import unicodedata
 import html
+import math
 from pathlib import Path
 from datetime import datetime
 
@@ -57,7 +58,7 @@ def safe_rerun():
 # Base CSS
 # -------------------------
 BASE_CSS = r"""
-:root{ --glass-bg-dark: rgba(255,255,255,0.03); --muted-text-dark:#bfc6cc; --glass-bg-light:#ffffff; --muted-text-light:#222; }
+:root{ --glass-bg-dark: rgba(255,255,255,0.03); --muted-text-dark:#bfc6cc; }
 body { transition: background-color .25s ease, color .25s ease; }
 .glass-box{ border-radius:12px; padding:16px; box-shadow:0 8px 32px rgba(4,9,20,0.15); }
 .card, .msg-card { border-radius:10px; padding:12px; margin-bottom:10px; }
@@ -69,39 +70,30 @@ body { transition: background-color .25s ease, color .25s ease; }
 .stButton>button, .stDownloadButton>button {
     transition: transform 0.1s ease, opacity 0.1s ease, background-color 0.15s ease !important;
 }
-.stButton>button:hover, .stDownloadButton>button:hover {
-    opacity: 0.9;
-}
 .stButton>button:active, .stDownloadButton>button:active {
     transform: scale(0.97);
     opacity: 0.8;
 }
 """
 
-# default dark CSS (will be overridden if user chooses light theme)
+# default dark CSS
 DEFAULT_CSS = r"""
 .css-1d391kg { background: linear-gradient(180deg,#071428 0%, #031926 100%) !important; }
 .glass-box{ background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.04); box-shadow:0 8px 32px rgba(4,9,20,0.5); }
 .stButton>button, .stDownloadButton>button{ background:transparent !important; color:#bfc6cc !important; border:1px solid rgba(255,255,255,0.06) !important; padding:8px 12px !important; border-radius:10px !important; }
+.stButton>button:hover, .stDownloadButton>button:hover {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
 .card, .msg-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.03); }
 .avatar{color:#fff;background:#6c5ce7}
 .small-muted{color:#bfc6cc;}
 .card-title{color:#fff}
 """
 
-LIGHT_CSS = r"""
-.css-1d391kg { background: linear-gradient(180deg,#ffffff 0%, #f6f8fa 100%) !important; }
-.glass-box{ background: rgba(0,0,0,0.02); border:1px solid rgba(0,0,0,0.06); box-shadow:0 4px 12px rgba(0,0,0,0.05); }
-.stButton>button, .stDownloadButton>button{ background:transparent !important; color:#222 !important; border:1px solid rgba(0,0,0,0.06) !important; padding:8px 12px !important; border-radius:10px !important; }
-.card, .msg-card { background: #fff; border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(0,0,0,0.06); }
-.avatar{color:#fff;background:#4b8bf4}
-.small-muted{color:#444;}
-.card-title{color:#111}
-"""
-
 # inject base CSS
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
-# inject dark default; we will override dynamically according to settings later
+# inject dark default
 st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
 
 # header
@@ -141,18 +133,14 @@ def gen_password(length=8):
     choices = string.ascii_letters + string.digits
     return ''.join(random.choice(choices) for _ in range(length))
 
-def apply_theme_css(theme, font_scale=1.0):
-    """Apply theme-specific CSS overrides (light/dark) and global font scale."""
+def apply_global_styles(font_scale=1.0):
+    """Applies global CSS for font scaling and ensures dark theme body styles."""
     try:
-        if theme == "light":
-            st.markdown(f"<style>{LIGHT_CSS}</style>", unsafe_allow_html=True)
-            st.markdown("<style>body { background-color: #f6f8fa; color: #111; }</style>", unsafe_allow_html=True)
-        else:
-            st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
-            st.markdown("<style>body { background-color: #071428; color: #d6d9dc; }</style>", unsafe_allow_html=True)
+        # Static dark theme body style
+        dark_body_style = "<style>body { background-color: #071428; color: #d6d9dc; }</style>"
+        st.markdown(dark_body_style, unsafe_allow_html=True)
 
-        # Apply global font scale. Browser base font is usually 16px. Streamlit uses 'rem'.
-        # Changing the font-size on the root element (html) scales all 'rem' units.
+        # Dynamic font scaling
         font_css = f"html {{ font-size: {font_scale * 100}%; }}"
         st.markdown(f"<style>{font_css}</style>", unsafe_allow_html=True)
     except Exception:
@@ -469,11 +457,8 @@ _defaults = {
     "search_view_index": None, "compose_inline": False, "compose_open": False,
     "settings": {
         "plot_height": 720,
-        "theme": "dark",
         "font_scale": 1.0,
         "node_opacity": 0.95,
-        "edge_opacity": 0.25,
-        "palette": "Plotly"
     }
 }
 for k, v in _defaults.items():
@@ -512,7 +497,7 @@ if not st.session_state.authenticated:
     with tabs[0]:
         login_cpf = st.text_input("CPF", key="ui_login_user")
         login_pass = st.text_input("Senha", type="password", key="ui_login_pass")
-        
+
         users = load_users() or {}
         if not users:
             admin_user = "admin"
@@ -546,11 +531,11 @@ if not st.session_state.authenticated:
         reg_cpf = st.text_input("CPF", key="ui_reg_user")
         reg_pass = st.text_input("Crie sua senha", type="password", key="ui_reg_pass")
         reg_pass_confirm = st.text_input("Confirme sua senha", type="password", key="ui_reg_pass_confirm")
-        
+
         if st.button("Cadastrar", "btn_register_main"):
             new_cpf = (reg_cpf or "").strip()
             new_pass = (reg_pass or "").strip()
-            
+
             if not new_cpf:
                 st.warning("Informe um CPF válido.")
             elif not new_pass:
@@ -602,7 +587,7 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
 
 # apply theme and font CSS based on settings immediately
 s = get_settings()
-apply_theme_css(s.get("theme", "dark"), s.get("font_scale", 1.0))
+apply_global_styles(s.get("font_scale", 1.0))
 
 # unread count
 UNREAD_COUNT = 0
@@ -730,7 +715,7 @@ if st.session_state.page == "planilha":
                     if "settings" in meta:
                         st.session_state.settings.update(meta.get("settings", {}))
                         s_restored = get_settings()
-                        apply_theme_css(s_restored.get("theme", "dark"), s_restored.get("font_scale", 1.0))
+                        apply_global_styles(s_restored.get("font_scale", 1.0))
                     st.success("Estado salvo restaurado.")
                     time.sleep(1)
                     safe_rerun()
@@ -842,8 +827,11 @@ elif st.session_state.page == "mapa":
         if G.number_of_nodes() == 0:
             st.info("Sem nós no grafo. Adicione nós ou carregue uma planilha para visualizar o mapa.")
         else:
-            # Layout is calculated on each render. Simpler, no persistence.
-            pos = nx.spring_layout(G, dim=3, seed=42, iterations=200)
+            # Calculate layout with adjusted separation (k value)
+            k_val = None
+            if G.number_of_nodes() > 0:
+                k_val = 2.0 / math.sqrt(G.number_of_nodes()) # Increased k for more separation
+            pos = nx.spring_layout(G, dim=3, seed=42, iterations=200, k=k_val)
 
             # Build edge traces
             edge_x, edge_y, edge_z = [], [], []
@@ -857,14 +845,13 @@ elif st.session_state.page == "mapa":
                 x=edge_x, y=edge_y, z=edge_z,
                 mode='lines',
                 hoverinfo='none',
-                line=dict(width=1.2, color=f'rgba(120,120,120,{get_settings().get("edge_opacity",0.25)})'),
+                line=dict(width=1.5, color='rgba(180,180,180,0.6)'), # More visible lines
                 showlegend=False
             )
 
             # Node grouping by 'tipo' and traces
             tipo_order = ["Autor", "Título", "Ano", "Tema", "Outro"]
-            palette_choice = get_settings().get("palette", "Plotly")
-            palette = px.colors.qualitative.Plotly if palette_choice == "Plotly" else px.colors.qualitative.Alphabet
+            palette = px.colors.qualitative.Plotly
             tipo_color = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
             deg = dict(G.degree())
             node_traces = []
@@ -906,16 +893,10 @@ elif st.session_state.page == "mapa":
             # Assemble figure (edges below nodes)
             fig = go.Figure(data=[edge_trace] + node_traces)
 
-            # Theme-aware colors
-            theme = get_settings().get("theme", "dark")
-            if theme == "light":
-                paper_bg = "#ffffff"
-                plot_bg = "#ffffff"
-                font_color = "#111111"
-            else:
-                paper_bg = "rgba(0,0,0,0)"
-                plot_bg = "rgba(0,0,0,0)"
-                font_color = "#d6d9dc"
+            # Fixed dark theme colors
+            paper_bg = "rgba(0,0,0,0)"
+            plot_bg = "rgba(0,0,0,0)"
+            font_color = "#d6d9dc"
 
             # Remove cube/axes for a "web" look
             fig.update_layout(
@@ -977,11 +958,8 @@ elif st.session_state.page == "graficos":
                     fig = px.bar(df, x=eixo_x, y=eixo_y, title=f"{eixo_y} por {eixo_x}")
                 else:
                     fig = px.histogram(df, x=eixo_x, title=f"Contagem por {eixo_x}")
-                theme = get_settings().get("theme", "dark")
-                if theme == "light":
-                    fig.update_layout(plot_bgcolor="#ffffff", paper_bgcolor="#ffffff", font=dict(color="#111111"))
-                else:
-                    fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#d6d9dc"))
+                # Fixed dark theme
+                fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#d6d9dc"))
                 st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
                 st.error(f"Erro ao gerar gráficos: {e}")
@@ -1311,35 +1289,29 @@ elif st.session_state.page == "config":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("⚙️ Configurações")
     s = get_settings()
-    c1, c2 = st.columns([1,1])
-    with c1:
-        plot_height = st.number_input("Altura do gráfico (px)", value=int(s.get("plot_height",720)), step=10, key="cfg_plot_height")
-        font_scale = st.slider("Escala de fonte (aplicada a todo o programa)", min_value=0.7, max_value=2.0, value=float(s.get("font_scale",1.0)), step=0.1, key="cfg_font_scale")
-    with c2:
-        theme = st.selectbox("Tema", options=["dark", "light"], index=0 if s.get("theme","dark")=="dark" else 1, key="cfg_theme")
-        palette = st.selectbox("Paleta de cores (nós)", options=["Plotly","Alphabet"], index=0 if s.get("palette","Plotly")=="Plotly" else 1, key="cfg_palette")
+
+    plot_height = st.number_input("Altura do gráfico (px)", value=int(s.get("plot_height",720)), step=10, key="cfg_plot_height")
+    font_scale = st.slider("Escala de fonte (aplicada a todo o programa)", min_value=0.7, max_value=2.0, value=float(s.get("font_scale",1.0)), step=0.1, key="cfg_font_scale")
+
     if st.button("Aplicar configurações"):
         st.session_state.settings["plot_height"] = int(plot_height)
         st.session_state.settings["font_scale"] = float(font_scale)
-        st.session_state.settings["theme"] = str(theme)
-        st.session_state.settings["palette"] = str(palette)
-        
+
         ok = save_user_state_minimal(USER_STATE)
-        
-        apply_theme_css(theme, font_scale)
-        
+        apply_global_styles(font_scale)
+
         if ok:
             st.success("Configurações aplicadas e salvas.")
         else:
             st.success("Configurações aplicadas (falha ao salvar localmente).")
-        
+
         time.sleep(0.5)
         safe_rerun()
 
     st.markdown("---")
     st.markdown("**Acessibilidade**")
     st.markdown("- Use *Escala de fonte* para aumentar ou diminuir o tamanho do texto em todo o programa.")
-    st.markdown("- *Tema* alterna entre claro e escuro para melhor contraste.")
+    st.markdown("- O programa utiliza um tema escuro fixo para garantir bom contraste.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
