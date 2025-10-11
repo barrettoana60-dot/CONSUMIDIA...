@@ -1,6 +1,3 @@
-# dashboard_nugep_pqr_final_complete.py
-# NUGEP-PQR — Versão final (login com CPF) + Mapa Mental 3D (separável/interativo)
-# Ajustado: Configurações simplificadas (Tema Claro/Escuro + Tamanho da fonte + Altura do gráfico)
 
 import os
 import re
@@ -1410,9 +1407,3 @@ elif st.session_state.page == "config":
     st.markdown("- Use *Escala de fonte* para aumentar o tamanho do texto no mapa e nos gráficos.")
     st.markdown("- *Tema* alterna entre claro e escuro.")
     st.markdown("</div>", unsafe_allow_html=True)
-
-# -------------------------
-# Fallback (should not happen)
-# -------------------------
-else:
-    st.info("Página não encontrada — selecione uma aba no topo.")
