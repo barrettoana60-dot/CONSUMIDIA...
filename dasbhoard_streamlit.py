@@ -1,4 +1,5 @@
-
+# dashboard_nugep_pqr_final.py
+# NUGEP-PQR — Versão final (ajustes: nome do projeto, criação de senha pelo usuário, correção de bug)
 import os
 import re
 import io
@@ -125,20 +126,23 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
         # download button
         creds_txt = f"username: {username}\npassword: {password}\n"
         st.download_button("⬇️ Baixar credenciais", data=creds_txt, file_name=f"credenciais_{username}.txt", mime="text/plain")
-        # copy to clipboard via JS - may be blocked in some deployments but try
+        
+        # Corrigido: Usando f-string e a variável key_prefix para criar um nome de função JS único.
         js = f"""
         <script>
-        function copyToClipboard{text_id}(){{
+        function copyToClipboard_{key_prefix}(){{
             navigator.clipboard.writeText(`username: {username}\\npassword: {password}`);
             const el = document.getElementById('copy_hint_{key_prefix}');
             if(el) el.innerText = 'Copiado!';
         }}
         </script>
-        <button onclick="copyToClipboard{text_id}()">📋 Copiar para área de transferência</button>
+        <button onclick="copyToClipboard_{key_prefix}()">📋 Copiar para área de transferência</button>
         <div id='copy_hint_{key_prefix}' style='margin-top:6px;font-size:13px;color:#bfc6cc'></div>
-        """.replace('{text_id}','').replace('{key_prefix}', key_prefix)
+        """
         st.markdown(js, unsafe_allow_html=True)
+        
     st.markdown("---")
+
 
 # -------------------------
 # load/save users (corrigido: atomic + Path.cwd())
@@ -477,7 +481,7 @@ if not st.session_state.authenticated:
         reg_pass_confirm = st.text_input("Confirme sua senha", type="password", key="ui_reg_pass_confirm")
         
         if st.button("Cadastrar", "btn_register_main"):
-            # local flow (supabase path left intact earlier)
+            # local flow
             new_user = (reg_user or "").strip()
             new_pass = (reg_pass or "").strip()
             
@@ -954,7 +958,7 @@ elif st.session_state.page == "busca":
                     st.markdown("---")
                     st.markdown("### ✉️ Contatar autor / origem")
 
-                    # INLINE contact form inside a st.form (usar form_submit_button para ENVIAR e CANCELAR)
+                    # INLINE contact form inside a st.form
                     if origin_user and origin_user != "N/A":
                         st.markdown(f"Enviar mensagem diretamente para **{escape_html(origin_user)}** sobre este registro.")
                         to_pref = origin_user
@@ -1096,7 +1100,7 @@ elif st.session_state.page == "mensagens":
                 </div>
                 """
                 st.markdown(card, unsafe_allow_html=True)
-                # SINGLE streamlit button "Abrir" (não um botão HTML)
+                # SINGLE streamlit button "Abrir"
                 if st.button("Abrir", key=f"open_inbox_{mid}"):
                     st.session_state.reply_message_id = mid
                     safe_rerun()
