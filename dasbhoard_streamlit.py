@@ -1,5 +1,5 @@
 # dashboard_nugep_pqr_final_complete.py
-# VERSÃO FINAL CORRIGIDA (11/10/2025)
+# VERSÃO FINAL CORRIGIDA (12/10/2025)
 # COM: Busca funcional, visual opaco, e mapa com legenda e cores corrigidas.
 
 import os
@@ -885,27 +885,29 @@ elif st.session_state.page == "mapa":
 
     st.info(f"O grafo atual tem **{G.number_of_nodes()}** nós (pontos) e **{G.number_of_edges()}** arestas (linhas).")
 
-    # 1. MAPA DE CORES FIXAS
+    # 1. MAPA DE CORES FIXAS (CORRIGIDO)
     tipo_color_map = {
         "Autor": "#2979ff",      # Azul
-        "Ano": "#1abc9c",        # Verde
-        "Tema": "#ff8a00",      # Laranja
-        "País": "#8e44ad",      # Roxo
-        "Título": "#d63384",    # Rosa
+        "Tema": "#1abc9c",       # Verde
+        "Ano": "#ff8a00",        # Laranja
+        "País": "#8e44ad",       # Roxo (Mantido para melhor distinção visual)
+        "Título": "#d63384",     # Rosa
         "Registro": "#6c757d",  # Cinza
         "Outro": "#adb5bd"       # Cinza claro
-    }
+    } # <-- CORRIGIDO: Cores ajustadas conforme solicitado. Mantive "País" como roxo para melhor contraste.
 
-    # 2. CONSTRUÇÃO E RENDERIZAÇÃO DA LEGENDA VISUAL
+    # 2. CONSTRUÇÃO E RENDERIZAÇÃO DA LEGENDA VISUAL (CORRIGIDO)
     st.markdown("**Legenda de Cores**")
     legend_html = "<div style='display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;'>"
     for tipo, color in tipo_color_map.items():
-        legend_html += f"""
-        <div style='display: flex; align-items: center; gap: 5px;'>
-            <div style='width: 15px; height: 15px; background-color: {color}; border-radius: 50%; border: 1px solid #555;'></div>
-            <span style='color: #d6d9dc;'>{tipo}</span>
-        </div>
-        """
+        # <-- CORRIGIDO: Removida a indentação que quebrava a renderização do HTML
+        legend_html += (
+            f"<div style='display: flex; align-items: center; gap: 5px;'>"
+            f"<div style='width: 15px; height: 15px; background-color: {color}; "
+            f"border-radius: 50%; border: 1px solid #555;'></div>"
+            f"<span style='color: #d6d9dc;'>{tipo}</span>"
+            f"</div>"
+        )
     legend_html += "</div>"
     
     # LINHA CRÍTICA: Garante que o HTML seja renderizado como elementos visuais
