@@ -888,12 +888,12 @@ elif st.session_state.page == "mapa":
     # 1. MAPA DE CORES FIXAS
     tipo_color_map = {
         "Autor": "#2979ff",      # Azul
-        "Ano": "#1abc9c",       # Verde
+        "Ano": "#1abc9c",        # Verde
         "Tema": "#ff8a00",      # Laranja
         "País": "#8e44ad",      # Roxo
         "Título": "#d63384",    # Rosa
         "Registro": "#6c757d",  # Cinza
-        "Outro": "#adb5bd"      # Cinza claro
+        "Outro": "#adb5bd"       # Cinza claro
     }
 
     # 2. CONSTRUÇÃO E RENDERIZAÇÃO DA LEGENDA VISUAL
@@ -963,8 +963,8 @@ elif st.session_state.page == "mapa":
 
             fig = go.Figure(data=[edge_trace, node_trace])
             fig.update_layout(height=int(get_settings().get("plot_height", 720)), showlegend=False, paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)",
-                              scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode='auto'),
-                              margin=dict(l=0, r=0, b=0, t=0))
+                                scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode='auto'),
+                                margin=dict(l=0, r=0, b=0, t=0))
             st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
