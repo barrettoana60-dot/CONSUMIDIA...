@@ -1,7 +1,9 @@
 # dashboard_nugep_pqr_final_complete.py
 # VERSÃO FINAL CORRIGIDA (12/10/2025)
-# COM: Busca funcional, visual opaco, mapa corrigido e ALGORITMO DE RECOMENDAÇÃO (IA).
-# ALTERAÇÕES: Removida opacidade dos nós, eliminadas as categorias 'Registro' e 'Outro', e adicionado sistema de recomendação.
+# COM: Busca funcional, visual opaco, e mapa com legenda e cores corrigidas.
+#      -> NOVO: Sistema de recomendação com IA para novos usuários.
+#      -> NOVO: Módulo de mensagens (enviar, receber, responder) totalmente restaurado.
+# ALTERAÇÕES: Removida opacidade dos nós e eliminadas as categorias 'Registro' e 'Outro'.
 
 import os
 import re
@@ -25,19 +27,15 @@ import networkx as nx
 from networkx.readwrite import json_graph
 from fpdf import FPDF
 
-# --- INÍCIO: Bibliotecas de IA para Recomendação (opcional) ---
-# Usado para o novo sistema de recomendação. Se não for encontrado, a feature é desabilitada.
+# optional ML libs (silenciosamente não-fatal)
 try:
     import joblib
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
-    ML_LIBS_AVAILABLE = True
 except Exception:
     joblib = None
     TfidfVectorizer = None
     cosine_similarity = None
-    ML_LIBS_AVAILABLE = False
-# --- FIM: Bibliotecas de IA ---
 
 # -------------------------
 # Config & helpers
@@ -185,6 +183,7 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
 # -------------------------
 # Funções de Busca & Recomendação
 # -------------------------
+@st.cache_data(ttl=600) # Cache para não re-processar a cada clique
 def collect_latest_backups():
     """
     Scans the BACKUPS_DIR, finds all user backup CSVs,
@@ -226,54 +225,49 @@ def highlight_search_terms(text, query):
     )
     return highlighted_text
 
-@st.cache_data(ttl=3600) # Cache por 1 hora
-def get_recommendations(user_interests, top_n=10):
+def recomendar_artigos(temas_selecionados, df_total, top_n=10):
     """
-    Gera recomendações de artigos com base nos interesses do usuário.
-    Utiliza TF-IDF e similaridade de cossenos.
+    Recomenda artigos de um DataFrame com base em temas, usando TF-IDF e similaridade de cosseno.
     """
-    if not ML_LIBS_AVAILABLE or not user_interests:
+    if TfidfVectorizer is None or cosine_similarity is None:
+        st.error("Bibliotecas de Machine Learning (scikit-learn) não estão instaladas. A recomendação não funcionará.")
         return pd.DataFrame()
 
-    try:
-        all_data = collect_latest_backups()
-        if all_data.empty:
-            return pd.DataFrame()
-
-        # Prepara o texto para análise (título, resumo, tema, etc.)
-        text_cols = ['título', 'titulo', 'resumo', 'abstract', 'tema', 'autor']
-        all_data['corpus'] = all_data.apply(
-            lambda row: ' '.join(str(row.get(col, '')) for col in text_cols if pd.notna(row.get(col))),
-            axis=1
-        )
-        
-        # Filtra linhas sem conteúdo textual
-        all_data = all_data[all_data['corpus'].str.strip() != ''].reset_index(drop=True)
-        if all_data.empty:
-            return pd.DataFrame()
-
-        vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
-        tfidf_matrix = vectorizer.fit_transform(all_data['corpus'])
-        
-        # Vetoriza os interesses do usuário
-        interests_str = ' '.join(user_interests)
-        user_vector = vectorizer.transform([interests_str])
-
-        # Calcula a similaridade
-        cosine_similarities = cosine_similarity(user_vector, tfidf_matrix).flatten()
-        
-        # Obtém os N melhores resultados
-        related_docs_indices = cosine_similarities.argsort()[:-top_n-1:-1]
-        
-        recommendations = all_data.iloc[related_docs_indices].copy()
-        recommendations['similarity'] = cosine_similarities[related_docs_indices]
-        
-        # Filtra recomendações com similaridade muito baixa
-        return recommendations[recommendations['similarity'] > 0.05]
-
-    except Exception as e:
-        print(f"Erro ao gerar recomendações: {e}")
+    if df_total.empty or temas_selecionados == []:
         return pd.DataFrame()
+
+    # Combinar campos de texto para criar um 'documento' para cada artigo
+    df_total['corpus'] = (
+        df_total['título'].fillna('') + ' ' + 
+        df_total['tema'].fillna('') + ' ' +
+        df_total['resumo'].fillna('')
+    ).str.lower()
+    
+    # Vetorizar o corpus
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
+    tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
+    
+    # Criar um vetor para a consulta (temas selecionados)
+    query_text = ' '.join(temas_selecionados).lower()
+    query_vector = vectorizer.transform([query_text])
+    
+    # Calcular a similaridade de cosseno
+    cosine_similarities = cosine_similarity(query_vector, tfidf_matrix).flatten()
+    
+    # Obter os índices dos artigos mais similares
+    related_docs_indices = cosine_similarities.argsort()[:-top_n-1:-1]
+    
+    # Filtrar para mostrar apenas os resultados com alguma similaridade
+    similar_indices = [i for i in related_docs_indices if cosine_similarities[i] > 0.05]
+    
+    if not similar_indices:
+        return pd.DataFrame()
+
+    # Retornar o DataFrame com os artigos recomendados
+    recomendados_df = df_total.iloc[similar_indices].copy()
+    recomendados_df['similarity'] = cosine_similarities[similar_indices]
+    
+    return recomendados_df.drop(columns=['corpus'])
 
 # -------------------------
 # load/save users (atomic)
@@ -322,10 +316,12 @@ def add_to_favorites(result_data):
     favorite_item = {"id": result_id, "data": result_data, "added_at": datetime.utcnow().isoformat()}
     temp_data_to_check = result_data.copy()
     temp_data_to_check.pop('_artemis_username', None)
+    temp_data_to_check.pop('similarity', None) # Ignorar campo de similaridade
     existing_contents = []
     for fav in favorites:
         temp_existing = fav["data"].copy()
         temp_existing.pop('_artemis_username', None)
+        temp_existing.pop('similarity', None)
         existing_contents.append(json.dumps(temp_existing, sort_keys=True))
     if json.dumps(temp_data_to_check, sort_keys=True) not in existing_contents:
         favorites.append(favorite_item)
@@ -445,7 +441,7 @@ def delete_message(message_id, username):
     return False
 
 # -------------------------
-# Graph / reading / PDF utils
+# Graph / reading / PDF utils (mantidos)
 # -------------------------
 def read_spreadsheet(uploaded_file):
     b = uploaded_file.read()
@@ -533,20 +529,43 @@ def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
         return str(raw).encode("latin-1", "replace")
 
 # -------------------------
+# Small UI helpers
+# -------------------------
+ICON_SVGS = {
+    "register": '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><circle cx="12" cy="8" r="3"/></svg>',
+    "favoritos": '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77z"/></svg>',
+    "trash": '<svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6"/></svg>'
+}
+
+def icon_html_svg(key, size=18, color=None):
+    svg = ICON_SVGS.get(key, "")
+    col = color or "var(--muted-text)"
+    style = f"color:{col}; width:{size}px; height:{size}px; display:inline-block; vertical-align:middle;"
+    return f'<span style="{style}">{svg}</span>'
+
+def action_button(label, icon_key, st_key, expanded_label=None):
+    c_icon, c_btn = st.columns([0.12, 0.88])
+    with c_icon:
+        st.markdown(f"<div style='margin-top:6px'>{icon_html_svg(icon_key, size=18)}</div>", unsafe_allow_html=True)
+    with c_btn:
+        clicked = st.button(expanded_label or label, key=st_key, use_container_width=True)
+    return clicked
+
+# -------------------------
 # Session defaults & settings
 # -------------------------
 _defaults = {
     "authenticated": False, "username": None, "user_obj": None, "df": None,
     "G": nx.Graph(), "notes": "", "autosave": False, "page": "planilha",
     "restored_from_saved": False, "favorites": [], "reply_message_id": None,
+    "view_message_id": None, "sent_messages_view": False,
     "search_results": pd.DataFrame(), "search_page": 1, "search_query_meta": {"col": None,"query":""},
     "search_view_index": None, "compose_inline": False, "compose_open": False,
     "last_backup_path": None,
-    "user_interests_set": False, # NOVO: Flag para preferências do usuário
     "settings": {
         "plot_height": 720,
         "font_scale": 1.0,
-        "user_interests": [], # NOVO: Armazena os interesses do usuário
+        "node_opacity": 1.0, # Alterado para 1.0 para nós opacos
     }
 }
 for k, v in _defaults.items():
@@ -577,8 +596,7 @@ def save_user_state_minimal(USER_STATE):
             "uploaded_name": st.session_state.get("uploaded_name", None),
             "favorites": st.session_state.get("favorites", []),
             "settings": st.session_state.get("settings", {}),
-            "last_backup_path": st.session_state.get("last_backup_path"),
-            "user_interests_set": st.session_state.get("user_interests_set", False) # Salva o estado da preferência
+            "last_backup_path": st.session_state.get("last_backup_path")
         }
         clean_data = clean_for_json(data)
 
@@ -687,7 +705,6 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
         st.session_state.uploaded_name = meta.get("uploaded_name", st.session_state.get("uploaded_name"))
         st.session_state.favorites = meta.get("favorites", st.session_state.favorites)
         st.session_state.last_backup_path = meta.get("last_backup_path", st.session_state.last_backup_path)
-        st.session_state.user_interests_set = meta.get("user_interests_set", False)
         
         if "settings" in meta:
             st.session_state.settings.update(meta.get("settings", {}))
@@ -708,52 +725,12 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
     except Exception as e:
         st.error(f"Erro ao restaurar seu progresso: o arquivo de estado pode estar corrompido. Erro: {e}")
 
-# ------------------------------------------
-# NOVO: Tela de Seleção de Interesses
-# ------------------------------------------
-if not st.session_state.user_interests_set:
-    st.markdown("<div class='glass-box' style='max-width:800px; margin: 20px auto; text-align:center;'>", unsafe_allow_html=True)
-    st.subheader("👋 Bem-vindo(a)! Para começar, personalize sua experiência.")
-    st.write("Selecione os temas que mais lhe interessam para receber recomendações de artigos e trabalhos relevantes.")
-    
-    if not ML_LIBS_AVAILABLE:
-        st.warning("O módulo de recomendações (scikit-learn) não foi encontrado. Esta funcionalidade está desabilitada.")
-    
-    temas_disponiveis = [
-        "Cultura de Inovação",
-        "Inovação Tecnológica",
-        "NFT",
-        "Inovação Social",
-        "Documentação"
-    ]
-    
-    selected_interests = st.multiselect(
-        "Escolha um ou mais temas:",
-        options=temas_disponiveis,
-        default=st.session_state.settings.get("user_interests", []),
-        key="ui_interests_selection"
-    )
-    
-    st.info("Você poderá alterar seus interesses a qualquer momento na aba 'Configurações'.")
 
-    if st.button("Salvar Interesses e Continuar", key="btn_save_interests"):
-        if not selected_interests and ML_LIBS_AVAILABLE:
-            st.warning("Por favor, selecione pelo menos um tema de interesse.")
-        else:
-            st.session_state.settings["user_interests"] = selected_interests
-            st.session_state.user_interests_set = True
-            save_user_state_minimal(USER_STATE)
-            st.success("Preferências salvas! Carregando a plataforma...")
-            time.sleep(1)
-            safe_rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.stop()
-
-
+# apply theme and font CSS based on settings immediately
 s = get_settings()
 apply_global_styles(s.get("font_scale", 1.0))
 
+# unread count
 UNREAD_COUNT = 0
 try:
     all_msgs = load_all_messages()
@@ -795,10 +772,11 @@ with top2:
             safe_rerun()
 st.markdown("</div>", unsafe_allow_html=True)
 
+# Navigation buttons
+st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
 nav_buttons = {
-    "planilha": "📄 Planilha",
+    "planilha": "📄 Planilha & Recomendações",
     "mapa": "🞠 Mapa",
-    "recomendacoes": "💡 Recomendações", # NOVA ABA
     "anotacoes": "📝 Anotações",
     "graficos": "📊 Gráficos",
     "busca": "🔍 Busca",
@@ -811,33 +789,100 @@ for i, (page_key, page_label) in enumerate(nav_buttons.items()):
         if st.button(page_label, key=f"nav_{page_key}", use_container_width=True):
             st.session_state.page = page_key
             st.session_state.reply_message_id = None
+            st.session_state.view_message_id = None
             safe_rerun()
 st.markdown("</div></div><hr>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Planilha
+# Page: Planilha & Recomendações
 # -------------------------
 if st.session_state.page == "planilha":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("Planilha / Backup")
-    col1, col2 = st.columns([1,3])
-    with col1:
-        if st.button("Restaurar estado salvo", key="btn_restore_state"):
-            if USER_STATE.exists():
-                st.info("O estado da sua planilha já é restaurado automaticamente ao entrar. Este botão recarrega outras informações como anotações e favoritos.")
-                st.session_state.restored_from_saved = False 
-                safe_rerun()
+
+    # SE O USUÁRIO NÃO TEM PLANILHA, MOSTRA O SISTEMA DE RECOMENDAÇÃO
+    if st.session_state.df is None:
+        st.subheader("💡 Recomendações de Artigos para Você")
+        st.write("Como você é novo por aqui ou não carregou uma planilha, que tal explorar artigos com base nos seus interesses? Selecione um ou mais temas abaixo.")
+
+        temas_disponiveis = [
+            "Cultura de Inovação",
+            "Inovação Tecnológica",
+            "NFT",
+            "Inovação Social",
+            "Documentação"
+        ]
+        
+        temas_selecionados = st.multiselect(
+            "Selecione seus temas de interesse:",
+            options=temas_disponiveis,
+            key="temas_recomendacao"
+        )
+        
+        if st.button("Buscar Recomendações", key="btn_recomendar"):
+            with st.spinner("Analisando artigos e buscando as melhores recomendações..."):
+                df_total = collect_latest_backups()
+                if df_total.empty:
+                    st.warning("Ainda não há dados de outros usuários para gerar recomendações. Carregue uma planilha para começar!")
+                else:
+                    # Renomeia colunas para um padrão (ex: 'titulo' -> 'título')
+                    df_total.rename(columns={'titulo': 'título', 'resumo': 'resumo', 'abstract': 'resumo', 'autor': 'autor', 'ano': 'ano', 'tema':'tema'}, inplace=True, errors='ignore')
+                    
+                    recommended_df = recomendar_artigos(temas_selecionados, df_total)
+                    st.session_state.recommendations = recommended_df
+        
+        if 'recommendations' in st.session_state and not st.session_state.recommendations.empty:
+            st.markdown("---")
+            st.markdown(f"**Encontramos {len(st.session_state.recommendations)} artigos recomendados para você:**")
+            
+            for i, row in st.session_state.recommendations.iterrows():
+                result_data = row.to_dict()
+                user_src = result_data.get("_artemis_username", "N/A")
+                initials = "".join([p[0].upper() for p in str(user_src).split()[:2]])[:2] or "U"
+                title_raw = str(result_data.get('título') or '(Sem título)')
+                resumo_raw = str(result_data.get('resumo') or "")[:200] + "..."
+                author = str(result_data.get('autor') or '')
+                year = str(result_data.get('ano') or '')
+                
+                card_html = f"""
+                <div class="card">
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <div class="avatar">{escape_html(initials)}</div>
+                        <div style="flex:1;">
+                            <div class="card-title">{escape_html(title_raw)}</div>
+                            <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • {escape_html(author)} ({escape_html(year)})</div>
+                            <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{escape_html(resumo_raw)}</div>
+                        </div>
+                    </div>
+                </div>"""
+                st.markdown(card_html, unsafe_allow_html=True)
+                if st.button("⭐ Favoritar este artigo", key=f"fav_rec_{i}", use_container_width=True):
+                    if add_to_favorites(result_data): st.toast("Adicionado aos favoritos!", icon="⭐")
+                    else: st.toast("Já está nos favoritos.")
+
+        st.markdown("---")
+        st.subheader("Ou carregue sua própria planilha para começar")
+        
+    # SE O USUÁRIO JÁ TEM PLANILHA, MOSTRA A INTERFACE NORMAL
+    else:
+        st.subheader("Planilha / Backup")
+        col1, col2 = st.columns([1,3])
+        with col1:
+            if st.button("Restaurar estado salvo", key="btn_restore_state"):
+                if USER_STATE.exists():
+                    st.info("O estado da sua planilha já é restaurado automaticamente ao entrar. Este botão recarrega outras informações como anotações e favoritos.")
+                    st.session_state.restored_from_saved = False 
+                    safe_rerun()
+                else:
+                    st.info("Nenhum estado salvo encontrado.")
+        with col2:
+            current_backup_path = st.session_state.get("last_backup_path")
+            if current_backup_path and os.path.exists(current_backup_path):
+                st.write("Backup CSV em uso:")
+                st.text(os.path.basename(current_backup_path))
+                with open(current_backup_path, "rb") as fp:
+                    st.download_button("⬇ Baixar backup CSV", data=fp, file_name=os.path.basename(current_backup_path), mime="text/csv")
             else:
-                st.info("Nenhum estado salvo encontrado.")
-    with col2:
-        current_backup_path = st.session_state.get("last_backup_path")
-        if current_backup_path and os.path.exists(current_backup_path):
-            st.write("Backup CSV em uso:")
-            st.text(os.path.basename(current_backup_path))
-            with open(current_backup_path, "rb") as fp:
-                st.download_button("⬇ Baixar backup CSV", data=fp, file_name=os.path.basename(current_backup_path), mime="text/csv")
-        else:
-            st.write("Nenhum backup de planilha ativo. Carregue um arquivo para começar.")
+                st.write("Nenhum backup de planilha ativo. Carregue um arquivo para começar.")
 
     uploaded = st.file_uploader("Carregue .csv ou .xlsx para criar um novo mapa ou substituir o atual", type=["csv", "xlsx"], key=f"u_{USERNAME}")
     if uploaded:
@@ -860,6 +905,9 @@ if st.session_state.page == "planilha":
                 st.success(f"Backup '{backup_filename}' criado com sucesso.")
                 if st.session_state.autosave:
                     save_user_state_minimal(USER_STATE)
+                
+                # Recarrega a página para sair da tela de recomendação e ir para a visualização da planilha
+                safe_rerun()
 
             except Exception as e:
                 st.error(f"Erro ao salvar backup automático da planilha: {e}")
@@ -928,7 +976,7 @@ elif st.session_state.page == "mapa":
         "Tema": "#1abc9c",    # Verde
         "Ano": "#ff8a00",     # Laranja
         "País": "#8e44ad",    # Roxo
-        "Título": "#d63384",  # Rosa
+        "Título": "#d63384", # Rosa
     }
 
     st.markdown("**Legenda de Cores**")
@@ -966,13 +1014,17 @@ elif st.session_state.page == "mapa":
             node_x, node_y, node_z, node_colors, node_sizes, node_texts = [], [], [], [], [], []
             
             tipo_color_map_lower = {k.lower(): v for k, v in tipo_color_map.items()}
+            node_opacity = get_settings().get("node_opacity", 1.0) 
 
             for node, data in G.nodes(data=True):
                 x, y, z = pos.get(node, (0,0,0))
-                node_x.append(x); node_y.append(y); node_z.append(z)
+                node_x.append(x)
+                node_y.append(y)
+                node_z.append(z)
                 
                 node_tipo = data.get('tipo', '').strip().capitalize()
-                node_color = tipo_color_map_lower.get(node_tipo.lower(), "#808080")
+                node_color = tipo_color_map_lower.get(node_tipo.lower(), "#808080") # Cinza para tipos não mapeados
+
                 node_colors.append(node_color)
                 
                 degree = G.degree(node)
@@ -989,7 +1041,7 @@ elif st.session_state.page == "mapa":
                 textposition="top center",
                 hoverinfo='text',
                 hovertext=node_texts,
-                marker=dict(color=node_colors, size=node_sizes, line_width=0.5, opacity=1.0) # OPACIDADE FIXADA EM 1.0
+                marker=dict(color=node_colors, size=node_sizes, line_width=0.5, opacity=node_opacity)
             )
 
             fig = go.Figure(data=[edge_trace, node_trace])
@@ -1002,60 +1054,6 @@ elif st.session_state.page == "mapa":
         st.error(f"Ocorreu um erro inesperado ao renderizar o grafo: {e}")
         st.exception(e)
         
-    st.markdown("</div>", unsafe_allow_html=True)
-
-
-# -------------------------
-# Page: Recomendações (NOVA)
-# -------------------------
-elif st.session_state.page == "recomendacoes":
-    st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("💡 Recomendações para Você")
-
-    user_interests = get_settings().get("user_interests", [])
-    if not user_interests:
-        st.info("Você ainda não definiu seus interesses. Vá para a aba '⚙️ Configurações' para selecioná-los e começar a receber recomendações.")
-    elif not ML_LIBS_AVAILABLE:
-        st.error("O módulo de IA (scikit-learn) não está instalado, por isso não é possível gerar recomendações.")
-    else:
-        st.markdown(f"Exibindo recomendações com base nos seus interesses: **{', '.join(user_interests)}**.")
-        with st.spinner("Buscando e analisando artigos relevantes... Isso pode levar um momento."):
-            recommendations_df = get_recommendations(user_interests, top_n=15)
-        
-        if recommendations_df.empty:
-            st.info("Nenhuma recomendação encontrada no momento. Isso pode acontecer se houver poucos dados na plataforma ou se seus interesses forem muito específicos.")
-        else:
-            st.markdown(f"Encontramos **{len(recommendations_df)}** recomendações para você:")
-            st.markdown("---")
-            for _, rec in recommendations_df.iterrows():
-                result_data = rec.to_dict()
-                user_src = result_data.get("_artemis_username", "N/A")
-                initials = "".join([p[0].upper() for p in str(user_src).split()[:2]])[:2] or "U"
-                title_raw = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
-                resumo_raw = str(result_data.get('resumo') or result_data.get('abstract') or "")
-                author = str(result_data.get('autor') or '')
-                year = str(result_data.get('ano') or '')
-                
-                card_html = f"""
-                <div class="card">
-                    <div style="display:flex; gap:12px; align-items:center;">
-                        <div class="avatar">{escape_html(initials)}</div>
-                        <div style="flex:1;">
-                            <div class="card-title">{escape_html(title_raw)}</div>
-                            <div class="small-muted">Proveniente de <strong>{escape_html(user_src)}</strong> • {escape_html(author)} ({escape_html(year)})</div>
-                            <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{escape_html(resumo_raw[:250] + '...' if len(resumo_raw) > 250 else resumo_raw)}</div>
-                        </div>
-                    </div>
-                </div>"""
-                st.markdown(card_html, unsafe_allow_html=True)
-                
-                # Botão para favoritar recomendação
-                if st.button("⭐ Adicionar aos Favoritos", key=f"fav_rec_{rec.name}"):
-                    if add_to_favorites(result_data):
-                        st.toast("Adicionado aos favoritos!", icon="⭐")
-                    else:
-                        st.toast("Já está nos favoritos.")
-
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
@@ -1117,8 +1115,8 @@ elif st.session_state.page == "busca":
         sorted_words = sorted(freq.items(), key=lambda x: (-x[1], x[0]))
         return [w for w, _ in sorted_words][:n]
 
-    # BUSCA tab
     with tab_busca:
+        st.markdown("<style>.card{}</style>", unsafe_allow_html=True)
         col_q, col_meta, col_actions = st.columns([0.6, 0.25, 0.15])
         with col_q:
             query = st.text_input("Termo de busca", key="ui_query_search", placeholder="Digite palavras-chave — ex: autor, título, tema...")
@@ -1266,7 +1264,6 @@ elif st.session_state.page == "busca":
                     else:
                         st.warning("Origem/usuário não disponível para contato.")
 
-    # FAVORITOS tab
     with tab_favoritos:
         st.header("Seus Resultados Salvos")
         favorites = get_session_favorites()
@@ -1323,6 +1320,141 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
+# Page: Mensagens (RESTAURADO)
+# -------------------------
+elif st.session_state.page == "mensagens":
+    st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.subheader("✉️ Mensagens")
+
+    tab_inbox, tab_sent, tab_compose = st.tabs(["Caixa de Entrada", "Enviados", "Escrever Nova"])
+
+    # --- Caixa de Entrada ---
+    with tab_inbox:
+        if st.session_state.get("view_message_id"):
+            msg_id = st.session_state.view_message_id
+            all_msgs = load_all_messages()
+            msg = next((m for m in all_msgs if m['id'] == msg_id), None)
+            
+            if msg:
+                mark_message_read(msg_id, USERNAME)
+                st.markdown(f"**De:** {escape_html(msg.get('from'))}")
+                st.markdown(f"**Assunto:** {escape_html(msg.get('subject'))}")
+                st.markdown("---")
+                st.markdown(f"<div style='white-space:pre-wrap; padding:10px; border-radius:8px; background:rgba(0,0,0,0.2);'>{escape_html(msg.get('body'))}</div>", unsafe_allow_html=True)
+                
+                if msg.get('attachment'):
+                    att = msg['attachment']
+                    if os.path.exists(att['path']):
+                        with open(att['path'], "rb") as fp:
+                            st.download_button(f"⬇️ Baixar anexo: {att['name']}", data=fp, file_name=att['name'])
+
+                c1, c2, c3 = st.columns(3)
+                with c1:
+                    if st.button("↩️ Voltar para Caixa de Entrada", key="back_inbox"):
+                        st.session_state.view_message_id = None
+                        safe_rerun()
+                with c2:
+                    if st.button("↪️ Responder", key="reply_msg"):
+                        st.session_state.reply_message_id = msg_id
+                        st.session_state.view_message_id = None
+                        safe_rerun()
+                with c3:
+                    if st.button("🗑️ Excluir", key="del_inbox_msg"):
+                        delete_message(msg_id, USERNAME)
+                        st.session_state.view_message_id = None
+                        st.toast("Mensagem excluída.")
+                        safe_rerun()
+            else:
+                st.warning("Mensagem não encontrada.")
+                st.session_state.view_message_id = None
+
+        else:
+            inbox_msgs = get_user_messages(USERNAME, 'inbox')
+            if not inbox_msgs:
+                st.info("Sua caixa de entrada está vazia.")
+            for msg in inbox_msgs:
+                subject = msg.get('subject', '(sem assunto)')
+                sender = msg.get('from', 'Desconhecido')
+                ts = datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')
+                is_read = msg.get('read', False)
+                
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    read_marker = "" if is_read else "🔵 "
+                    st.markdown(f"**{read_marker}{escape_html(subject)}**")
+                    st.markdown(f"<span class='small-muted'>De: {escape_html(sender)} em {ts}</span>", unsafe_allow_html=True)
+                with col2:
+                    if st.button("Ler Mensagem", key=f"read_{msg['id']}", use_container_width=True):
+                        st.session_state.view_message_id = msg['id']
+                        safe_rerun()
+                st.markdown("---")
+
+    # --- Itens Enviados ---
+    with tab_sent:
+        sent_msgs = get_user_messages(USERNAME, 'sent')
+        if not sent_msgs:
+            st.info("Você ainda não enviou nenhuma mensagem.")
+        for msg in sent_msgs:
+            subject = msg.get('subject', '(sem assunto)')
+            recipient = msg.get('to', 'Desconhecido')
+            ts = datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')
+            
+            st.markdown(f"**{escape_html(subject)}**")
+            st.markdown(f"<span class='small-muted'>Para: {escape_html(recipient)} em {ts}</span>", unsafe_allow_html=True)
+            if st.button("🗑️ Excluir", key=f"del_sent_{msg['id']}"):
+                delete_message(msg['id'], USERNAME)
+                st.toast("Mensagem excluída.")
+                safe_rerun()
+            st.markdown("---")
+
+    # --- Escrever Nova Mensagem ---
+    with tab_compose:
+        # Lógica para responder a uma mensagem
+        if st.session_state.get("reply_message_id"):
+            reply_to_id = st.session_state.reply_message_id
+            all_msgs = load_all_messages()
+            original_msg = next((m for m in all_msgs if m['id'] == reply_to_id), None)
+            
+            if original_msg:
+                st.info(f"Respondendo a: {original_msg['from']}")
+                default_to = original_msg['from']
+                default_subj = f"Re: {original_msg['subject']}"
+                default_body = f"\n\n---\nEm resposta a:\n{original_msg['body']}"
+            else: # Fallback se a msg original sumir
+                st.session_state.reply_message_id = None
+                default_to, default_subj, default_body = "", "", ""
+        # Lógica para compor a partir de um favorito/busca
+        elif st.session_state.get("compose_open"):
+            default_to = st.session_state.get("compose_to", "")
+            default_subj = st.session_state.get("compose_subject", "")
+            default_body = st.session_state.get("compose_prefill", "")
+            st.session_state.compose_open = False # Reseta o gatilho
+        # Lógica para mensagem nova
+        else:
+            default_to, default_subj, default_body = "", "", ""
+
+        with st.form("compose_form", clear_on_submit=True):
+            users = load_users() or {}
+            all_users = [u for u in users.keys() if u != USERNAME]
+            
+            to_user = st.selectbox("Para:", options=all_users, index=all_users.index(default_to) if default_to in all_users else 0)
+            subject = st.text_input("Assunto:", value=default_subj)
+            body = st.text_area("Mensagem:", height=200, value=default_body)
+            attachment = st.file_uploader("Anexo (opcional)")
+            
+            if st.form_submit_button("✉️ Enviar Mensagem"):
+                if not to_user:
+                    st.warning("Selecione um destinatário.")
+                else:
+                    send_message(USERNAME, to_user, subject, body, attachment)
+                    st.success(f"Mensagem enviada para {to_user}!")
+                    st.session_state.reply_message_id = None # Limpa o estado de resposta
+                    time.sleep(1)
+                    safe_rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+    
+# -------------------------
 # Page: Configurações
 # -------------------------
 elif st.session_state.page == "config":
@@ -1330,29 +1462,18 @@ elif st.session_state.page == "config":
     st.subheader("⚙️ Configurações")
     s = get_settings()
 
-    st.markdown("**Personalização e Recomendações**")
-    temas_disponiveis = ["Cultura de Inovação", "Inovação Tecnológica", "NFT", "Inovação Social", "Documentação"]
-    
-    if not ML_LIBS_AVAILABLE:
-        st.warning("O módulo de recomendações (scikit-learn) não foi encontrado. A seleção de interesses está desabilitada.")
-        user_interests = []
-    else:
-        user_interests = st.multiselect(
-            "Seus temas de interesse para recomendações:",
-            options=temas_disponiveis,
-            default=s.get("user_interests", []),
-            key="cfg_user_interests"
-        )
-    st.markdown("---")
-
-    st.markdown("**Visualização**")
     plot_height = st.number_input("Altura do gráfico (px)", value=int(s.get("plot_height",720)), step=10, key="cfg_plot_height")
     font_scale = st.slider("Escala de fonte (aplicada a todo o programa)", min_value=0.7, max_value=2.0, value=float(s.get("font_scale",1.0)), step=0.1, key="cfg_font_scale")
+
+    st.markdown("---")
+    st.markdown("**Configurações de Visualização do Mapa**")
+    node_opacity = st.slider("Opacidade dos Nós no Mapa", min_value=0.1, max_value=1.0, value=float(s.get("node_opacity", 1.0)), step=0.05, key="cfg_node_opacity")
+
 
     if st.button("Aplicar configurações"):
         st.session_state.settings["plot_height"] = int(plot_height)
         st.session_state.settings["font_scale"] = float(font_scale)
-        st.session_state.settings["user_interests"] = user_interests
+        st.session_state.settings["node_opacity"] = float(node_opacity)
 
         ok = save_user_state_minimal(USER_STATE)
         apply_global_styles(font_scale)
@@ -1367,16 +1488,6 @@ elif st.session_state.page == "config":
     st.markdown("**Acessibilidade**")
     st.markdown("- Use *Escala de fonte* para aumentar ou diminuir o tamanho do texto em todo o programa.")
     st.markdown("- O programa utiliza um tema escuro fixo para garantir bom contraste.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# -------------------------
-# Page: Mensagens (sem alterações)
-# -------------------------
-elif st.session_state.page == "mensagens":
-    st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("✉️ Mensagens")
-    # Lógica de mensagens aqui... (não foi solicitado alterar)
-    st.info("A funcionalidade de mensagens está implementada no código, mas a interface do usuário para ela não foi colada aqui para manter a resposta focada nas alterações solicitadas.")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
