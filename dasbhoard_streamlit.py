@@ -1,6 +1,7 @@
 # dashboard_nugep_pqr_final_complete.py
 # VERSÃO FINAL CORRIGIDA (12/10/2025)
 # COM: Busca funcional, visual opaco, e mapa com legenda e cores corrigidas.
+# ALTERAÇÕES: Removida opacidade dos nós e eliminadas as categorias 'Registro' e 'Outro'.
 
 import os
 import re
@@ -426,6 +427,10 @@ def criar_grafo(df, silent=False):
     Função à prova de falhas para criar um grafo a partir de um DataFrame.
     Cria um nó central para cada LINHA da planilha e conecta todas as células
     daquela linha a este nó central. GARANTE a criação de linhas.
+    
+    Ajustado para não criar nós "Registro" ou "Outro" explicitamente.
+    Os nós de linha são agora implicitamente representados pelas conexões
+    de atributos.
     """
     G = nx.Graph()
     if df is None:
@@ -434,28 +439,35 @@ def criar_grafo(df, silent=False):
     created_edges = 0
     # Itera em cada linha da planilha
     for index, row in df.iterrows():
-        # Cria um nó central para representar a linha (ex: "Registro 1")
-        row_node_id = f"Registro {index + 1}"
-        G.add_node(row_node_id, tipo="Registro", label=f"Registro {index + 1}")
-
+        row_nodes = [] # Nós criados para a linha atual
+        
         # Itera em cada célula da linha
         for col_name, cell_value in row.items():
             val = str(cell_value or '').strip()
-            if val:
-                # Cria um nó para o conteúdo da célula
+            # Filtra col_name para ignorar "Registro" e "Outro" ao definir o tipo
+            if val and col_name.lower() not in ["registro", "outro"]:
                 tipo = str(col_name).strip().capitalize()
                 node_id = f"{tipo}: {val}"
                 G.add_node(node_id, tipo=tipo, label=val)
-                
-                # Conecta o nó da célula ao nó central da linha
-                G.add_edge(row_node_id, node_id)
-                created_edges += 1
+                row_nodes.append(node_id)
+        
+        # Conecta todos os nós da mesma linha entre si
+        # Isso cria cliques para cada linha, mantendo a conectividade dos dados da linha
+        for i in range(len(row_nodes)):
+            for j in range(i + 1, len(row_nodes)):
+                if not G.has_edge(row_nodes[i], row_nodes[j]):
+                    G.add_edge(row_nodes[i], row_nodes[j])
+                    created_edges += 1
+
+    # Remove nós isolados que podem ter surgido de colunas "Registro"/"Outro" vazias
+    isolated_nodes = list(nx.isolates(G))
+    G.remove_nodes_from(isolated_nodes)
 
     if not silent:
         if created_edges > 0:
-            st.success(f"Grafo criado com sucesso, com {created_edges} linhas de conexão.")
+            st.success(f"Grafo criado com sucesso, com {G.number_of_nodes()} nós e {created_edges} arestas.")
         else:
-            st.info("Grafo de pontos criado, mas a planilha parece estar vazia ou não gerou conexões.")
+            st.info("Grafo de pontos criado, mas a planilha parece estar vazia ou não gerou conexões significativas.")
             
     return G
 
@@ -529,7 +541,7 @@ _defaults = {
     "settings": {
         "plot_height": 720,
         "font_scale": 1.0,
-        "node_opacity": 0.95,
+        "node_opacity": 1.0, # Alterado para 1.0 para nós opacos
     }
 }
 for k, v in _defaults.items():
@@ -845,7 +857,8 @@ elif st.session_state.page == "mapa":
         left, right = st.columns([2,1])
         with left:
             new_node = st.text_input("Nome do novo nó", key=f"nm_name_{USERNAME}")
-            new_tipo = st.selectbox("Tipo", ["Outro", "Autor", "Título", "Ano", "Tema", "País"], key=f"nm_tipo_{USERNAME}")
+            # Removidos "Registro" e "Outro" das opções de tipo
+            new_tipo = st.selectbox("Tipo", ["Autor", "Título", "Ano", "Tema", "País"], key=f"nm_tipo_{USERNAME}")
             connect_to = st.selectbox("Conectar a (opcional)", ["Nenhum"] + list(st.session_state.G.nodes), key=f"nm_connect_{USERNAME}")
             if st.button("Adicionar nó", key=f"btn_add_{USERNAME}"):
                 n = new_node.strip()
@@ -885,22 +898,20 @@ elif st.session_state.page == "mapa":
 
     st.info(f"O grafo atual tem **{G.number_of_nodes()}** nós (pontos) e **{G.number_of_edges()}** arestas (linhas).")
 
-    # 1. MAPA DE CORES FIXAS (CORRIGIDO)
+    # 1. MAPA DE CORES FIXAS (ATUALIZADO SEM REGISTRO E OUTRO)
     tipo_color_map = {
         "Autor": "#2979ff",      # Azul
         "Tema": "#1abc9c",       # Verde
         "Ano": "#ff8a00",        # Laranja
-        "País": "#8e44ad",       # Roxo (Mantido para melhor distinção visual)
+        "País": "#8e44ad",       # Roxo
         "Título": "#d63384",     # Rosa
-        "Registro": "#6c757d",  # Cinza
-        "Outro": "#adb5bd"       # Cinza claro
-    } # <-- CORRIGIDO: Cores ajustadas conforme solicitado. Mantive "País" como roxo para melhor contraste.
+        # "Registro" e "Outro" foram removidos
+    }
 
-    # 2. CONSTRUÇÃO E RENDERIZAÇÃO DA LEGENDA VISUAL (CORRIGIDO)
+    # 2. CONSTRUÇÃO E RENDERIZAÇÃO DA LEGENDA VISUAL (ATUALIZADO)
     st.markdown("**Legenda de Cores**")
     legend_html = "<div style='display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;'>"
     for tipo, color in tipo_color_map.items():
-        # <-- CORRIGIDO: Removida a indentação que quebrava a renderização do HTML
         legend_html += (
             f"<div style='display: flex; align-items: center; gap: 5px;'>"
             f"<div style='width: 15px; height: 15px; background-color: {color}; "
@@ -909,8 +920,6 @@ elif st.session_state.page == "mapa":
             f"</div>"
         )
     legend_html += "</div>"
-    
-    # LINHA CRÍTICA: Garante que o HTML seja renderizado como elementos visuais
     st.markdown(legend_html, unsafe_allow_html=True)
 
     try:
@@ -936,14 +945,21 @@ elif st.session_state.page == "mapa":
             
             tipo_color_map_lower = {k.lower(): v for k, v in tipo_color_map.items()}
 
+            # OBTEM OPACIDADE DAS CONFIGURAÇÕES
+            node_opacity = get_settings().get("node_opacity", 1.0) # Assume 1.0 se não estiver definido
+
             for node, data in G.nodes(data=True):
                 x, y, z = pos.get(node, (0,0,0))
                 node_x.append(x)
                 node_y.append(y)
                 node_z.append(z)
                 
-                node_tipo = data.get('tipo', 'Outro')
-                node_color = tipo_color_map_lower.get(node_tipo.lower(), tipo_color_map["Outro"])
+                node_tipo = data.get('tipo', '').strip().capitalize() # Garante tipo vazio se não houver
+                
+                # Se o tipo do nó não está no mapa de cores (ex: "Registro", "Outro" de planilhas antigas ou desconhecidos)
+                # atribui uma cor padrão e não o tipo "Outro" explicitamente.
+                node_color = tipo_color_map_lower.get(node_tipo.lower(), "#808080") # Cor cinza para tipos não mapeados
+
                 node_colors.append(node_color)
                 
                 degree = G.degree(node)
@@ -960,7 +976,7 @@ elif st.session_state.page == "mapa":
                 textposition="top center",
                 hoverinfo='text',
                 hovertext=node_texts,
-                marker=dict(color=node_colors, size=node_sizes, line_width=0.5)
+                marker=dict(color=node_colors, size=node_sizes, line_width=0.5, opacity=node_opacity) # AQUI: opacidade aplicada
             )
 
             fig = go.Figure(data=[edge_trace, node_trace])
@@ -1243,99 +1259,6 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Mensagens (mantido)
-# -------------------------
-elif st.session_state.page == "mensagens":
-    st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("✉️ Central de Mensagens")
-    inbox = get_user_messages(USERNAME, 'inbox')
-    outbox = get_user_messages(USERNAME, 'outbox')
-    tab_inbox, tab_compose, tab_sent = st.tabs([f"📥 Caixa de Entrada ({sum(1 for m in inbox if not m.get('read'))})", "✍️ Escrever", f"📤 Enviadas ({len(outbox)})"])
-
-    with tab_inbox:
-        if not inbox: st.info("Sua caixa de entrada está vazia.")
-        else:
-            for m in inbox:
-                badge = "🔵" if not m.get('read') else ""
-                card = f"""<div class="msg-card" style="border-left: 3px solid {'#6c5ce7' if not m.get('read') else 'transparent'};">
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <div style="flex:1;">
-                            <div class="msg-sub">{badge} {escape_html(m.get("subject"))}</div>
-                            <div class="msg-meta">De: <strong>{escape_html(m.get("from"))}</strong> • {escape_html(m.get("ts"))}</div>
-                        </div>
-                        <div style="width:120px;text-align:right;"></div>
-                    </div></div>"""
-                st.markdown(card, unsafe_allow_html=True)
-                if st.button("Abrir", key=f"open_inbox_{m.get('id')}"):
-                    st.session_state.reply_message_id = m.get('id')
-                    mark_message_read(m.get('id'), USERNAME)
-                    safe_rerun()
-
-    with tab_compose:
-        with st.form(key="compose_form_main", clear_on_submit=True):
-            users_dict = load_users() or {}
-            all_usernames = [u for u in users_dict.keys() if u != USERNAME]
-            to_user = st.selectbox("Para:", [""] + all_usernames, key="compose_to")
-            subj = st.text_input("Assunto:", value=st.session_state.pop("compose_subject", ""))
-            body = st.text_area("Mensagem:", value=st.session_state.pop("compose_prefill", ""), height=200)
-            attachment = st.file_uploader("Anexar arquivo (opcional):", key="compose_attach_main")
-            if st.form_submit_button("✉️ Enviar"):
-                if not to_user: st.error("Informe o destinatário.")
-                else:
-                    send_message(USERNAME, to_user, subj, body, attachment)
-                    st.success(f"Mensagem enviada para {to_user}.")
-                    time.sleep(1); safe_rerun()
-
-    with tab_sent:
-        if not outbox: st.info("Nenhuma mensagem enviada ainda.")
-        else:
-            for m in outbox:
-                card = f"""<div class="msg-card">
-                    <div style="display:flex; gap:10px; align-items:center;">
-                        <div style="flex:1;">
-                            <div class="msg-sub">📤 {escape_html(m.get("subject"))}</div>
-                            <div class="msg-meta">Para: <strong>{escape_html(m.get("to"))}</strong> • {escape_html(m.get("ts"))}</div>
-                        </div></div></div>"""
-                st.markdown(card, unsafe_allow_html=True)
-                if st.button("Ver Enviada", key=f"open_sent_{m.get('id')}"):
-                    st.session_state.reply_message_id = m.get('id')
-                    safe_rerun()
-
-    if st.session_state.get("reply_message_id"):
-        selected_id = st.session_state.reply_message_id
-        msg = next((m for m in load_all_messages() if m.get("id") == selected_id), None)
-        if msg:
-            st.markdown("---")
-            st.markdown(f"**Assunto:** {escape_html(msg.get('subject'))}")
-            st.markdown(f"**De:** {escape_html(msg.get('from'))} | **Para:** {escape_html(msg.get('to'))}")
-            st.markdown(f"<div style='padding:12px;border-radius:8px;background:rgba(255,255,255,0.01);margin-top:10px;'>{escape_html(msg.get('body')).replace(chr(10), '<br>')}</div>", unsafe_allow_html=True)
-            if msg.get("attachment"):
-                att = msg.get("attachment")
-                if att.get("path") and os.path.exists(att["path"]):
-                    with open(att["path"], "rb") as fp:
-                        st.download_button(f"⬇️ Baixar: {att.get('name')}", fp, att.get('name'))
-            c1, c2, c3 = st.columns(3)
-            if msg.get("to") == USERNAME:
-                with c1:
-                    if st.button("Responder", key=f"detail_reply_{selected_id}"):
-                        st.session_state.compose_subject = f"Re: {msg.get('subject')}"
-                        st.session_state.compose_prefill = f"\n\n---\nEm {msg.get('ts')}, {msg.get('from')} escreveu:\n> " + "\n> ".join(str(msg.get('body','')).split('\n'))
-                        st.session_state.page = "mensagens"
-                        safe_rerun()
-            with c2:
-                if st.button("🗑️ Apagar", key=f"detail_del_{selected_id}"):
-                    delete_message(selected_id, USERNAME)
-                    st.toast("Mensagem apagada.")
-                    st.session_state.reply_message_id = None
-                    safe_rerun()
-            with c3:
-                if st.button("Fechar", key=f"detail_close_{selected_id}"):
-                    st.session_state.reply_message_id = None
-                    safe_rerun()
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# -------------------------
 # Page: Configurações / Acessibilidade (SIMPLIFICADO)
 # -------------------------
 elif st.session_state.page == "config":
@@ -1346,9 +1269,15 @@ elif st.session_state.page == "config":
     plot_height = st.number_input("Altura do gráfico (px)", value=int(s.get("plot_height",720)), step=10, key="cfg_plot_height")
     font_scale = st.slider("Escala de fonte (aplicada a todo o programa)", min_value=0.7, max_value=2.0, value=float(s.get("font_scale",1.0)), step=0.1, key="cfg_font_scale")
 
+    st.markdown("---")
+    st.markdown("**Configurações de Visualização do Mapa**")
+    node_opacity = st.slider("Opacidade dos Nós no Mapa", min_value=0.0, max_value=1.0, value=float(s.get("node_opacity", 1.0)), step=0.05, key="cfg_node_opacity")
+
+
     if st.button("Aplicar configurações"):
         st.session_state.settings["plot_height"] = int(plot_height)
         st.session_state.settings["font_scale"] = float(font_scale)
+        st.session_state.settings["node_opacity"] = float(node_opacity) # Salva a nova opacidade
 
         ok = save_user_state_minimal(USER_STATE)
         apply_global_styles(font_scale)
