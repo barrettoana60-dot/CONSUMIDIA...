@@ -1,6 +1,7 @@
 # dashboard_nugep_pqr_final_complete.py
 # NUGEP-PQR — Versão final (login com CPF) + Mapa Mental 3D (separável/interativo)
 # Ajustado: Lógica de criação de grafo refeita para GARANTIR a criação de linhas a partir de qualquer planilha.
+# MODIFICADO: Removido efeito translúcido, adicionado cores e legenda ao mapa.
 
 import os
 import re
@@ -79,13 +80,14 @@ body { transition: background-color .25s ease, color .25s ease; }
 # default dark CSS
 DEFAULT_CSS = r"""
 .css-1d391kg { background: linear-gradient(180deg,#071428 0%, #031926 100%) !important; }
-.glass-box{ background: rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.04); box-shadow:0 8px 32px rgba(4,9,20,0.5); }
-.stButton>button, .stDownloadButton>button{ background:transparent !important; color:#bfc6cc !important; border:1px solid rgba(255,255,255,0.06) !important; padding:8px 12px !important; border-radius:10px !important; }
+/* CAIXAS COM FUNDO SÓLIDO (SEM EFEITO TRANSLÚCIDO) */
+.glass-box{ background: #0E192A; border:1px solid #2A3B52; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.stButton>button, .stDownloadButton>button{ background:#1C2D4A !important; color:#bfc6cc !important; border:1px solid #2A3B52 !important; padding:8px 12px !important; border-radius:10px !important; }
 .stButton>button:hover, .stDownloadButton>button:hover {
-    background: rgba(255, 255, 255, 0.05) !important;
-    border-color: rgba(255, 255, 255, 0.1) !important;
+    background: #2A3B52 !important;
+    border-color: #3C5070 !important;
 }
-.card, .msg-card { background: linear-gradient(180deg, rgba(255,255,255,0.02), rgba(255,255,255,0.01)); border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid rgba(255,255,255,0.03); }
+.card, .msg-card { background: #0E192A; border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid #2A3B52; }
 .avatar{color:#fff;background:#6c5ce7}
 .small-muted{color:#bfc6cc;}
 .card-title{color:#fff}
@@ -847,7 +849,7 @@ elif st.session_state.page == "mapa":
         left, right = st.columns([2,1])
         with left:
             new_node = st.text_input("Nome do novo nó", key=f"nm_name_{USERNAME}")
-            new_tipo = st.selectbox("Tipo", ["Outro", "Autor", "Título", "Ano", "Tema"], key=f"nm_tipo_{USERNAME}")
+            new_tipo = st.selectbox("Tipo", ["Outro", "Autor", "Título", "Ano", "Tema", "País"], key=f"nm_tipo_{USERNAME}")
             connect_to = st.selectbox("Conectar a (opcional)", ["Nenhum"] + list(st.session_state.G.nodes), key=f"nm_connect_{USERNAME}")
             if st.button("Adicionar nó", key=f"btn_add_{USERNAME}"):
                 n = new_node.strip()
@@ -880,12 +882,36 @@ elif st.session_state.page == "mapa":
     st.markdown("### Visualização 3D")
 
     G = st.session_state.G or nx.Graph()
-
     show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
 
     # Diagnóstico: Informar o status do grafo atual
     st.info(f"O grafo atual tem **{G.number_of_nodes()}** nós (pontos) e **{G.number_of_edges()}** arestas (linhas).")
+    
+    # --- INÍCIO DAS MODIFICAÇÕES NO GRÁFICO ---
 
+    # 1. MAPA DE CORES FIXAS (CONFORME SOLICITADO)
+    tipo_color_map = {
+        "Autor": "#2979ff",      # Azul
+        "Ano": "#1abc9c",       # Verde
+        "Tema": "#ff8a00",      # Laranja
+        "País": "#8e44ad",      # Roxo
+        "Título": "#d63384",    # Rosa (para diferenciar)
+        "Registro": "#6c757d",  # Cinza
+        "Outro": "#adb5bd"      # Cinza claro
+    }
+
+    # 2. RENDERIZAÇÃO DA LEGENDA
+    with st.expander("Ver Legenda de Cores", expanded=True):
+        legend_html = "<div style='display: flex; flex-wrap: wrap; gap: 15px;'>"
+        for tipo, color in tipo_color_map.items():
+            legend_html += f"""
+            <div style='display: flex; align-items: center; gap: 5px;'>
+                <div style='width: 15px; height: 15px; background-color: {color}; border-radius: 50%;'></div>
+                <span style='color: #d6d9dc;'>{tipo}</span>
+            </div>
+            """
+        legend_html += "</div>"
+        st.markdown(legend_html, unsafe_allow_html=True)
 
     try:
         if G.number_of_nodes() == 0:
@@ -894,11 +920,9 @@ elif st.session_state.page == "mapa":
             st.warning("O mapa não tem linhas porque nenhum nó está conectado. Conecte os nós ao criá-los ou carregue uma planilha com dados.")
 
         if G.number_of_nodes() > 0:
-            # 1. Calculate layout once
             k_val = 2.0 / math.sqrt(G.number_of_nodes()) if G.number_of_nodes() > 0 else None
             pos = nx.spring_layout(G, dim=3, seed=42, iterations=200, k=k_val)
 
-            # 2. Prepare ONE trace for ALL edges
             edge_x, edge_y, edge_z = [], [], []
             for u, v in G.edges():
                 x0, y0, z0 = pos.get(u, (0,0,0))
@@ -906,16 +930,10 @@ elif st.session_state.page == "mapa":
                 edge_x.extend([x0, x1, None])
                 edge_y.extend([y0, y1, None])
                 edge_z.extend([z0, z1, None])
-
             edge_trace = go.Scatter3d(x=edge_x, y=edge_y, z=edge_z, mode='lines', line=dict(color='#888', width=2), hoverinfo='none')
 
-            # 3. Prepare ONE trace for ALL nodes
             node_x, node_y, node_z = [], [], []
             node_colors, node_sizes, node_texts = [], [], []
-            
-            tipo_order = ["Registro", "Autor", "Título", "Ano", "Tema", "Outro"]
-            palette = px.colors.qualitative.Plotly
-            tipo_color_map = {t: palette[i % len(palette)] for i, t in enumerate(tipo_order)}
             
             for node, data in G.nodes(data=True):
                 x, y, z = pos.get(node, (0,0,0))
@@ -923,8 +941,9 @@ elif st.session_state.page == "mapa":
                 node_y.append(y)
                 node_z.append(z)
                 
+                # Usa o novo mapa de cores fixas
                 node_tipo = data.get('tipo', 'Outro')
-                node_colors.append(tipo_color_map.get(node_tipo, '#cccccc'))
+                node_colors.append(tipo_color_map.get(node_tipo, tipo_color_map["Outro"]))
                 
                 degree = G.degree(node)
                 node_sizes.append(max(8, (degree + 1) * 8))
@@ -943,10 +962,8 @@ elif st.session_state.page == "mapa":
                 marker=dict(color=node_colors, size=node_sizes, line_width=0.5)
             )
 
-            # 4. Create figure with ONLY TWO traces: lines first, then nodes on top
             fig = go.Figure(data=[edge_trace, node_trace])
 
-            # 5. Apply layout
             fig.update_layout(
                 height=int(get_settings().get("plot_height", 720)),
                 showlegend=False,
@@ -960,12 +977,13 @@ elif st.session_state.page == "mapa":
                 ),
                 margin=dict(l=0, r=0, b=0, t=0)
             )
-
             st.plotly_chart(fig, use_container_width=True)
 
     except Exception as e:
         st.error(f"Ocorreu um erro inesperado ao renderizar o grafo: {e}")
         st.exception(e)
+        
+    # --- FIM DAS MODIFICAÇÕES NO GRÁFICO ---
 
     st.markdown("</div>", unsafe_allow_html=True)
 
