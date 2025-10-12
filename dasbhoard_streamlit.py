@@ -177,7 +177,7 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
 
 
 # -------------------------
-# FUNÇÕES CORRIGIDAS - INÍCIO
+# Funções de Busca
 # -------------------------
 def collect_latest_backups():
     """
@@ -189,26 +189,21 @@ def collect_latest_backups():
     if not base_path.exists():
         return pd.DataFrame()
 
-    # Iterate through each user's backup directory (e.g., /backups/user123/)
     for user_dir in base_path.iterdir():
         if user_dir.is_dir():
             username = user_dir.name
-            # Find all CSV files in the user's directory
             for csv_file in user_dir.glob("*.csv"):
                 try:
                     df_temp = pd.read_csv(csv_file)
-                    # Add a column to track the data's origin
                     df_temp['_artemis_username'] = username
                     all_dfs.append(df_temp)
                 except Exception as e:
-                    # Silently skip corrupted or unreadable files
                     print(f"Skipping unreadable backup {csv_file}: {e}")
                     continue
     
     if not all_dfs:
         return pd.DataFrame()
 
-    # Combine all individual dataframes into one
     return pd.concat(all_dfs, ignore_index=True)
 
 def highlight_search_terms(text, query):
@@ -219,11 +214,8 @@ def highlight_search_terms(text, query):
     if not query or not text or not isinstance(text, str):
         return escape_html(text)
     
-    # Escape original text to prevent rendering raw HTML from the data
     safe_text = escape_html(text)
     
-    # Use regex for case-insensitive replacement, wrapping found terms in a span
-    # The class 'card-mark' is already defined in your BASE_CSS
     highlighted_text = re.sub(
         f'({re.escape(query)})', 
         r'<span class="card-mark">\1</span>', 
@@ -231,9 +223,6 @@ def highlight_search_terms(text, query):
         flags=re.IGNORECASE
     )
     return highlighted_text
-# -------------------------
-# FUNÇÕES CORRIGIDAS - FIM
-# -------------------------
 
 
 # -------------------------
@@ -575,7 +564,6 @@ def save_user_state_minimal(USER_STATE):
             "settings": st.session_state.get("settings", {}),
             "last_backup_path": st.session_state.get("last_backup_path")
         }
-        # Limpa os dados para garantir que são compatíveis com JSON
         clean_data = clean_for_json(data)
 
         tmp = USER_STATE.with_suffix(".tmp")
@@ -585,9 +573,8 @@ def save_user_state_minimal(USER_STATE):
         tmp.replace(USER_STATE)
         return True
     except Exception as e:
-        # Mostra o erro diretamente na interface do usuário
         st.error(f"FALHA AO SALVAR O ESTADO: {e}")
-        print(f"Erro ao salvar estado do usuário: {e}") # Mantém no log para debug
+        print(f"Erro ao salvar estado do usuário: {e}") 
         return False
 
 
@@ -680,40 +667,34 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
         with USER_STATE.open("r", encoding="utf-8") as f:
             meta = json.load(f)
 
-        # Restore simple values
         st.session_state.notes = meta.get("notes", st.session_state.notes)
         st.session_state.uploaded_name = meta.get("uploaded_name", st.session_state.get("uploaded_name"))
         st.session_state.favorites = meta.get("favorites", st.session_state.favorites)
         st.session_state.last_backup_path = meta.get("last_backup_path", st.session_state.last_backup_path)
         
-        # Restore settings
         if "settings" in meta:
             st.session_state.settings.update(meta.get("settings", {}))
         
-        # *** NEW: AUTOMATICALLY RESTORE SPREADSHEET AND GRAPH ***
         backup_path = st.session_state.get("last_backup_path")
         if backup_path and os.path.exists(backup_path):
             try:
                 df = pd.read_csv(backup_path)
                 st.session_state.df = df
-                st.session_state.G = criar_grafo(df, silent=True) # silent=True to avoid messages on login
+                st.session_state.G = criar_grafo(df, silent=True)
                 st.toast(f"Planilha '{os.path.basename(backup_path)}' restaurada automaticamente.", icon="📄")
             except Exception as e:
                 st.error(f"Falha ao restaurar o backup da sua planilha: {e}")
-                st.session_state.last_backup_path = None # Invalidate bad path
+                st.session_state.last_backup_path = None
         
         st.session_state.restored_from_saved = True
         st.toast("Progresso anterior restaurado.", icon="👍")
     except Exception as e:
-        # CRITICAL: Show error if loading fails
         st.error(f"Erro ao restaurar seu progresso: o arquivo de estado pode estar corrompido. Erro: {e}")
 
 
-# apply theme and font CSS based on settings immediately
 s = get_settings()
 apply_global_styles(s.get("font_scale", 1.0))
 
-# unread count
 UNREAD_COUNT = 0
 try:
     all_msgs = load_all_messages()
@@ -755,7 +736,6 @@ with top2:
             safe_rerun()
 st.markdown("</div>", unsafe_allow_html=True)
 
-# Navigation buttons (inclui Configurações)
 st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
 nav_buttons = {
     "planilha": "📄 Planilha",
@@ -783,17 +763,14 @@ if st.session_state.page == "planilha":
     st.subheader("Planilha / Backup")
     col1, col2 = st.columns([1,3])
     with col1:
-        # Este botão agora só restaura o estado que não inclui a planilha (que já carrega sozinha)
         if st.button("Restaurar estado salvo", key="btn_restore_state"):
             if USER_STATE.exists():
                 st.info("O estado da sua planilha já é restaurado automaticamente ao entrar. Este botão recarrega outras informações como anotações e favoritos.")
-                # Força um re-run para garantir que o processo de load no topo da página seja re-executado.
                 st.session_state.restored_from_saved = False 
                 safe_rerun()
             else:
                 st.info("Nenhum estado salvo encontrado.")
     with col2:
-        # Mostra o caminho do backup que está em uso no momento
         current_backup_path = st.session_state.get("last_backup_path")
         if current_backup_path and os.path.exists(current_backup_path):
             st.write("Backup CSV em uso:")
@@ -809,9 +786,8 @@ if st.session_state.page == "planilha":
             df = read_spreadsheet(uploaded)
             st.session_state.df = df
             st.session_state.uploaded_name = uploaded.name
-            st.session_state.G = criar_grafo(df) # Usa a nova função robusta
+            st.session_state.G = criar_grafo(df)
             
-            # Cria o backup da planilha recém-carregada
             try:
                 ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
                 safe_name = re.sub(r"[^\w\-_.]", "_", uploaded.name)
@@ -821,7 +797,6 @@ if st.session_state.page == "planilha":
                 path = p / backup_filename
                 df.to_csv(path, index=False, encoding="utf-8")
                 
-                # ATUALIZA o caminho do backup em uso e salva o estado se autosave estiver ativo
                 st.session_state.last_backup_path = str(path)
                 st.success(f"Backup '{backup_filename}' criado com sucesso.")
                 if st.session_state.autosave:
@@ -863,6 +838,7 @@ elif st.session_state.page == "mapa":
                         st.session_state.G.add_edge(n, connect_to)
                     st.success(f"Nó '{n}' adicionado.")
                     if st.session_state.autosave: save_user_state_minimal(USER_STATE)
+                    safe_rerun()
         with right:
             del_n = st.selectbox("Excluir nó", [""] + list(st.session_state.G.nodes), key=f"del_{USERNAME}")
             if st.button("Excluir nó", key=f"btn_del_{USERNAME}"):
@@ -870,6 +846,7 @@ elif st.session_state.page == "mapa":
                     st.session_state.G.remove_node(del_n)
                     st.success(f"Nó '{del_n}' removido.")
                     if st.session_state.autosave: save_user_state_minimal(USER_STATE)
+                    safe_rerun()
             st.markdown("---")
             r_old = st.selectbox("Renomear: selecione nó", [""] + list(st.session_state.G.nodes), key=f"r_old_{USERNAME}")
             r_new = st.text_input("Novo nome", key=f"r_new_{USERNAME}")
@@ -878,18 +855,15 @@ elif st.session_state.page == "mapa":
                     nx.relabel_nodes(st.session_state.G, {r_old: r_new}, copy=False)
                     st.success(f"'{r_old}' → '{r_new}'")
                     if st.session_state.autosave: save_user_state_minimal(USER_STATE)
+                    safe_rerun()
 
     st.markdown("### Visualização 3D")
 
     G = st.session_state.G or nx.Graph()
     show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
 
-    # Diagnóstico: Informar o status do grafo atual
     st.info(f"O grafo atual tem **{G.number_of_nodes()}** nós (pontos) e **{G.number_of_edges()}** arestas (linhas).")
     
-    # --- INÍCIO DAS MODIFICAÇÕES NO GRÁFICO ---
-
-    # 1. MAPA DE CORES FIXAS (CONFORME SOLICITADO)
     tipo_color_map = {
         "Autor": "#2979ff",      # Azul
         "Ano": "#1abc9c",       # Verde
@@ -900,18 +874,17 @@ elif st.session_state.page == "mapa":
         "Outro": "#adb5bd"      # Cinza claro
     }
 
-    # 2. RENDERIZAÇÃO DA LEGENDA
-    with st.expander("Ver Legenda de Cores", expanded=True):
-        legend_html = "<div style='display: flex; flex-wrap: wrap; gap: 15px;'>"
-        for tipo, color in tipo_color_map.items():
-            legend_html += f"""
-            <div style='display: flex; align-items: center; gap: 5px;'>
-                <div style='width: 15px; height: 15px; background-color: {color}; border-radius: 50%;'></div>
-                <span style='color: #d6d9dc;'>{tipo}</span>
-            </div>
-            """
-        legend_html += "</div>"
-        st.markdown(legend_html, unsafe_allow_html=True)
+    st.markdown("**Legenda de Cores**")
+    legend_html = "<div style='display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 20px;'>"
+    for tipo, color in tipo_color_map.items():
+        legend_html += f"""
+        <div style='display: flex; align-items: center; gap: 5px;'>
+            <div style='width: 15px; height: 15px; background-color: {color}; border-radius: 50%; border: 1px solid #555;'></div>
+            <span style='color: #d6d9dc;'>{tipo}</span>
+        </div>
+        """
+    legend_html += "</div>"
+    st.markdown(legend_html, unsafe_allow_html=True)
 
     try:
         if G.number_of_nodes() == 0:
@@ -935,15 +908,17 @@ elif st.session_state.page == "mapa":
             node_x, node_y, node_z = [], [], []
             node_colors, node_sizes, node_texts = [], [], []
             
+            tipo_color_map_lower = {k.lower(): v for k, v in tipo_color_map.items()}
+
             for node, data in G.nodes(data=True):
                 x, y, z = pos.get(node, (0,0,0))
                 node_x.append(x)
                 node_y.append(y)
                 node_z.append(z)
                 
-                # Usa o novo mapa de cores fixas
                 node_tipo = data.get('tipo', 'Outro')
-                node_colors.append(tipo_color_map.get(node_tipo, tipo_color_map["Outro"]))
+                node_color = tipo_color_map_lower.get(node_tipo.lower(), tipo_color_map["Outro"])
+                node_colors.append(node_color)
                 
                 degree = G.degree(node)
                 node_sizes.append(max(8, (degree + 1) * 8))
@@ -983,8 +958,6 @@ elif st.session_state.page == "mapa":
         st.error(f"Ocorreu um erro inesperado ao renderizar o grafo: {e}")
         st.exception(e)
         
-    # --- FIM DAS MODIFICAÇÕES NO GRÁFICO ---
-
     st.markdown("</div>", unsafe_allow_html=True)
 
 
@@ -1023,7 +996,6 @@ elif st.session_state.page == "graficos":
                     fig = px.bar(df, x=eixo_x, y=eixo_y, title=f"{eixo_y} por {eixo_x}")
                 else:
                     fig = px.histogram(df, x=eixo_x, title=f"Contagem por {eixo_x}")
-                # Fixed dark theme
                 fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#d6d9dc"))
                 st.plotly_chart(fig, use_container_width=True)
             except Exception as e:
@@ -1031,7 +1003,7 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Busca (mantido)
+# Page: Busca
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1048,7 +1020,6 @@ elif st.session_state.page == "busca":
         sorted_words = sorted(freq.items(), key=lambda x: (-x[1], x[0]))
         return [w for w, _ in sorted_words][:n]
 
-    # BUSCA tab
     with tab_busca:
         st.markdown("<style>.card{}</style>", unsafe_allow_html=True)
         col_q, col_meta, col_actions = st.columns([0.6, 0.25, 0.15])
@@ -1198,7 +1169,6 @@ elif st.session_state.page == "busca":
                     else:
                         st.warning("Origem/usuário não disponível para contato.")
 
-    # FAVORITOS tab
     with tab_favoritos:
         st.header("Seus Resultados Salvos")
         favorites = get_session_favorites()
@@ -1255,7 +1225,7 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Mensagens (mantido)
+# Page: Mensagens
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1348,7 +1318,7 @@ elif st.session_state.page == "mensagens":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Configurações / Acessibilidade (SIMPLIFICADO)
+# Page: Configurações
 # -------------------------
 elif st.session_state.page == "config":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1367,8 +1337,7 @@ elif st.session_state.page == "config":
 
         if ok:
             st.success("Configurações aplicadas e salvas.")
-        # O erro já é mostrado dentro da função save_user_state_minimal
-
+        
         time.sleep(0.5)
         safe_rerun()
 
@@ -1379,7 +1348,7 @@ elif st.session_state.page == "config":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Fallback (should not happen)
+# Fallback
 # -------------------------
 else:
     st.info("Página não encontrada — selecione uma aba no topo.")
