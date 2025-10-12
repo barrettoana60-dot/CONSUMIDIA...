@@ -133,6 +133,12 @@ def normalize_text(text):
 def escape_html(s):
     return html.escape(str(s) if s is not None else "")
 
+def hex_to_rgba(h, alpha):
+    """Converte cor hex (ex: #ffffff) para string rgba (ex: rgba(255,255,255,0.5))."""
+    h = h.lstrip('#')
+    return f"rgba({', '.join(str(i) for i in tuple(int(h[i:i+2], 16) for i in (0, 2, 4)))}, {alpha})"
+
+
 def gen_password(length=8):
     choices = string.ascii_letters + string.digits
     return ''.join(random.choice(choices) for _ in range(length))
@@ -234,23 +240,24 @@ def recomendar_artigos(temas_selecionados, df_total, top_n=10):
     if df_total.empty or not temas_selecionados:
         return pd.DataFrame()
 
-    # --- INÍCIO DA CORREÇÃO ---
-    # Constrói o corpus de forma segura, verificando se cada coluna existe
-    corpus_text = ""
-    if 'título' in df_total.columns:
-        corpus_text += df_total['título'].fillna('') + ' '
-    if 'tema' in df_total.columns:
-        corpus_text += df_total['tema'].fillna('') + ' '
-    if 'resumo' in df_total.columns:
-        corpus_text += df_total['resumo'].fillna('')
+    # --- INÍCIO DA CORREÇÃO (AttributeError) ---
+    # Inicializa um Pandas Series vazio para garantir que o tipo seja consistente
+    corpus_series = pd.Series([''] * len(df_total), index=df_total.index, dtype=str)
     
-    df_total['corpus'] = corpus_text.str.lower()
+    if 'título' in df_total.columns:
+        corpus_series += df_total['título'].fillna('') + ' '
+    if 'tema' in df_total.columns:
+        corpus_series += df_total['tema'].fillna('') + ' '
+    if 'resumo' in df_total.columns:
+        corpus_series += df_total['resumo'].fillna('')
+    
+    df_total['corpus'] = corpus_series.str.lower()
+    # --- FIM DA CORREÇÃO ---
     
     # Se o corpus estiver vazio após a tentativa, retorna um DataFrame vazio
     if df_total['corpus'].str.strip().eq('').all():
         st.warning("Nenhum conteúdo textual (título, tema, resumo) encontrado nos dados para gerar recomendações.")
         return pd.DataFrame()
-    # --- FIM DA CORREÇÃO ---
     
     # Vetorizar o corpus
     vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
@@ -902,7 +909,7 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Mapa Interativo (VERSÃO MELHORADA)
+# Page: Mapa Interativo (VERSÃO MELHORADA E CORRIGIDA)
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -927,7 +934,6 @@ elif st.session_state.page == "mapa":
         st.markdown("---")
         st.write("**Edição Avançada do Grafo**")
         
-        # --- NOVAS FERRAMENTAS DE EDIÇÃO ---
         edit_c1, edit_c2 = st.columns(2)
 
         with edit_c1:
@@ -1015,7 +1021,6 @@ elif st.session_state.page == "mapa":
             with st.spinner("Renderizando mapa interativo..."):
                 pos = nx.spring_layout(G, dim=3, seed=42, iterations=iterations, k=(2.0 / math.sqrt(G.number_of_nodes()) if G.number_of_nodes() > 0 else None))
                 
-                # --- LÓGICA DE VISUALIZAÇÃO APRIMORADA ---
                 selected = st.session_state.get("selected_node")
                 neighbors = list(G.neighbors(selected)) if selected else []
 
@@ -1035,7 +1040,6 @@ elif st.session_state.page == "mapa":
                     hoverinfo='none'
                 )
                 
-                # Arestas destacadas para o nó selecionado
                 if selected:
                     focus_edge_trace = go.Scatter3d(
                         x=[p for u, v in G.edges() if u == selected or v == selected for p in (pos[u][0], pos[v][0], None)],
@@ -1047,19 +1051,21 @@ elif st.session_state.page == "mapa":
                     )
 
                 # Configuração de Nós
-                node_x, node_y, node_z, node_colors, node_sizes, node_texts, node_opacities = [], [], [], [], [], [], []
+                node_x, node_y, node_z, node_colors, node_sizes, node_texts = [], [], [], [], [], []
                 node_opacity_setting = get_settings().get("node_opacity", 1.0)
                 
                 for node in nodes_list:
                     data = G.nodes[node]
                     x, y, z = pos[node]
                     node_x.append(x); node_y.append(y); node_z.append(z)
-                    node_tipo = data.get('tipo', '').capitalize()
                     
-                    # Lógica de cor e opacidade
+                    # --- INÍCIO DA CORREÇÃO (Plotly Opacity Error) ---
+                    node_tipo = data.get('tipo', '').capitalize()
+                    hex_color = tipo_color_map.get(node_tipo, "#808080")
                     is_focus = (selected and (node == selected or node in neighbors))
-                    node_colors.append(tipo_color_map.get(node_tipo, "#808080"))
-                    node_opacities.append(node_opacity_setting if not selected or is_focus else 0.25)
+                    opacity = node_opacity_setting if not selected or is_focus else 0.25
+                    node_colors.append(hex_to_rgba(hex_color, opacity))
+                    # --- FIM DA CORREÇÃO ---
                     
                     degree = G.degree(node)
                     node_sizes.append(18 if node == selected else max(8, (degree + 1) * 4))
@@ -1076,15 +1082,14 @@ elif st.session_state.page == "mapa":
                     hovertext=node_texts,
                     marker=dict(
                         color=node_colors, 
-                        size=node_sizes, 
-                        opacity=node_opacities,
+                        size=node_sizes,
                         line=dict(color='rgba(255, 255, 255, 0.6)', width=0.8)
                     )
                 )
 
                 fig_data = [edge_trace, node_trace]
                 if selected:
-                    fig_data.append(focus_edge_trace) # Adiciona as arestas destacadas
+                    fig_data.append(focus_edge_trace)
 
                 fig = go.Figure(data=fig_data)
                 fig.update_layout(
@@ -1094,18 +1099,16 @@ elif st.session_state.page == "mapa":
                     plot_bgcolor="rgba(0,0,0,0)",
                     scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode='data'),
                     margin=dict(l=0, r=0, b=0, t=0), 
-                    uirevision='constant' # Mantém o zoom/rotação ao recarregar
+                    uirevision='constant'
                 )
                 
                 selection = fig_container.plotly_chart(fig, use_container_width=True, on_select="rerun", key="mapa_3d")
                 
-                # Processa o clique
                 if selection and selection.get("points"):
                     point = selection["points"][0]
-                    if point['curveNumber'] == 1: # Garante que foi um nó (curve 1) e não uma aresta
+                    if point['curveNumber'] == 1:
                         node_index = point['pointNumber']
                         clicked_node = nodes_list[node_index]
-                        # Alterna a seleção: se clicar no mesmo nó, desmarca.
                         if st.session_state.get("selected_node") == clicked_node:
                             st.session_state.selected_node = None
                         else:
@@ -1115,7 +1118,6 @@ elif st.session_state.page == "mapa":
     except Exception as e:
         st.error(f"Ocorreu um erro inesperado ao renderizar o grafo: {e}")
     
-    # Painel de detalhes do nó selecionado
     if st.session_state.get("selected_node"):
         selected_node_name = st.session_state.selected_node
         if selected_node_name in G:
