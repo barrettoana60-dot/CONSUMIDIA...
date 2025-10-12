@@ -175,6 +175,66 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
 
 
 # -------------------------
+# FUNÇÕES CORRIGIDAS - INÍCIO
+# -------------------------
+def collect_latest_backups():
+    """
+    Scans the BACKUPS_DIR, finds all user backup CSVs,
+    and consolidates them into a single DataFrame for searching.
+    """
+    all_dfs = []
+    base_path = Path(BACKUPS_DIR)
+    if not base_path.exists():
+        return pd.DataFrame()
+
+    # Iterate through each user's backup directory (e.g., /backups/user123/)
+    for user_dir in base_path.iterdir():
+        if user_dir.is_dir():
+            username = user_dir.name
+            # Find all CSV files in the user's directory
+            for csv_file in user_dir.glob("*.csv"):
+                try:
+                    df_temp = pd.read_csv(csv_file)
+                    # Add a column to track the data's origin
+                    df_temp['_artemis_username'] = username
+                    all_dfs.append(df_temp)
+                except Exception as e:
+                    # Silently skip corrupted or unreadable files
+                    print(f"Skipping unreadable backup {csv_file}: {e}")
+                    continue
+    
+    if not all_dfs:
+        return pd.DataFrame()
+
+    # Combine all individual dataframes into one
+    return pd.concat(all_dfs, ignore_index=True)
+
+def highlight_search_terms(text, query):
+    """
+    Highlights occurrences of the query within the text using HTML.
+    Case-insensitive search.
+    """
+    if not query or not text or not isinstance(text, str):
+        return escape_html(text)
+    
+    # Escape original text to prevent rendering raw HTML from the data
+    safe_text = escape_html(text)
+    
+    # Use regex for case-insensitive replacement, wrapping found terms in a span
+    # The class 'card-mark' is already defined in your BASE_CSS
+    highlighted_text = re.sub(
+        f'({re.escape(query)})', 
+        r'<span class="card-mark">\1</span>', 
+        safe_text, 
+        flags=re.IGNORECASE
+    )
+    return highlighted_text
+# -------------------------
+# FUNÇÕES CORRIGIDAS - FIM
+# -------------------------
+
+
+# -------------------------
 # load/save users (atomic)
 # -------------------------
 def load_users():
@@ -979,7 +1039,7 @@ elif st.session_state.page == "busca":
         with col_meta:
             backups_df_tmp = collect_latest_backups()
             all_cols = []
-            if backups_df_tmp is not None:
+            if backups_df_tmp is not None and not backups_df_tmp.empty:
                 all_cols = [c for c in backups_df_tmp.columns if c.lower() not in ['_artemis_username', 'ano']]
             search_col = st.selectbox("Buscar em", options=all_cols or ["(nenhuma planilha encontrada)"], key="ui_search_col")
         with col_actions:
