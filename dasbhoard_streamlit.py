@@ -1161,7 +1161,9 @@ elif st.session_state.page == "mapa":
             st.warning("O mapa está vazio. Carregue uma planilha ou crie nós para começar.")
         else:
             with st.spinner("Renderizando mapa interativo..."):
-                pos = nx.spring_layout(G, dim=3, seed=42, iterations=iterations, k=(2.0 / math.sqrt(G.number_of_nodes()) if G.number_of_nodes() > 0 else None))
+                # CORREÇÃO: Adicionado `if G.number_of_nodes() > 0 else 1` para evitar ZeroDivisionError
+                k_value = (2.0 / math.sqrt(G.number_of_nodes())) if G.number_of_nodes() > 0 else 1
+                pos = nx.spring_layout(G, dim=3, seed=42, iterations=iterations, k=k_value)
                 
                 selected = st.session_state.get("selected_node")
                 neighbors = list(G.neighbors(selected)) if selected else []
