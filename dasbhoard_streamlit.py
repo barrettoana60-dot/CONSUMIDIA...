@@ -1,7 +1,7 @@
-# dashboard_nugep_pqr_final_complete.py
-# VERSÃO FINAL CORRIGIDA (12/10/2025)
-# COM: Página de Recomendações dedicada e Mapa Mental Interativo com nós clicáveis.
-# ALTERAÇÕES: Refatorada a lógica de navegação. Adicionada interatividade e painel de detalhes ao mapa.
+# dashboard_nugep_pqr_final.py
+# VERSÃO FINAL CORRIGIDA (13/10/2025)
+# COM: Tutorial de primeiro uso, página de Recomendações dedicada e Mapa Mental Interativo com nós clicáveis.
+# ALTERAÇÕES: Adicionado guia para novos usuários. Refatorada a lógica de Recomendações com descoberta inteligente.
 
 import os
 import re
@@ -285,6 +285,78 @@ def recomendar_artigos(temas_selecionados, df_total, top_n=10):
     
     return recomendados_df.drop(columns=['corpus'])
 
+# Lista de stop words para melhorar a extração de temas
+PORTUGUESE_STOP_WORDS = [
+    'de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'uma',
+    'os', 'no', 'se', 'na', 'por', 'mais', 'as', 'dos', 'como', 'mas', 'foi', 'ao',
+    'ele', 'das', 'tem', 'à', 'seu', 'sua', 'ou', 'ser', 'quando', 'muito', 'há',
+    'nos', 'já', 'está', 'eu', 'também', 'só', 'pelo', 'pela', 'até', 'isso', 'ela',
+    'entre', 'era', 'depois', 'sem', 'mesmo', 'aos', 'ter', 'seus', 'quem', 'nas',
+    'me', 'esse', 'eles', 'estão', 'você', 'tinha', 'foram', 'essa', 'num', 'nem',
+    'suas', 'meu', 'às', 'minha', 'têm', 'numa', 'pelos', 'elas', 'havia', 'seja',
+    'qual', 'será', 'nós', 'tenho', 'lhe', 'deles', 'essas', 'esses', 'pelas',
+    'este', 'fosse', 'dele', 'tu', 'te', 'vocês', 'vos', 'lhes', 'meus', 'minhas',
+    'teu', 'tua', 'teus', 'tuas', 'nosso', 'nossa', 'nossos', 'nossas', 'dela',
+    'delas', 'esta', 'estes', 'estas', 'aquele', 'aquela', 'aqueles', 'aquelas',
+    'isto', 'aquilo', 'estou', 'está', 'estamos', 'estão', 'estive', 'esteve',
+    'estivemos', 'estiveram', 'estava', 'estávamos', 'estavam', 'estivera',
+    'estivéramos', 'esteja', 'estejamos', 'estejam', 'estivesse', 'estivéssemos',
+    'estivessem', 'estiver', 'estivermos', 'estiverem', 'hei', 'há', 'havemos',
+    'hão', 'houve', 'houvemos', 'houveram', 'houvera', 'houvéramos', 'haja',
+    'hajamos', 'hajam', 'houvesse', 'houvéssemos', 'houvessem', 'houver',
+    'houvermos', 'houverem', 'houverei', 'houverá', 'houveremos', 'houverão',
+    'houveria', 'houveríamos', 'houveriam', 'sou', 'somos', 'são', 'era', 'éramos',
+    'eram', 'fui', 'foi', 'fomos', 'foram', 'fora', 'fôramos', 'seja', 'sejamos',
+    'sejam', 'fosse', 'fôssemos', 'fossem', 'for', 'formos', 'forem', 'serei',
+    'será', 'seremos', 'serão', 'seria', 'seríamos', 'seriam', 'tenho', 'tem',
+    'temos', 'tém', 'tinha', 'tínhamos', 'tinham', 'tive', 'teve', 'tivemos',
+    'tiveram', 'tivera', 'tivéramos', 'tenha', 'tenhamos', 'tenham', 'tivesse',
+    'tivéssemos', 'tivessem', 'tiver', 'tivermos', 'tiverem', 'terei', 'terá',
+    'teremos', 'terão', 'teria', 'teríamos', 'teriam'
+]
+
+@st.cache_data(ttl=600) # Cache para não re-processar a cada clique
+def extract_popular_themes_from_data(df_total, top_n=30):
+    """
+    Extrai os temas/palavras-chave mais populares de um DataFrame consolidado usando TF-IDF.
+    """
+    if TfidfVectorizer is None:
+        return [] # Retorna vazio se a biblioteca não estiver disponível
+
+    if df_total.empty:
+        return []
+
+    corpus_series = pd.Series([''] * len(df_total), index=df_total.index, dtype=str)
+    
+    # Concatena colunas relevantes para formar o corpus de texto
+    for col in ['título', 'tema', 'resumo', 'titulo', 'abstract']:
+        if col in df_total.columns:
+            corpus_series += df_total[col].fillna('') + ' '
+    
+    df_total['corpus'] = corpus_series.str.lower()
+
+    if df_total['corpus'].str.strip().eq('').all():
+        return []
+
+    try:
+        # Usa TF-IDF para encontrar os termos mais relevantes
+        vectorizer = TfidfVectorizer(stop_words=PORTUGUESE_STOP_WORDS, max_features=1000, ngram_range=(1, 2))
+        tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
+        
+        # Soma os scores de TF-IDF de cada termo em todos os documentos
+        sum_tfidf = tfidf_matrix.sum(axis=0)
+        
+        # Mapeia os índices dos termos para seus nomes
+        words = vectorizer.get_feature_names_out()
+        tfidf_scores = [(words[i], sum_tfidf[0, i]) for i in range(len(words))]
+        
+        # Ordena por score e retorna os top_n termos
+        sorted_scores = sorted(tfidf_scores, key=lambda x: x[1], reverse=True)
+        
+        return [word for word, score in sorted_scores[:top_n]]
+    except Exception as e:
+        print(f"Erro ao extrair temas populares: {e}")
+        return [] # Em caso de erro, retorna uma lista vazia
 # -------------------------
 # load/save users (atomic)
 # -------------------------
@@ -555,6 +627,7 @@ _defaults = {
     "search_results": pd.DataFrame(), "search_page": 1, "search_query_meta": {"col": None,"query":""},
     "search_view_index": None, "compose_inline": False, "compose_open": False,
     "last_backup_path": None, "selected_node": None,
+    "tutorial_completed": False, # Flag para o novo tutorial
     "settings": {
         "plot_height": 720,
         "font_scale": 1.0,
@@ -589,7 +662,8 @@ def save_user_state_minimal(USER_STATE):
             "uploaded_name": st.session_state.get("uploaded_name", None),
             "favorites": st.session_state.get("favorites", []),
             "settings": st.session_state.get("settings", {}),
-            "last_backup_path": st.session_state.get("last_backup_path")
+            "last_backup_path": st.session_state.get("last_backup_path"),
+            "tutorial_completed": st.session_state.get("tutorial_completed", False) # Salva o estado do tutorial
         }
         clean_data = clean_for_json(data)
 
@@ -698,6 +772,7 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
         st.session_state.uploaded_name = meta.get("uploaded_name", st.session_state.get("uploaded_name"))
         st.session_state.favorites = meta.get("favorites", st.session_state.favorites)
         st.session_state.last_backup_path = meta.get("last_backup_path", st.session_state.last_backup_path)
+        st.session_state.tutorial_completed = meta.get("tutorial_completed", False) # Restaura o estado do tutorial
         
         if "settings" in meta:
             st.session_state.settings.update(meta.get("settings", {}))
@@ -788,6 +863,42 @@ for i, (page_key, page_label) in enumerate(nav_buttons.items()):
             safe_rerun()
 st.markdown("</div></div><hr>", unsafe_allow_html=True)
 
+
+# -------------------------
+# TUTORIAL DE PRIMEIRO USO
+# -------------------------
+if not st.session_state.get("tutorial_completed"):
+    with st.expander("👋 Bem-vindo ao NUGEP-PQR! Um Guia Rápido Para Você", expanded=True):
+        st.markdown("""
+        Olá! Parece que esta é a sua primeira vez aqui. Preparamos um resumo rápido para você aproveitar ao máximo a plataforma.
+        
+        **O que cada botão faz?**
+        
+        * **📄 Planilha**: **Este é o ponto de partida.** Carregue aqui sua planilha (.csv ou .xlsx). Os dados dela alimentarão o mapa, os gráficos e as buscas. Um backup é criado automaticamente.
+        
+        * **💡 Recomendações**: Explore artigos e trabalhos de outros usuários com base em temas de interesse. Na sua primeira visita, sugerimos os temas mais populares para você começar!
+        
+        * **🞠 Mapa**: Visualize as conexões da sua planilha como um **mapa mental 3D interativo**. Clique nos pontos (nós) para ver como os diferentes autores, temas e anos se relacionam.
+        
+        * **📝 Anotações**: Um bloco de notas simples e útil. Para destacar um texto, coloque-o entre `==sinais de igual==`. Você pode baixar suas anotações como um PDF com os destaques.
+        
+        * **📊 Gráficos**: Gere gráficos de barras ou histogramas personalizados a partir dos dados da sua planilha. Ótimo para análises rápidas.
+        
+        * **🔍 Busca**: Uma poderosa ferramenta de busca que pesquisa **em todas as planilhas** já carregadas na plataforma. Encontre trabalhos, salve seus achados nos favoritos e contate os autores.
+        
+        * **✉️ Mensagens**: Um sistema de mensagens interno para você se comunicar e colaborar com outros pesquisadores da plataforma.
+        
+        * **⚙️ Configurações**: Personalize sua experiência. Aumente o tamanho da fonte para melhor leitura ou ajuste detalhes visuais do mapa.
+        """)
+        if st.button("Entendido, começar a usar!", use_container_width=True):
+            st.session_state.tutorial_completed = True
+            save_user_state_minimal(USER_STATE) # Salva o estado para não mostrar o tutorial novamente
+            st.balloons()
+            time.sleep(1)
+            safe_rerun()
+    st.markdown("---")
+
+
 # -------------------------
 # Page: Planilha
 # -------------------------
@@ -841,38 +952,68 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Recomendações
+# Page: Recomendações (VERSÃO MELHORADA COM DESCOBERTA INTELIGENTE)
 # -------------------------
 elif st.session_state.page == "recomendacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("💡 Recomendações de Artigos")
-    st.write("Explore artigos de outros usuários com base nos seus temas de interesse. Selecione um ou mais temas abaixo.")
 
-    temas_disponiveis = [
-        "Cultura de Inovação",
-        "Inovação Tecnológica",
-        "NFT",
-        "Inovação Social",
-        "Documentação"
-    ]
-    
-    temas_selecionados = st.multiselect(
-        "Selecione seus temas de interesse:",
-        options=temas_disponiveis,
-        key="temas_recomendacao"
-    )
-    
-    if st.button("Buscar Recomendações", key="btn_recomendar"):
-        with st.spinner("Analisando artigos e buscando as melhores recomendações..."):
-            df_total = collect_latest_backups()
-            if df_total.empty:
-                st.warning("Ainda não há dados de outros usuários para gerar recomendações. Carregue uma planilha para começar!")
+    with st.spinner("Analisando o conhecimento da plataforma..."):
+        df_total = collect_latest_backups()
+        
+    # Extrai temas populares de todos os backups para sugerir ao usuário
+    temas_populares = extract_popular_themes_from_data(df_total, top_n=50)
+
+    # --- INÍCIO DA LÓGICA DE DESCOBERTA INTELIGENTE (ESTILO SPOTIFY) ---
+    # Verifica se o usuário já fez uma busca nesta sessão
+    if 'recommendation_onboarding_complete' not in st.session_state:
+        st.session_state.recommendation_onboarding_complete = False
+
+    # Se não há temas populares, significa que não há dados na plataforma
+    if not temas_populares:
+        st.warning("Ainda não há dados de outros usuários para gerar recomendações. Carregue uma planilha na aba '📄 Planilha' para começar e ver a mágica acontecer!")
+    # Se é o primeiro acesso do usuário, mostra a interface de descoberta
+    elif not st.session_state.recommendation_onboarding_complete:
+        st.markdown("#### Bem-vindo à Descoberta Inteligente!")
+        st.write("Para começar, selecione alguns tópicos de seu interesse abaixo. Eles foram extraídos dos trabalhos mais relevantes da plataforma. Com base na sua seleção, encontraremos os melhores artigos para você.")
+        
+        temas_selecionados = st.multiselect(
+            "Selecione um ou mais temas para começar:",
+            options=temas_populares,
+            key="temas_onboarding"
+        )
+        
+        if st.button("Gerar minhas primeiras recomendações", key="btn_onboarding_recomendar"):
+            if not temas_selecionados:
+                st.error("Por favor, selecione pelo menos um tema para continuar.")
             else:
-                df_total.rename(columns={'titulo': 'título', 'resumo': 'resumo', 'abstract': 'resumo', 'autor': 'autor', 'ano': 'ano', 'tema':'tema'}, inplace=True, errors='ignore')
-                
-                recommended_df = recomendar_artigos(temas_selecionados, df_total)
-                st.session_state.recommendations = recommended_df
-    
+                with st.spinner("Analisando artigos e buscando as melhores recomendações..."):
+                    df_total.rename(columns={'titulo': 'título', 'resumo': 'resumo', 'abstract': 'resumo', 'autor': 'autor', 'ano': 'ano', 'tema':'tema'}, inplace=True, errors='ignore')
+                    recommended_df = recomendar_artigos(temas_selecionados, df_total)
+                    st.session_state.recommendations = recommended_df
+                    # Marca que o onboarding foi concluído para não mostrar novamente na mesma sessão
+                    st.session_state.recommendation_onboarding_complete = True
+                    safe_rerun() # Recarrega a página para mostrar os resultados
+    # Se o usuário já passou pela descoberta, mostra a interface padrão
+    else:
+        st.write("Explore artigos de outros usuários com base nos seus temas de interesse. Selecione um ou mais temas abaixo.")
+        temas_selecionados = st.multiselect(
+            "Selecione seus temas de interesse:",
+            options=temas_populares,
+            key="temas_recomendacao"
+        )
+        
+        if st.button("Buscar Novas Recomendações", key="btn_recomendar"):
+            with st.spinner("Analisando artigos e buscando as melhores recomendações..."):
+                if df_total.empty:
+                    st.warning("Ainda não há dados de outros usuários para gerar recomendações.")
+                else:
+                    df_total.rename(columns={'titulo': 'título', 'resumo': 'resumo', 'abstract': 'resumo', 'autor': 'autor', 'ano': 'ano', 'tema':'tema'}, inplace=True, errors='ignore')
+                    recommended_df = recomendar_artigos(temas_selecionados, df_total)
+                    st.session_state.recommendations = recommended_df
+    # --- FIM DA LÓGICA DE DESCOBERTA INTELIGENTE ---
+
+    # Lógica para exibir os resultados (permanece a mesma)
     if 'recommendations' in st.session_state:
         if not st.session_state.recommendations.empty:
             st.markdown("---")
@@ -903,6 +1044,7 @@ elif st.session_state.page == "recomendacoes":
                     if add_to_favorites(result_data): st.toast("Adicionado aos favoritos!", icon="⭐")
                     else: st.toast("Já está nos favoritos.")
         else:
+            # Garante que a mensagem de "nenhum resultado" apareça após uma busca, não no carregamento inicial
             if st.session_state.get('recommendations') is not None:
                 st.info("Nenhum artigo relevante encontrado para os temas selecionados. Tente outra combinação.")
 
