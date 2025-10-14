@@ -783,7 +783,8 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
             try:
                 df = pd.read_csv(backup_path)
                 st.session_state.df = df
-                st.session_state.G = criar_grafo(df, silent=True)
+                # IMPORTANTE: A linha abaixo foi removida para não sobrescrever o mapa mental
+                # st.session_state.G = criar_grafo(df, silent=True)
                 st.toast(f"Planilha '{os.path.basename(backup_path)}' restaurada automaticamente.", icon="📄")
             except Exception as e:
                 st.error(f"Falha ao restaurar o backup da sua planilha: {e}")
@@ -875,11 +876,11 @@ if not st.session_state.get("tutorial_completed"):
         
         **O que cada botão faz?**
         
-        * **📄 Planilha**: **Este é o ponto de partida.** Carregue aqui sua planilha (.csv ou .xlsx). Os dados dela alimentarão o mapa, os gráficos e as buscas. Um backup é criado automaticamente.
+        * **📄 Planilha**: **Este é o ponto de partida.** Carregue aqui sua planilha (.csv ou .xlsx). Os dados dela alimentarão os gráficos e as buscas. Um backup é criado automaticamente.
         
         * **💡 Recomendações**: Explore artigos e trabalhos de outros usuários com base em temas de interesse. Na sua primeira visita, sugerimos os temas mais populares para você começar!
         
-        * **🞠 Mapa**: Visualize as conexões da sua planilha como um **mapa mental 2D interativo**. Clique e arraste os pontos (nós) para organizar o mapa como quiser.
+        * **🞠 Mapa**: Esta página agora mostra um **mapa mental fixo** sobre IA e bem-estar, como na imagem que você enviou. É um mapa interativo para exploração.
         
         * **📝 Anotações**: Um bloco de notas simples e útil. Para destacar um texto, coloque-o entre `==sinais de igual==`. Você pode baixar suas anotações como um PDF com os destaques.
         
@@ -907,13 +908,15 @@ if st.session_state.page == "planilha":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("📄 Planilha / Backup")
     
-    uploaded = st.file_uploader("Carregue .csv ou .xlsx para criar um novo mapa ou substituir o atual", type=["csv", "xlsx"], key=f"u_{USERNAME}")
+    uploaded = st.file_uploader("Carregue .csv ou .xlsx para usar nas buscas e gráficos", type=["csv", "xlsx"], key=f"u_{USERNAME}")
     if uploaded:
         try:
             df = read_spreadsheet(uploaded)
             st.session_state.df = df
             st.session_state.uploaded_name = uploaded.name
-            st.session_state.G = criar_grafo(df)
+            
+            # ATENÇÃO: A linha abaixo agora só gera o grafo para as outras páginas, não para o mapa mental principal.
+            st.session_state.G = criar_grafo(df) 
             
             try:
                 ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
@@ -953,7 +956,7 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Recomendações (VERSÃO CORRIGIDA COM BUSCA POR PALAVRA-CHAVE)
+# Page: Recomendações
 # -------------------------
 elif st.session_state.page == "recomendacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1166,169 +1169,112 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Mapa Mental (MODELO ANARCHES)
+# Page: Mapa Mental (CORRIGIDO - Mostra sempre o mapa da imagem)
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🞠 Mapa Mental Interativo - Modelo ANARCHES")
-    st.info("Clique e arraste os nós para organizar o mapa. Clique em um nó para ver seus detalhes e conexões.")
+    st.subheader("🞠 AI + Mindmap")
+    st.info("Este é o mapa mental interativo da imagem. Você pode arrastar os nós para organizá-los.")
+
+    # 1. Define os nós do mapa mental desejado
+    nodes = [
+        Node(id="AI + MINDMAP", 
+             label="AI + MINDMAP", 
+             size=40, 
+             shape="dot", 
+             color="#a37eff"), # Nó central roxo
+        
+        Node(id="Nutrition", 
+             label="NUTRITION\n\n...providing the essential\nresources...", 
+             size=25,
+             shape="box",
+             borderRadius=5,
+             font={"color": "#343434", "size":16},
+             color="#e8e8e8"),
+             
+        Node(id="Awareness", 
+             label="AWARENESS\n\nDeveloping a keen understanding of one's physical\nand emotional responses to stressors allows\nindividuals to recognize early signs of stress.", 
+             size=25,
+             shape="box",
+             borderRadius=5,
+             font={"color": "#343434", "size":16},
+             color="#e8e8e8"),
+             
+        Node(id="Reduction", 
+             label="REDUCTION\n\nParticipating in activities that bring joy and relaxation,\nsuch as hobbies, creative pursuits,\nor spending time in nature.", 
+             size=25,
+             shape="box",
+             borderRadius=5,
+             font={"color": "#343434", "size":16},
+             color="#e8e8e8"),
+             
+        Node(id="Breakdown", 
+             label="BREAKDOWN\n\nBreaking down larger tasks into smaller, actionable steps\nenables individuals to approach them systematically.", 
+             size=25,
+             shape="box",
+             borderRadius=5,
+             font={"color": "#343434", "size":16},
+             color="#e8e8e8"),
+
+        Node(id="Self-Care", 
+             label="SELF-CARE\n\nEngaging in self-care activities such as relaxation techniques,\nhobbies, or leisure pursuits nurtures emotional well-being.", 
+             size=25,
+             shape="box",
+             borderRadius=5,
+             font={"color": "#343434", "size":16},
+             color="#e8e8e8"),
+             
+        Node(id="Reframing", 
+             label="REFRAMING\n\nAdopting a positive mindset and reframing\nnegative thoughts into more constructive perspectives.", 
+             size=25,
+             shape="box",
+             borderRadius=5,
+             font={"color": "#343434", "size":16},
+             color="#e8e8e8")
+    ]
+
+    # 2. Define as conexões (linhas) do nó central para os outros
+    edges = [
+        Edge(source="AI + MINDMAP", target="Nutrition", color="#e8e8e8", width=3),
+        Edge(source="AI + MINDMAP", target="Awareness", color="#e8e8e8", width=3),
+        Edge(source="AI + MINDMAP", target="Reduction", color="#e8e8e8", width=3),
+        Edge(source="AI + MINDMAP", target="Breakdown", color="#e8e8e8", width=3),
+        Edge(source="AI + MINDMAP", target="Self-Care", color="#e8e8e8", width=3),
+        Edge(source="AI + MINDMAP", target="Reframing", color="#e8e8e8", width=3)
+    ]
+
+    # 3. Configura a aparência e a física do grafo
+    config = Config(width="100%", 
+                    height=800,
+                    directed=False, 
+                    physics=True, 
+                    hierarchical=False,
+                    # Opções de layout para um visual de mapa mental
+                    layout={
+                        "randomSeed": 42,
+                        "improvedLayout": True,
+                    },
+                    interaction={
+                        "navigationButtons": True, 
+                        "keyboard": True,
+                        "dragView": True,
+                        "zoomView": True
+                    },
+                    # Configurações de física para um efeito mais "elástico" e centralizado
+                    physics_settings={
+                        "barnesHut": {
+                            "gravitationalConstant": -10000,
+                            "centralGravity": 0.3,
+                            "springLength": 200,
+                            "springConstant": 0.05,
+                            "avoidOverlap": 0.5
+                        },
+                        "solver": "barnesHut"
+                    })
+
+    # 4. Renderiza o grafo na tela
+    agraph(nodes=nodes, edges=edges, config=config)
     
-    G = st.session_state.get("G", nx.Graph())
-    nodes_list = list(G.nodes())
-
-    # Opções e edição do grafo
-    with st.expander("Opções e Edição do Mapa Mental"):
-        edit_c1, edit_c2 = st.columns(2)
-        with edit_c1:
-            with st.form("create_node_form", clear_on_submit=True):
-                st.write("**1. Criar Novo Nó**")
-                new_node_label = st.text_input("Rótulo do nó")
-                new_node_type = st.selectbox("Tipo do nó", options=["Autor", "Tema", "Ano", "País", "Título", "Conceito", "Ideia"])
-                if st.form_submit_button("➕ Criar Nó"):
-                    if new_node_label and new_node_type:
-                        node_id = f"{new_node_type}: {new_node_label.strip()}"
-                        if node_id not in G:
-                            G.add_node(node_id, tipo=new_node_type, label=new_node_label.strip())
-                            st.success(f"Nó '{node_id}' criado!")
-                            if st.session_state.autosave: save_user_state_minimal(USER_STATE)
-                            time.sleep(0.5); safe_rerun()
-                        else: st.warning("Este nó já existe.")
-                    else: st.warning("Preencha o rótulo e o tipo.")
-
-        with edit_c2:
-            with st.form("connect_nodes_form", clear_on_submit=True):
-                st.write("**2. Conectar Nós**")
-                node1 = st.selectbox("Primeiro nó", options=[""] + nodes_list, key="connect1")
-                node2 = st.selectbox("Segundo nó", options=[""] + nodes_list, key="connect2")
-                if st.form_submit_button("🔗 Conectar"):
-                    if node1 and node2 and node1 != node2:
-                        if not G.has_edge(node1, node2):
-                           G.add_edge(node1, node2)
-                           st.success(f"Nós '{node1}' e '{node2}' conectados.")
-                           if st.session_state.autosave: save_user_state_minimal(USER_STATE)
-                           time.sleep(0.5); safe_rerun()
-                        else: st.info("Esses nós já estão conectados.")
-                    else: st.warning("Selecione dois nós diferentes para conectar.")
-
-    # Renderização do mapa mental - MODELO ANARCHES
-    if G.number_of_nodes() > 0:
-        nodes = []
-        edges = []
-        
-        # Cores do modelo ANARCHES
-        node_colors = {
-            "Autor": "#FF6B6B",      # Vermelho
-            "Tema": "#4ECDC4",       # Turquesa  
-            "Ano": "#45B7D1",        # Azul
-            "País": "#96CEB4",       # Verde
-            "Título": "#FFEAA7",     # Amarelo
-            "Conceito": "#DDA0DD",   # Lilás
-            "Ideia": "#98D8C8"       # Verde água
-        }
-        
-        # Tamanhos diferentes para hierarquia visual
-        node_sizes = {
-            "Tema": 25,
-            "Conceito": 22,
-            "Ideia": 20,
-            "Título": 18,
-            "Autor": 16,
-            "Ano": 14,
-            "País": 14
-        }
-        
-        for node_id, data in G.nodes(data=True):
-            node_type = data.get("tipo", "Tema")
-            color = node_colors.get(node_type, "#E0B0FF")
-            size = node_sizes.get(node_type, 20)
-            
-            nodes.append(Node(
-                id=node_id, 
-                label=data.get("label", node_id), 
-                size=size,
-                shape="box",
-                font={"color": "#2C3E50", "size": 14, "face": "Arial", "weight": "bold"},
-                color=color,
-                borderWidth=3,
-                borderColor="#34495E",
-                borderRadius=15,
-                shadow=True,
-                mass=2
-            ))
-            
-        for u, v in G.edges():
-            edges.append(Edge(
-                source=u, 
-                target=v, 
-                color="#7F8C8D", 
-                width=2,
-                dashes=False,
-                physics=True
-            ))
-
-        # Configurações de layout ANARCHES
-        config = Config(
-            width="100%", 
-            height=700, 
-            directed=False, 
-            physics=True, 
-            hierarchical=False,
-            layout={"improvedLayout": True},
-            interaction={
-                "navigationButtons": True, 
-                "keyboard": True,
-                "dragView": True,
-                "zoomView": True
-            },
-            nodes={
-                "shapeProperties": {
-                    "useBorderWithImage": True,
-                    "borderRadius": 15
-                }
-            }
-        )
-
-        # O componente agraph retorna o ID do nó clicado
-        clicked_node_id = agraph(nodes=nodes, edges=edges, config=config)
-        
-        # Atualiza o estado da sessão se um nó foi clicado
-        if clicked_node_id:
-            st.session_state.selected_node = clicked_node_id
-
-    else:
-        st.warning("O mapa está vazio. Carregue uma planilha ou crie nós para começar.")
-
-    # Exibição dos detalhes do nó selecionado
-    selected_node_name = st.session_state.get("selected_node")
-    if selected_node_name and selected_node_name in G:
-        node_data = G.nodes[selected_node_name]
-        neighbors = list(G.neighbors(selected_node_name))
-        
-        st.markdown("---")
-        st.subheader(f"🔍 Detalhes do Nó: {node_data.get('label', selected_node_name)}")
-        
-        col1, col2 = st.columns([3, 1])
-        with col1:
-            st.markdown(f"**Tipo:** {escape_html(node_data.get('tipo', 'N/A'))}")
-            st.markdown(f"**Conexões:** {len(neighbors)}")
-        with col2:
-            if st.button("🗑️ Excluir Nó", use_container_width=True):
-                G.remove_node(selected_node_name)
-                st.session_state.selected_node = None
-                if st.session_state.autosave: save_user_state_minimal(USER_STATE)
-                st.toast(f"Nó '{selected_node_name}' removido.")
-                time.sleep(1); safe_rerun()
-
-        st.write("**Conectado a:**")
-        if neighbors:
-            for neighbor in sorted(neighbors):
-                neighbor_data = G.nodes[neighbor]
-                neighbor_label = neighbor_data.get('label', neighbor)
-                neighbor_type = neighbor_data.get('tipo', 'N/A')
-                st.markdown(f"- **{neighbor_type}:** {neighbor_label}")
-        else:
-            st.write("Este nó não possui conexões.")
-
     st.markdown("</div>", unsafe_allow_html=True)
     
 # -------------------------
