@@ -1,5 +1,4 @@
-# app_nugep_pqr_full.py
-# NUGEP-PQR — versão completa com Favoritos integrado na página "Recomendações"
+
 import os
 import re
 import io
@@ -32,7 +31,7 @@ except Exception:
     TfidfVectorizer = None
     cosine_similarity = None
 
-# bcrypt for password hashing
+# bcrypt for password hashing (optional)
 try:
     import bcrypt
     BCRYPT_AVAILABLE = True
@@ -927,8 +926,7 @@ if not st.session_state.get("tutorial_completed"):
         * **📄 Planilha**: Carregue sua planilha (.csv ou .xlsx). Os dados dela alimentarão os gráficos e as buscas.
         * **💡 Recomendações**: Explore artigos e trabalhos de outros usuários com base em temas de interesse.
         * **🞠 Mapa**: Visualize e edite um mapa de ideias no formato hierárquico. Você pode adicionar, conectar e remover nós.
-        * **📝 Anotações**: Um bloc
-        o de notas para destacar texto com `==sinais de igual==` e exportar como PDF.
+        * **📝 Anotações**: Um bloco de notas para destacar texto com `==sinais de igual==` e exportar como PDF.
         * **📊 Gráficos**: Gere gráficos personalizados a partir da sua planilha.
         * **🔍 Busca**: Pesquise em todas as planilhas carregadas na plataforma.
         * **✉️ Mensagens**: Comunique-se com outros pesquisadores.
@@ -989,7 +987,7 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: recomendacoes (agora inclui Favoritos)
+# Page: recomendacoes (mantém Favoritos aqui)
 # -------------------------
 elif st.session_state.page == "recomendacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1356,7 +1354,7 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: busca (SEM painel de favoritos — favoritos agora ficam em Recomendações)
+# Page: busca (AQUI foi a alteração principal)
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1398,6 +1396,8 @@ elif st.session_state.page == "busca":
                 st.session_state.search_page = 1
 
     results_df = st.session_state.get('search_results', pd.DataFrame())
+    users_map = load_users()  # carregamos os usuários para mapear CPF -> nome
+
     if not results_df.empty:
         total = len(results_df)
         max_pages = max(1, (total + per_page - 1) // per_page)
@@ -1408,8 +1408,15 @@ elif st.session_state.page == "busca":
         st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {end}.")
         for orig_i in page_df.index:
             result_data = results_df.loc[orig_i].to_dict()
-            user_src = result_data.get("_artemis_username", "N/A")
-            initials = "".join([p[0] for p in str(user_src).split()[:2]]).upper() or "U"
+            origin_uid = result_data.get("_artemis_username", "N/A")
+            # Aqui: mostrar o NOME do usuário (se existir), senão uma indicação ("Usuário desconhecido" / "Web")
+            if origin_uid == "web":
+                user_display_name = "Fonte: Web"
+            else:
+                user_obj = users_map.get(str(origin_uid), {})
+                user_display_name = user_obj.get("name") if user_obj and user_obj.get("name") else str(origin_uid)
+
+            initials = "".join([p[0] for p in str(user_display_name).split()[:2]]).upper() or "U"
             title_raw = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
             resumo_raw = str(result_data.get('resumo') or result_data.get('abstract') or "")
             
@@ -1419,7 +1426,7 @@ elif st.session_state.page == "busca":
                     <div class="avatar">{escape_html(initials)}</div>
                     <div style="flex:1;">
                         <div class="card-title">{highlight_search_terms(title_raw, query)}</div>
-                        <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • {escape_html(result_data.get('autor', ''))}</div>
+                        <div class="small-muted">De <strong>{escape_html(user_display_name)}</strong> • {escape_html(result_data.get('autor', ''))}</div>
                         <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{highlight_search_terms(resumo_raw, query) if resumo_raw else ''}</div>
                     </div>
                 </div>
@@ -1451,28 +1458,35 @@ elif st.session_state.page == "busca":
                 det = results_df.loc[vi].to_dict()
                 det = enrich_article_metadata(det)
                 origin_user = det.get("_artemis_username", "N/A")
+                # display-friendly name
+                if origin_user == "web":
+                    origin_display = "Fonte: Web"
+                else:
+                    ou = users_map.get(str(origin_user), {})
+                    origin_display = ou.get("name") if ou and ou.get("name") else str(origin_user)
                 st.markdown("## Detalhes do Registro")
                 st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
-                st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— —'))} • _Ano:_ {escape_html(str(det.get('ano', '—')))}")
+                st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— —'))} • _Fonte:_ {escape_html(origin_display)}")
                 st.markdown("---")
                 st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
                 st.markdown("---")
                 st.markdown("### ✉️ Contatar autor")
-                if origin_user != "N/A":
+                if origin_user != "N/A" and origin_user != "web":
                     with st.form(key=f"inline_compose_{vi}_{USERNAME}"):
                         subj_fill = st.text_input("Assunto:", value=f"Sobre: {det.get('título', '')[:50]}...")
-                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_user},\n\nVi seu registro na plataforma e gostaria de conversar.\n\n")
+                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_display},\n\nVi seu registro na plataforma e gostaria de conversar.\n\n")
                         c1, c2 = st.columns(2)
                         with c1:
                             if st.form_submit_button("✉️ Enviar"):
-                                send_message(USERNAME, origin_user, subj_fill, body_fill)
-                                st.success(f"Mensagem enviada para {origin_user}.")
+                                # aqui enviamos para o CPF (origin_user) internamente
+                                send_message(USERNAME, str(origin_user), subj_fill, body_fill)
+                                st.success(f"Mensagem enviada para {origin_display}.")
                                 time.sleep(2); safe_rerun()
                         with c2:
                             if st.form_submit_button("Cancelar"):
                                 st.session_state.search_view_index = None; safe_rerun()
                 else:
-                    st.warning("Origem indisponível para contato.")
+                    st.warning("Origem indisponível para contato (registro público/web).")
     else:
         st.info("Nenhum resultado de busca (executar uma pesquisa com dados carregados).")
 
