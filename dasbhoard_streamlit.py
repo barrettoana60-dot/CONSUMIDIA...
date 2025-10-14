@@ -1,4 +1,4 @@
-# NUGEP-PQR — versão atualizada com onboarding de recomendações (CrossRef)
+# NUGEP-PQR — versão atualizada (corrige busca por novos temas; fallback web; metadados enriquecidos)
 import os
 import re
 import io
@@ -22,7 +22,6 @@ import plotly.express as px
 import networkx as nx
 from fpdf import FPDF
 
-# Importe a nova biblioteca para o mapa mental
 from streamlit_agraph import agraph, Node, Edge, Config
 
 # optional ML libs (silenciosamente não-fatal)
@@ -78,10 +77,8 @@ body { transition: background-color .25s ease, color .25s ease; }
 }
 """
 
-# default dark CSS
 DEFAULT_CSS = r"""
 .css-1d391kg { background: linear-gradient(180deg,#071428 0%, #031926 100%) !important; }
-/* CAIXAS COM FUNDO SÓLIDO (SEM EFEITO TRANSLÚCIDO) */
 .glass-box{ background: #0E192A; border:1px solid #2A3B52; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
 .stButton>button, .stDownloadButton>button{ background:#1C2D4A !important; color:#bfc6cc !important; border:1px solid #2A3B52 !important; padding:8px 12px !important; border-radius:10px !important; }
 .stButton>button:hover, .stDownloadButton>button:hover {
@@ -94,12 +91,9 @@ DEFAULT_CSS = r"""
 .card-title{color:#fff}
 """
 
-# inject base CSS
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
-# inject dark default
 st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
 
-# header
 st.markdown("<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'><h1 style='font-weight:800;font-size:40px; background:linear-gradient(90deg,#8e44ad,#2979ff,#1abc9c,#ff8a00); -webkit-background-clip:text; color:transparent; margin:0;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
 
 # -------------------------
@@ -149,7 +143,6 @@ def apply_global_styles(font_scale=1.0):
     except Exception:
         pass
 
-# helper: render credential box with copy & download
 def _render_credentials_box(username, password, note=None, key_prefix="cred"):
     st.markdown("---")
     st.success("Usuário criado com sucesso — anote/guarde a senha abaixo:")
@@ -249,7 +242,6 @@ def recomendar_artigos(temas_selecionados, df_total, query_text=None, top_n=50):
     if df_total['corpus'].str.strip().eq('').all():
         return pd.DataFrame()
     
-    # Use stop-words em português
     vectorizer = TfidfVectorizer(stop_words=PORTUGUESE_STOP_WORDS, max_features=5000)
     tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
     
@@ -270,7 +262,6 @@ def recomendar_artigos(temas_selecionados, df_total, query_text=None, top_n=50):
     recomendados_df = df_total.iloc[similar_indices].copy()
     recomendados_df['similarity'] = cosine_similarities[similar_indices]
     
-    # normalize column names
     if 'titulo' in recomendados_df.columns and 'título' not in recomendados_df.columns:
         recomendados_df = recomendados_df.rename(columns={'titulo': 'título'})
     if 'autor' not in recomendados_df.columns and 'autores' in recomendados_df.columns:
@@ -326,7 +317,7 @@ def search_crossref(query, rows=6):
     for it in data:
         title = " ".join(it.get("title", [])) if it.get("title") else ""
         authors = []
-        for a in it.get("author", [])[:4]:
+        for a in it.get("author", [])[:6]:
             fam = a.get("family") or ""
             given = a.get("given") or ""
             authors.append((given + " " + fam).strip())
@@ -345,6 +336,112 @@ def search_crossref(query, rows=6):
             "resumo": re.sub(r'<[^>]+>', '', abstr) if abstr else ""
         })
     return results
+
+# -------------------------
+# Enriquecer metadados & formatação de detalhe bonitinha
+# -------------------------
+import html as _html
+
+def _safe_strip_html(s):
+    if not s: return ""
+    return re.sub(r'<[^>]+>', '', str(s)).strip()
+
+def _format_authors_field(auth_field):
+    if not auth_field: return "— Autor(es) não informado(s) —"
+    if isinstance(auth_field, (list, tuple)):
+        return "; ".join([str(a).strip() for a in auth_field if a])
+    s = str(auth_field)
+    s = s.replace("|", ";")
+    s = re.sub(r'\s{2,}', ' ', s).strip()
+    return s or "— Autor(es) não informado(s) —"
+
+def enrich_article_metadata(det):
+    """
+    Tenta preencher 'título', 'autor' e 'resumo' em det (dict).
+    1) se tiver doi -> consulta CrossRef
+    2) senão, se tiver url -> tenta extrair og:title / og:description
+    Retorna dict atualizado (modifica in-place também).
+    """
+    if not isinstance(det, dict):
+        return det or {}
+
+    # normalize keys lowercase
+    lower_map = {}
+    for k in list(det.keys()):
+        if isinstance(k, str) and k.lower() != k:
+            lower_map[k.lower()] = det.pop(k)
+    det.update(lower_map)
+
+    titulo = det.get('título') or det.get('title') or det.get('titulo')
+    autor = det.get('autor') or det.get('autores')
+    resumo = det.get('resumo') or det.get('abstract')
+    if titulo and autor and resumo:
+        return det
+
+    doi = det.get('doi') or det.get('DOI') or None
+    if doi:
+        try:
+            doi_clean = str(doi).strip()
+            cr_url = f"https://api.crossref.org/works/{requests.utils.requote_uri(doi_clean)}"
+            r = requests.get(cr_url, timeout=8)
+            if r.status_code == 200:
+                msg = r.json().get("message", {})
+                if not titulo:
+                    t = " ".join(msg.get("title", [])) if msg.get("title") else ""
+                    if t: det['título'] = _safe_strip_html(t)
+                if not autor:
+                    authors = []
+                    for a in msg.get("author", [])[:10]:
+                        given = a.get("given") or ""
+                        fam = a.get("family") or ""
+                        name = (given + " " + fam).strip()
+                        if name:
+                            authors.append(name)
+                    if authors:
+                        det['autor'] = "; ".join(authors)
+                if not resumo:
+                    abstr = msg.get("abstract") or ""
+                    if abstr:
+                        det['resumo'] = _safe_strip_html(abstr)
+        except Exception:
+            pass
+
+    if (not det.get('título') or not det.get('resumo')) and det.get('url'):
+        try:
+            r = requests.get(det.get('url'), timeout=6, headers={"User-Agent": "nugrp-pqr-bot/1.0"})
+            if r.status_code == 200:
+                html_text = r.text
+                if not det.get('título'):
+                    m = re.search(r'<meta[^>]+property=["\']og:title["\'][^>]+content=["\']([^"\']+)["\']', html_text, flags=re.I)
+                    if m:
+                        det['título'] = _html.unescape(m.group(1).strip())
+                    else:
+                        m2 = re.search(r'<title>([^<]+)</title>', html_text, flags=re.I)
+                        if m2:
+                            det['título'] = _html.unescape(m2.group(1).strip())
+                if not det.get('resumo'):
+                    m = re.search(r'<meta[^>]+property=["\']og:description["\'][^>]+content=["\']([^"\']+)["\']', html_text, flags=re.I)
+                    if m:
+                        det['resumo'] = _html.unescape(m.group(1).strip())
+                    else:
+                        m2 = re.search(r'<meta[^>]+name=["\']description["\'][^>]+content=["\']([^"\']+)["\']', html_text, flags=re.I)
+                        if m2:
+                            det['resumo'] = _html.unescape(m2.group(1).strip())
+        except Exception:
+            pass
+
+    if not det.get('título'):
+        det['título'] = det.get('title') or det.get('titulo') or "— Título não disponível —"
+    if not det.get('autor'):
+        det['autor'] = _format_authors_field(det.get('autor') or det.get('autores'))
+    if not det.get('resumo'):
+        det['resumo'] = det.get('abstract') or "Resumo não disponível."
+
+    for k in ('título','autor','resumo'):
+        if k in det and isinstance(det[k], str):
+            det[k] = _safe_strip_html(det[k])
+
+    return det
 
 # -------------------------
 # User / messages / storage
@@ -381,11 +478,8 @@ def get_session_favorites(): return st.session_state.get("favorites", [])
 def add_to_favorites(result_data):
     favorites = get_session_favorites()
     favorite_item = {"id": f"{int(time.time())}_{random.randint(1000,9999)}", "data": result_data, "added_at": datetime.utcnow().isoformat()}
-    
     temp_data_to_check = {k: v for k, v in result_data.items() if k not in ['_artemis_username', 'similarity']}
-    
     existing_contents = [json.dumps({k: v for k, v in fav["data"].items() if k not in ['_artemis_username', 'similarity']}, sort_keys=True) for fav in favorites]
-    
     if json.dumps(temp_data_to_check, sort_keys=True) not in existing_contents:
         favorites.append(favorite_item)
         st.session_state.favorites = favorites
@@ -485,7 +579,7 @@ def delete_message(message_id, username):
     msgs = _local_load_all_messages()
     msg_to_delete = next((m for m in msgs if m.get("id") == message_id and (m.get("to") == username or m.get("from") == username)), None)
     if msg_to_delete:
-        if msg_to_delete.get("attachment", {}).get("path"):
+        if msg_to_delete.get("attachment", {}).get('path'):
             _local_remove_attachment(msg_to_delete["attachment"]["path"])
         new_msgs = [m for m in msgs if m.get("id") != message_id]
         _local_save_all_messages(new_msgs)
@@ -512,7 +606,6 @@ def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=12)
     pdf.add_page()
-    # NOTE: if you need full unicode support, register a TTF and use uni=True (pdf.add_font)
     pdf.set_font("Arial", size=12)
     for linha in (texto or "").split("\n"):
         parts = re.split(r"(==.*?==)", linha)
@@ -724,16 +817,11 @@ if st.session_state.authenticated and not st.session_state.recommendation_onboar
                 for theme in sel:
                     hits = search_crossref(theme, rows=max_per_theme)
                     for h in hits:
-                        h["_artemis_username"] = "web"  # source
+                        h["_artemis_username"] = "web"
                         h["_tema_origem"] = theme
                     all_hits.extend(hits)
             if all_hits:
                 rec_df = pd.DataFrame(all_hits)
-                # normalize names to match app expectations
-                if 'título' in rec_df.columns and 'titulo' not in rec_df.columns:
-                    rec_df = rec_df.rename(columns={'título': 'título'})
-                if 'autor' in rec_df.columns and 'autores' not in rec_df.columns:
-                    rec_df = rec_df.rename(columns={'autor': 'autor'})
                 st.session_state.recommendations = rec_df
                 st.session_state.recommendation_onboarding_complete = True
                 st.session_state.recommendation_page = 1
@@ -855,7 +943,7 @@ elif st.session_state.page == "recomendacoes":
 
     temas_populares = extract_popular_themes_from_data(df_total) if not df_total.empty else []
 
-    # Se onboarding já completou, mostramos refinamento
+    # Se onboarding não completou, mostramos o onboarding (já aplicado no topo também)
     if not st.session_state.recommendation_onboarding_complete:
         if df_total.empty:
             st.warning("Ainda não há dados suficientes para gerar recomendações automaticamente. Use o onboarding no topo para obter recomendações inicial.")
@@ -866,7 +954,7 @@ elif st.session_state.page == "recomendacoes":
             st.write("Selecione tópicos de interesse para encontrarmos artigos para você.")
             temas_selecionados = st.multiselect("Selecione um ou mais temas:", options=temas_populares, key="temas_onboarding")
             
-            if st.button("🔍 Gerar Recomendações"):
+            if st.button("🔍 Gerar Recomendações", key=f"gen_rec_{USERNAME}"):
                 if temas_selecionados:
                     with st.spinner("Buscando..."):
                         if 'titulo' in df_total.columns and 'título' not in df_total.columns:
@@ -884,19 +972,53 @@ elif st.session_state.page == "recomendacoes":
         st.write("Refine suas recomendações ou explore novos temas.")
         
         col1, col2 = st.columns([3, 2])
-        with col1: temas_selecionados = st.multiselect("Selecione temas:", options=temas_populares, key="temas_recomendacao")
-        with col2: palavra_chave = st.text_input("Buscar por palavra-chave:", placeholder="...", key="palavra_chave_recomendacao")
+        with col1:
+            # se df_total vazio, ainda deixamos o usuário digitar temas livres
+            temas_options = temas_populares or []
+            temas_selecionados = st.multiselect("Selecione temas:", options=temas_options, key="temas_recomendacao", help="Se não houver dados locais, use temas livres na caixa ao lado")
+        with col2:
+            palavra_chave = st.text_input("Buscar por palavra-chave (ou escreva qualquer tema):", placeholder="ex.: documentação participativa", key="palavra_chave_recomendacao")
 
         if st.button("🔍 Buscar Recomendações", use_container_width=True, key=f"btn_recom_search_{USERNAME}"):
             if temas_selecionados or palavra_chave:
                 with st.spinner("Analisando..."):
-                    if 'titulo' in df_total.columns and 'título' not in df_total.columns:
-                        df_total = df_total.rename(columns={'titulo': 'título'})
-                    
-                    recommended_df = recomendar_artigos(temas_selecionados, df_total, palavra_chave)
-                    st.session_state.recommendations = recommended_df
+                    # Primeiro: se existem dados locais, usamos TF-IDF sobre df_total
+                    if not df_total.empty:
+                        # se usuário não selecionou temas mas digitou palavra-chave -> usar a palavra-chave como query
+                        q_parts = temas_selecionados[:] if temas_selecionados else []
+                        if palavra_chave: q_parts.append(palavra_chave)
+                        recommended_df = recomendar_artigos(q_parts, df_total, palavra_chave if palavra_chave else None)
+                        # se resultado estiver vazio, fallback para busca web
+                        if recommended_df.empty:
+                            # fallback web
+                            hits = []
+                            queries = temas_selecionados if temas_selecionados else ([palavra_chave] if palavra_chave else [])
+                            for q in queries:
+                                hits += search_crossref(q, rows=6)
+                            if palavra_chave and not temas_selecionados:
+                                hits += search_crossref(palavra_chave, rows=6)
+                            for h in hits:
+                                h["_artemis_username"] = "web"
+                            rec_df = pd.DataFrame(hits) if hits else pd.DataFrame()
+                            st.session_state.recommendations = rec_df
+                        else:
+                            st.session_state.recommendations = recommended_df
+                    else:
+                        # não há dados locais -> buscar na web via CrossRef
+                        hits = []
+                        if temas_selecionados:
+                            for t in temas_selecionados:
+                                hits += search_crossref(t, rows=6)
+                        if palavra_chave:
+                            hits += search_crossref(palavra_chave, rows=6)
+                        for h in hits:
+                            h["_artemis_username"] = "web"
+                        rec_df = pd.DataFrame(hits) if hits else pd.DataFrame()
+                        st.session_state.recommendations = rec_df
+
                     st.session_state.recommendation_page = 1
                     st.session_state.recommendation_view_index = None
+                    st.session_state.recommendation_onboarding_complete = True
                     safe_rerun()
             else:
                 st.warning("Selecione um tema ou digite uma palavra-chave.")
@@ -904,24 +1026,31 @@ elif st.session_state.page == "recomendacoes":
     results_df = st.session_state.get('recommendations', pd.DataFrame())
     
     if not results_df.empty:
+        # view individual recommendation (index in session is index of results_df)
         if st.session_state.get("recommendation_view_index") is not None:
             vi = st.session_state.recommendation_view_index
             if 0 <= vi < len(results_df):
                 det = results_df.iloc[vi].to_dict()
+                det = enrich_article_metadata(det)
+
                 st.markdown("### 📄 Detalhes do Artigo Recomendado")
                 if st.button("⬅️ Voltar para a lista", key=f"rec_back_{USERNAME}"):
                     st.session_state.recommendation_view_index = None
                     safe_rerun()
 
-                for campo in ['título', 'autor', 'ano', 'tema', 'resumo']:
-                    if campo in det and pd.notna(det[campo]):
-                        st.markdown(f"**{campo.capitalize()}:** {escape_html(str(det[campo]))}")
-                
-                st.markdown("**Outras informações:**")
-                for k, v in det.items():
-                    if k not in ['similarity', 'corpus', 'título', 'autor', 'ano', 'tema', 'resumo'] and pd.notna(v):
-                        st.markdown(f"- **{str(k).capitalize()}:** {escape_html(str(v))}")
-                
+                # título / subtítulo
+                st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
+                st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— Não informado —'))} • _Ano:_ {escape_html(str(det.get('ano', det.get('year','— —'))))}")
+                st.markdown("---")
+                st.markdown("**Resumo**")
+                st.markdown(escape_html(det.get('resumo', 'Resumo não disponível.')))
+                st.markdown("---")
+                if det.get('doi'):
+                    doi_link = f"https://doi.org/{det.get('doi')}"
+                    st.markdown(f"[🔗 Abrir DOI]({doi_link})")
+                elif det.get('url'):
+                    st.markdown(f"[🔗 Ir para fonte]({det.get('url')})")
+
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
                     if st.button("⭐ Adicionar aos Favoritos", use_container_width=True, key=f"fav_detail_rec_{vi}_{USERNAME}"):
@@ -947,6 +1076,7 @@ elif st.session_state.page == "recomendacoes":
                 initials = "".join([p[0] for p in str(user_src).split()[:2]]).upper() or "U"
                 title = str(row.get('título') or row.get('titulo') or '(Sem título)')
                 similarity = row.get('similarity', 0)
+                author_snippet = row.get('autor') or ""
                 
                 st.markdown(f"""
                 <div class="card">
@@ -954,7 +1084,7 @@ elif st.session_state.page == "recomendacoes":
                         <div class="avatar" style="background:#6c5ce7; color:white; font-weight:bold;">{escape_html(initials)}</div>
                         <div style="flex:1;">
                             <div class="card-title">{escape_html(title)}</div>
-                            <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • Similaridade: <strong>{similarity:.2f}</strong></div>
+                            <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • {escape_html(author_snippet)}</div>
                         </div>
                     </div>
                 </div>""", unsafe_allow_html=True)
@@ -986,6 +1116,14 @@ elif st.session_state.page == "recomendacoes":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+# (rest of pages: mapa, anotacoes, graficos, busca, mensagens, config)...
+# For brevity and correctness, the rest of the file below is the same as previously provided,
+# but with detail rendering enhanced to call enrich_article_metadata() where appropriate
+# and with node font color forced to white in the mapa section.
+
+# -------------------------
+# Mapa (com texto branco garantido)
+# -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("🞠 Mapa de Ideias Editável")
@@ -1057,8 +1195,7 @@ elif st.session_state.page == "mapa":
         for node_id, data in G.nodes(data=True):
             node_args = data.copy()
             node_args['id'] = node_id
-            node_args.pop('tipo', None) # CORREÇÃO DO TypeError
-            # garante texto branco nos labels do mapa
+            node_args.pop('tipo', None)
             if 'font' not in node_args:
                 node_args['font'] = {"color": "#FFFFFF", "size": 16}
             else:
@@ -1225,10 +1362,13 @@ elif st.session_state.page == "busca":
                 vi = int(st.session_state.search_view_index)
                 if 0 <= vi < len(results_df):
                     det = results_df.loc[vi].to_dict()
+                    det = enrich_article_metadata(det)
                     origin_user = det.get("_artemis_username", "N/A")
                     st.markdown("## Detalhes do Registro")
-                    for k, v in det.items():
-                        if k != "_artemis_username": st.markdown(f"- **{escape_html(k)}:** {escape_html(v)}")
+                    st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
+                    st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— —'))} • _Ano:_ {escape_html(str(det.get('ano', '—')))}")
+                    st.markdown("---")
+                    st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
                     st.markdown("---")
                     st.markdown("### ✉️ Contatar autor")
                     if origin_user != "N/A":
@@ -1272,8 +1412,12 @@ elif st.session_state.page == "busca":
                         remove_from_favorites(fav['id']); safe_rerun()
             if 'fav_detail' in st.session_state and st.session_state.fav_detail:
                 det = st.session_state.pop("fav_detail")
+                det = enrich_article_metadata(det)
                 st.markdown("## Detalhes do Favorito")
-                for k, v in det.items(): st.markdown(f"- **{escape_html(k)}:** {escape_html(v)}")
+                st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
+                st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— —'))}")
+                st.markdown("---")
+                st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
 
     st.markdown("</div>", unsafe_allow_html=True)
 
