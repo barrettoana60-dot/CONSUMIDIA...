@@ -183,7 +183,7 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
 # -------------------------
 # Funções de Busca & Recomendação
 # -------------------------
-@st.cache_data(ttl=600) # Cache para não re-processar a cada clique
+@st.cache_data(ttl=600)
 def collect_latest_backups():
     """
     Scans the BACKUPS_DIR, finds all user backup CSVs,
@@ -191,6 +191,8 @@ def collect_latest_backups():
     """
     all_dfs = []
     base_path = Path(BACKUPS_DIR)
+    
+    # Garantir que o diretório existe
     if not base_path.exists():
         return pd.DataFrame()
 
@@ -200,8 +202,10 @@ def collect_latest_backups():
             for csv_file in user_dir.glob("*.csv"):
                 try:
                     df_temp = pd.read_csv(csv_file)
-                    df_temp['_artemis_username'] = username
-                    all_dfs.append(df_temp)
+                    # Verificar se o DataFrame não está vazio
+                    if not df_temp.empty:
+                        df_temp['_artemis_username'] = username
+                        all_dfs.append(df_temp)
                 except Exception as e:
                     print(f"Skipping unreadable backup {csv_file}: {e}")
                     continue
@@ -209,7 +213,11 @@ def collect_latest_backups():
     if not all_dfs:
         return pd.DataFrame()
 
-    return pd.concat(all_dfs, ignore_index=True)
+    try:
+        return pd.concat(all_dfs, ignore_index=True)
+    except Exception as e:
+        print(f"Error concatenating DataFrames: {e}")
+        return pd.DataFrame()
 
 def highlight_search_terms(text, query):
     if not query or not text or not isinstance(text, str):
@@ -225,7 +233,7 @@ def highlight_search_terms(text, query):
     )
     return highlighted_text
 
-def recomendar_artigos(temas_selecionados, df_total, top_n=50): # Aumentado para ter mais resultados para paginar
+def recomendar_artigos(temas_selecionados, df_total, query_text=None, top_n=50):
     """
     Recomenda artigos de um DataFrame com base em temas, usando TF-IDF e similaridade de cosseno.
     """
@@ -233,7 +241,7 @@ def recomendar_artigos(temas_selecionados, df_total, top_n=50): # Aumentado para
         st.error("Bibliotecas de Machine Learning (scikit-learn) não estão instaladas. A recomendação não funcionará.")
         return pd.DataFrame()
 
-    if df_total.empty or not temas_selecionados:
+    if df_total.empty or (not temas_selecionados and not query_text):
         return pd.DataFrame()
 
     corpus_series = pd.Series([''] * len(df_total), index=df_total.index, dtype=str)
@@ -254,8 +262,15 @@ def recomendar_artigos(temas_selecionados, df_total, top_n=50): # Aumentado para
     vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
     tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
     
-    query_text = ' '.join(temas_selecionados).lower()
-    query_vector = vectorizer.transform([query_text])
+    # Combinar temas selecionados e query_text
+    query_parts = []
+    if temas_selecionados:
+        query_parts.extend(temas_selecionados)
+    if query_text:
+        query_parts.append(query_text)
+    
+    query_final = ' '.join(query_parts).lower()
+    query_vector = vectorizer.transform([query_final])
     
     cosine_similarities = cosine_similarity(query_vector, tfidf_matrix).flatten()
     
@@ -285,23 +300,23 @@ PORTUGUESE_STOP_WORDS = [
     'teu', 'tua', 'teus', 'tuas', 'nosso', 'nossa', 'nossos', 'nossas', 'dela',
     'delas', 'esta', 'estes', 'estas', 'aquele', 'aquela', 'aqueles', 'aquelas',
     'isto', 'aquilo', 'estou', 'está', 'estamos', 'estão', 'estive', 'esteve',
-    'estivemos', 'estiveram', 'estava', 'estávamos', 'estavam', 'estivera',
-    'estivéramos', 'esteja', 'estejamos', 'estejam', 'estivesse', 'estivéssemos',
-    'estivessem', 'estiver', 'estivermos', 'estiverem', 'hei', 'há', 'havemos',
-    'hão', 'houve', 'houvemos', 'houveram', 'houvera', 'houvéramos', 'haja',
-    'hajamos', 'hajam', 'houvesse', 'houvéssemos', 'houvessem', 'houver',
-    'houvermos', 'houverem', 'houverei', 'houverá', 'houveremos', 'houverão',
-    'houveria', 'houveríamos', 'houveriam', 'sou', 'somos', 'são', 'era', 'éramos',
-    'eram', 'fui', 'foi', 'fomos', 'foram', 'fora', 'fôramos', 'seja', 'sejamos',
-    'sejam', 'fosse', 'fôssemos', 'fossem', 'for', 'formos', 'forem', 'serei',
-    'será', 'seremos', 'serão', 'seria', 'seríamos', 'seriam', 'tenho', 'tem',
-    'temos', 'tém', 'tinha', 'tínhamos', 'tinham', 'tive', 'teve', 'tivemos',
-    'tiveram', 'tivera', 'tivéramos', 'tenha', 'tenhamos', 'tenham', 'tivesse',
-    'tivéssemos', 'tivessem', 'tiver', 'tivermos', 'tiverem', 'terei', 'terá',
-    'teremos', 'terão', 'teria', 'teríamos', 'teriam'
+    'estivemos', 'estiveram', 'estivera', 'estivéramos', 'esteja', 'estejamos',
+    'estejam', 'estivesse', 'estivéssemos', 'estivessem', 'estiver', 'estivermos',
+    'estiverem', 'hei', 'há', 'havemos', 'hão', 'houve', 'houvemos', 'houveram',
+    'houvera', 'houvéramos', 'haja', 'hajamos', 'hajam', 'houvesse', 'houvéssemos',
+    'houvessem', 'houver', 'houvermos', 'houverem', 'houverei', 'houverá',
+    'houveremos', 'houverão', 'houveria', 'houveríamos', 'houveriam', 'sou',
+    'somos', 'são', 'era', 'éramos', 'eram', 'fui', 'foi', 'fomos', 'foram',
+    'fora', 'fôramos', 'seja', 'sejamos', 'sejam', 'fosse', 'fôssemos', 'fossem',
+    'for', 'formos', 'forem', 'serei', 'será', 'seremos', 'serão', 'seria',
+    'seríamos', 'seriam', 'tenho', 'tem', 'temos', 'tém', 'tinha', 'tínhamos',
+    'tinham', 'tive', 'teve', 'tivemos', 'tiveram', 'tivera', 'tivéramos',
+    'tenha', 'tenhamos', 'tenham', 'tivesse', 'tivéssemos', 'tivessem', 'tiver',
+    'tivermos', 'tiverem', 'terei', 'terá', 'teremos', 'terão', 'teria',
+    'teríamos', 'teriam'
 ]
 
-@st.cache_data(ttl=600) # Cache para não re-processar a cada clique
+@st.cache_data(ttl=600)
 def extract_popular_themes_from_data(df_total, top_n=30):
     """
     Extrai os temas/palavras-chave mais populares de um DataFrame consolidado usando TF-IDF.
@@ -341,7 +356,6 @@ def extract_popular_themes_from_data(df_total, top_n=30):
         print(f"Erro ao extrair temas populares: {e}")
         return []
 
-# ... (O resto das funções de `load_users` até `generate_pdf_with_highlights` permanece o mesmo) ...
 def load_users():
     if _supabase:
         return None
@@ -612,6 +626,7 @@ _defaults = {
     "tutorial_completed": False, 
     # NOVOS ESTADOS PARA A PÁGINA DE RECOMENDAÇÕES
     "recommendations": pd.DataFrame(), "recommendation_page": 1, "recommendation_view_index": None,
+    "recommendation_onboarding_complete": False,
     "settings": {
         "plot_height": 720,
         "font_scale": 1.0,
@@ -622,7 +637,6 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
-# ... (O resto do código até a definição da página "recomendacoes" permanece o mesmo) ...
 def get_settings():
     return st.session_state.get("settings", _defaults["settings"])
 
@@ -648,7 +662,8 @@ def save_user_state_minimal(USER_STATE):
             "favorites": st.session_state.get("favorites", []),
             "settings": st.session_state.get("settings", {}),
             "last_backup_path": st.session_state.get("last_backup_path"),
-            "tutorial_completed": st.session_state.get("tutorial_completed", False) # Salva o estado do tutorial
+            "tutorial_completed": st.session_state.get("tutorial_completed", False), # Salva o estado do tutorial
+            "recommendation_onboarding_complete": st.session_state.get("recommendation_onboarding_complete", False)
         }
         clean_data = clean_for_json(data)
 
@@ -758,6 +773,7 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
         st.session_state.favorites = meta.get("favorites", st.session_state.favorites)
         st.session_state.last_backup_path = meta.get("last_backup_path", st.session_state.last_backup_path)
         st.session_state.tutorial_completed = meta.get("tutorial_completed", False) # Restaura o estado do tutorial
+        st.session_state.recommendation_onboarding_complete = meta.get("recommendation_onboarding_complete", False)
         
         if "settings" in meta:
             st.session_state.settings.update(meta.get("settings", {}))
@@ -796,7 +812,7 @@ if "last_unread_count" not in st.session_state:
     st.session_state.last_unread_count = 0
 if UNREAD_COUNT > st.session_state.last_unread_count:
     try:
-        st.toast(f"Você tem {UNREAD_COUNT} nova(s) mensagem(ns) não lida(s).", icon="✉️")
+        st.toast(f"Você tem {UNREAD_COUNT} nova(s) mensagem(n) não lida(s).", icon="✉️")
     except Exception:
         pass
 st.session_state.last_unread_count = UNREAD_COUNT
@@ -936,61 +952,104 @@ if st.session_state.page == "planilha":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ----------------------------------------------------
-# Page: Recomendações (NOVA VERSÃO COM BUSCA LIVRE)
-# ----------------------------------------------------
+# -------------------------
+# Page: Recomendações (VERSÃO CORRIGIDA COM BUSCA POR PALAVRA-CHAVE)
+# -------------------------
 elif st.session_state.page == "recomendacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("💡 Recomendações de Artigos")
 
-    # Coleta os dados uma vez
-    with st.spinner("Analisando o conhecimento da plataforma..."):
-        df_total = collect_latest_backups()
-    
-    temas_populares = extract_popular_themes_from_data(df_total, top_n=50)
+    # Coleta os dados com tratamento de erro
+    try:
+        with st.spinner("Analisando o conhecimento da plataforma..."):
+            df_total = collect_latest_backups()
+            # Garantir que df_total seja um DataFrame válido
+            if df_total is None:
+                df_total = pd.DataFrame()
+    except Exception as e:
+        st.error(f"Erro ao carregar dados: {e}")
+        df_total = pd.DataFrame()
 
-    # Lógica de Onboarding (primeira visita) - Mantida simples
-    if 'recommendation_onboarding_complete' not in st.session_state:
-        st.session_state.recommendation_onboarding_complete = False
+    # Extrair temas populares apenas se houver dados
+    temas_populares = []
+    if not df_total.empty:
+        try:
+            temas_populares = extract_popular_themes_from_data(df_total, top_n=50)
+        except Exception as e:
+            st.error(f"Erro ao extrair temas: {e}")
+            temas_populares = []
 
-    if not temas_populares:
-        st.warning("Ainda não há dados de outros usuários para gerar recomendações. Carregue uma planilha para começar!")
-    
-    # <-- MUDANÇA: Interface principal de busca e recomendação
-    st.write("Encontre artigos e trabalhos de outros pesquisadores.")
-    
-    # Campo para digitar palavras-chave livremente
-    palavras_chave = st.text_input(
-        "Digite palavras de interesse (autor, tema, etc.)", 
-        placeholder="Ex: 'inteligência artificial', 'museus', 'Santos Dumont'"
-    )
+    # Lógica de Onboarding (primeira visita)
+    if not st.session_state.recommendation_onboarding_complete:
 
-    # Expander para selecionar temas populares
-    with st.expander("Ou selecione temas populares para refinar a busca"):
-        temas_selecionados_multi = st.multiselect(
-            "Selecione um ou mais temas:", options=temas_populares, key="temas_recomendacao"
-        )
-
-    if st.button("🔎 Buscar Recomendações"):
-        # Combina as palavras-chave do text_input com os temas do multiselect
-        termos_de_busca = temas_selecionados_multi
-        if palavras_chave:
-            # Adiciona as palavras do input de texto, separando por espaço ou vírgula
-            termos_de_busca.extend([p.strip() for p in re.split(r'[,\s]+', palavras_chave) if p.strip()])
-
-        if termos_de_busca:
-            with st.spinner("Analisando artigos..."):
-                df_total.rename(columns={'titulo': 'título'}, inplace=True, errors='ignore')
-                recommended_df = recomendar_artigos(termos_de_busca, df_total)
-                st.session_state.recommendations = recommended_df
-                st.session_state.recommendation_page = 1
-                st.session_state.recommendation_view_index = None
-                st.session_state.recommendation_onboarding_complete = True # Marca onboarding como completo após a primeira busca
-                safe_rerun()
+        if df_total.empty:
+            st.warning("""
+            Ainda não há dados suficientes para gerar recomendações. 
+            
+            Para começar:
+            1. Carregue uma planilha na aba **📄 Planilha**
+            2. Ou aguarde até que outros usuários compartilhem seus dados
+            """)
+        elif not temas_populares:
+            st.warning("Não foi possível identificar temas populares nos dados disponíveis.")
         else:
-            st.error("Por favor, digite uma palavra-chave ou selecione um tema.")
+            st.markdown("#### Bem-vindo à Descoberta Inteligente!")
+            st.write("Selecione alguns tópicos de seu interesse para encontrarmos os melhores artigos para você.")
+            
+            temas_selecionados = st.multiselect(
+                "Selecione um ou mais temas:", options=temas_populares, key="temas_onboarding"
+            )
+            
+            if st.button("🔍 Gerar minhas primeiras recomendações"):
+                if temas_selecionados:
+                    with st.spinner("Buscando as melhores recomendações..."):
+                        # Garantir nomes de colunas consistentes
+                        if 'titulo' in df_total.columns and 'título' not in df_total.columns:
+                            df_total = df_total.rename(columns={'titulo': 'título'})
+                        
+                        recommended_df = recomendar_artigos(temas_selecionados, df_total)
+                        st.session_state.recommendations = recommended_df
+                        st.session_state.recommendation_page = 1
+                        st.session_state.recommendation_view_index = None
+                        st.session_state.recommendation_onboarding_complete = True
+                        safe_rerun()
+                else:
+                    st.error("Por favor, selecione pelo menos um tema.")
+    else:
+        # Interface principal após o onboarding - COM BUSCA POR PALAVRA-CHAVE
+        st.write("Refine suas recomendações ou explore novos temas.")
+        
+        col1, col2 = st.columns([3, 2])
+        with col1:
+            temas_selecionados = st.multiselect(
+                "Selecione temas de interesse:", options=temas_populares, key="temas_recomendacao"
+            )
+        with col2:
+            # Campo de busca por palavra-chave
+            palavra_chave = st.text_input(
+                "🔍 Buscar por palavra-chave:",
+                placeholder="Digite palavras de interesse...",
+                key="palavra_chave_recomendacao"
+            )
 
-    # Exibição dos resultados (estilo página de busca)
+        col1, col2 = st.columns([1, 4])
+        with col1:
+            if st.button("🔍 Buscar Recomendações", use_container_width=True):
+                if temas_selecionados or palavra_chave:
+                    with st.spinner("Analisando artigos..."):
+                        # Garantir nomes de colunas consistentes
+                        if 'titulo' in df_total.columns and 'título' not in df_total.columns:
+                            df_total = df_total.rename(columns={'titulo': 'título'})
+                        
+                        recommended_df = recomendar_artigos(temas_selecionados, df_total, palavra_chave)
+                        st.session_state.recommendations = recommended_df
+                        st.session_state.recommendation_page = 1
+                        st.session_state.recommendation_view_index = None
+                        safe_rerun()
+                else:
+                    st.warning("Selecione pelo menos um tema ou digite uma palavra-chave.")
+
+    # Exibição dos resultados
     results_df = st.session_state.get('recommendations', pd.DataFrame())
     
     if not results_df.empty:
@@ -998,22 +1057,42 @@ elif st.session_state.page == "recomendacoes":
         if st.session_state.get("recommendation_view_index") is not None:
             vi = st.session_state.recommendation_view_index
             if 0 <= vi < len(results_df):
-                det = results_df.loc[vi].to_dict()
+                det = results_df.iloc[vi].to_dict()
                 st.markdown("---")
-                st.markdown("### Detalhes do Artigo Recomendado")
+                st.markdown("### 📄 Detalhes do Artigo Recomendado")
 
                 if st.button("⬅️ Voltar para a lista"):
                     st.session_state.recommendation_view_index = None
                     safe_rerun()
 
-                for k, v in det.items():
-                    if k not in ['similarity', 'corpus']:
-                        st.markdown(f"**{str(k).capitalize()}:** {escape_html(v)}")
+                # Exibir campos principais primeiro
+                campos_principais = ['título', 'autor', 'ano', 'tema', 'resumo']
+                for campo in campos_principais:
+                    if campo in det and pd.notna(det[campo]) and det[campo] != '':
+                        st.markdown(f"**{campo.capitalize()}:** {escape_html(str(det[campo]))}")
                 
                 st.markdown("---")
-                if st.button("⭐ Favoritar este artigo", key=f"fav_detail_rec_{vi}"):
-                    if add_to_favorites(det): st.toast("Adicionado aos favoritos!", icon="⭐")
-                    else: st.toast("Já está nos favoritos.")
+                
+                # Exibir outros campos
+                st.markdown("**Outras informações:**")
+                for k, v in det.items():
+                    if k not in ['similarity', 'corpus'] + campos_principais and pd.notna(v) and v != '':
+                        st.markdown(f"- **{str(k).capitalize()}:** {escape_html(str(v))}")
+                
+                st.markdown("---")
+                
+                # Botões de ação
+                col_btn1, col_btn2 = st.columns(2)
+                with col_btn1:
+                    if st.button("⭐ Adicionar aos Favoritos", use_container_width=True, key=f"fav_detail_rec_{vi}"):
+                        if add_to_favorites(det): 
+                            st.toast("Adicionado aos favoritos!", icon="⭐")
+                        else: 
+                            st.toast("Este artigo já está nos favoritos.")
+                with col_btn2:
+                    if st.button("📝 Ver Anotações", use_container_width=True, key=f"notes_rec_{vi}"):
+                        st.session_state.page = "anotacoes"
+                        safe_rerun()
 
         # Exibição da lista paginada
         else:
@@ -1027,53 +1106,71 @@ elif st.session_state.page == "recomendacoes":
             page_df = results_df.iloc[start:end]
 
             st.markdown("---")
-            st.markdown(f"**{total}** artigo(s) recomendado(s) — exibindo {start+1} a {end}.")
+            st.markdown(f"**🎯 {total}** artigo(s) recomendado(s) — exibindo {start+1} a {end}.")
 
-            for i in page_df.index:
-                row = results_df.loc[i]
+            for i, (idx, row) in enumerate(page_df.iterrows()):
                 user_src = row.get("_artemis_username", "N/A")
                 initials = "".join([p[0].upper() for p in str(user_src).split()[:2]])[:2] or "U"
-                title = str(row.get('título', '(Sem título)'))
+                
+                # Obter título de forma segura
+                title = str(row.get('título') or row.get('titulo') or '(Sem título)')
+                similarity = row.get('similarity', 0)
                 
                 card_html = f"""
                 <div class="card">
-                    <div class="card-title">{escape_html(title)}</div>
-                    <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • Similaridade: {row.get('similarity', 0):.2f}</div>
+                    <div style="display:flex; gap:12px; align-items:flex-start;">
+                        <div class="avatar" style="background:#6c5ce7; color:white; font-weight:bold;">{escape_html(initials)}</div>
+                        <div style="flex:1;">
+                            <div class="card-title">{escape_html(title)}</div>
+                            <div class="small-muted">
+                                De <strong>{escape_html(user_src)}</strong> • 
+                                Similaridade: <strong>{similarity:.2f}</strong>
+                            </div>
+                        </div>
+                    </div>
                 </div>"""
                 st.markdown(card_html, unsafe_allow_html=True)
 
                 b_col1, b_col2 = st.columns([1, 1])
                 with b_col1:
-                    if st.button("⭐ Favoritar", key=f"fav_rec_{i}", use_container_width=True):
-                        if add_to_favorites(row.to_dict()): st.toast("Adicionado aos favoritos!", icon="⭐")
-                        else: st.toast("Já está nos favoritos.")
+                    if st.button("⭐ Favoritar", key=f"fav_rec_{idx}", use_container_width=True):
+                        if add_to_favorites(row.to_dict()): 
+                            st.toast("Adicionado aos favoritos!", icon="⭐")
+                        else: 
+                            st.toast("Já está nos favoritos.")
                 with b_col2:
-                    if st.button("🔎 Ver detalhes", key=f"view_rec_{i}", use_container_width=True):
-                        st.session_state.recommendation_view_index = i
+                    if st.button("🔎 Ver detalhes", key=f"view_rec_{idx}", use_container_width=True):
+                        st.session_state.recommendation_view_index = idx
                         safe_rerun()
+                
+                if i < len(page_df) - 1:
+                    st.markdown("---")
             
             # Paginação
             st.markdown("---")
             p1, p2, p3 = st.columns([1, 1, 1])
             with p1:
-                if st.button("◀ Anterior", key="rec_prev", disabled=(page <= 1)):
+                if st.button("◀ Anterior", key="rec_prev", disabled=(page <= 1), use_container_width=True):
                     st.session_state.recommendation_page -= 1
                     safe_rerun()
             with p2:
                 st.markdown(f"<div style='text-align:center; padding-top:8px'><b>Página {page} / {max_pages}</b></div>", unsafe_allow_html=True)
             with p3:
-                if st.button("Próxima ▶", key="rec_next", disabled=(page >= max_pages)):
+                if st.button("Próxima ▶", key="rec_next", disabled=(page >= max_pages), use_container_width=True):
                     st.session_state.recommendation_page += 1
                     safe_rerun()
 
+    elif st.session_state.recommendation_onboarding_complete and st.session_state.get('recommendations') is not None:
+        st.info("Nenhum resultado encontrado para os temas selecionados. Tente outros temas.")
+
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ----------------------------------------------------
-# Page: Mapa Mental (NOVA VERSÃO COM ESTILO ATUALIZADO)
-# ----------------------------------------------------
+# -------------------------
+# Page: Mapa Mental (MODELO ANARCHES)
+# -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🞠 Mapa Mental Interativo")
+    st.subheader("🞠 Mapa Mental Interativo - Modelo ANARCHES")
     st.info("Clique e arraste os nós para organizar o mapa. Clique em um nó para ver seus detalhes e conexões.")
     
     G = st.session_state.get("G", nx.Graph())
@@ -1086,7 +1183,7 @@ elif st.session_state.page == "mapa":
             with st.form("create_node_form", clear_on_submit=True):
                 st.write("**1. Criar Novo Nó**")
                 new_node_label = st.text_input("Rótulo do nó")
-                new_node_type = st.selectbox("Tipo do nó", options=["Autor", "Tema", "Ano", "País", "Título"])
+                new_node_type = st.selectbox("Tipo do nó", options=["Autor", "Tema", "Ano", "País", "Título", "Conceito", "Ideia"])
                 if st.form_submit_button("➕ Criar Nó"):
                     if new_node_label and new_node_type:
                         node_id = f"{new_node_type}: {new_node_label.strip()}"
@@ -1113,39 +1210,83 @@ elif st.session_state.page == "mapa":
                         else: st.info("Esses nós já estão conectados.")
                     else: st.warning("Selecione dois nós diferentes para conectar.")
 
-    # Renderização do mapa mental
+    # Renderização do mapa mental - MODELO ANARCHES
     if G.number_of_nodes() > 0:
         nodes = []
         edges = []
         
-        # <-- MUDANÇA: Estilo dos nós (nodes) atualizado para o novo modelo
-        for node_id, data in G.nodes(data=True):
-            nodes.append(Node(id=node_id, 
-                               label=data.get("label", node_id), 
-                               shape="box",
-                               font={"color": "#343434", "size": 16},
-                               color="#E0B0FF", # Cor de fundo roxo claro
-                               borderWidth=1,
-                               # borderRadius=10 # Infelizmente, agraph não suporta esta propriedade diretamente
-                               ))
+        # Cores do modelo ANARCHES
+        node_colors = {
+            "Autor": "#FF6B6B",      # Vermelho
+            "Tema": "#4ECDC4",       # Turquesa  
+            "Ano": "#45B7D1",        # Azul
+            "País": "#96CEB4",       # Verde
+            "Título": "#FFEAA7",     # Amarelo
+            "Conceito": "#DDA0DD",   # Lilás
+            "Ideia": "#98D8C8"       # Verde água
+        }
         
-        # <-- MUDANÇA: Estilo das conexões (edges) atualizado para o novo modelo
+        # Tamanhos diferentes para hierarquia visual
+        node_sizes = {
+            "Tema": 25,
+            "Conceito": 22,
+            "Ideia": 20,
+            "Título": 18,
+            "Autor": 16,
+            "Ano": 14,
+            "País": 14
+        }
+        
+        for node_id, data in G.nodes(data=True):
+            node_type = data.get("tipo", "Tema")
+            color = node_colors.get(node_type, "#E0B0FF")
+            size = node_sizes.get(node_type, 20)
+            
+            nodes.append(Node(
+                id=node_id, 
+                label=data.get("label", node_id), 
+                size=size,
+                shape="box",
+                font={"color": "#2C3E50", "size": 14, "face": "Arial", "weight": "bold"},
+                color=color,
+                borderWidth=3,
+                borderColor="#34495E",
+                borderRadius=15,
+                shadow=True,
+                mass=2
+            ))
+            
         for u, v in G.edges():
-            edges.append(Edge(source=u, 
-                              target=v, 
-                              color="#C9A0DC", 
-                              width=2,
-                              smooth={'enabled': True, 'type': 'curvedCW', 'roundness': 0.2} # Deixa as setas curvas
-                              ))
+            edges.append(Edge(
+                source=u, 
+                target=v, 
+                color="#7F8C8D", 
+                width=2,
+                dashes=False,
+                physics=True
+            ))
 
-        # Configurações de layout e física do mapa
-        config = Config(width="100%", 
-                        height=600, 
-                        directed=False, 
-                        physics=True, 
-                        hierarchical=False,
-                        layout={"improvedLayout": True},
-                        interaction={"navigationButtons": True, "keyboard": True})
+        # Configurações de layout ANARCHES
+        config = Config(
+            width="100%", 
+            height=700, 
+            directed=False, 
+            physics=True, 
+            hierarchical=False,
+            layout={"improvedLayout": True},
+            interaction={
+                "navigationButtons": True, 
+                "keyboard": True,
+                "dragView": True,
+                "zoomView": True
+            },
+            nodes={
+                "shapeProperties": {
+                    "useBorderWithImage": True,
+                    "borderRadius": 15
+                }
+            }
+        )
 
         # O componente agraph retorna o ID do nó clicado
         clicked_node_id = agraph(nodes=nodes, edges=edges, config=config)
@@ -1181,19 +1322,18 @@ elif st.session_state.page == "mapa":
         st.write("**Conectado a:**")
         if neighbors:
             for neighbor in sorted(neighbors):
-                neighbor_label = G.nodes[neighbor].get('label', neighbor)
-                st.markdown(f"- {neighbor_label}")
+                neighbor_data = G.nodes[neighbor]
+                neighbor_label = neighbor_data.get('label', neighbor)
+                neighbor_type = neighbor_data.get('tipo', 'N/A')
+                st.markdown(f"- **{neighbor_type}:** {neighbor_label}")
         else:
             st.write("Este nó não possui conexões.")
 
     st.markdown("</div>", unsafe_allow_html=True)
     
-
 # -------------------------
-# O restante do código permanece o mesmo
+# Page: Anotações
 # -------------------------
-
-# ... (Page: Anotações) ...
 elif st.session_state.page == "anotacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Anotações com Marca-texto")
@@ -1204,7 +1344,9 @@ elif st.session_state.page == "anotacoes":
     st.download_button("Baixar Anotações (PDF)", data=pdf_bytes, file_name="anotacoes_nugep_pqr.pdf", mime="application/pdf")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ... (Page: Gráficos) ...
+# -------------------------
+# Page: Gráficos
+# -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Gráficos Personalizados")
@@ -1230,7 +1372,9 @@ elif st.session_state.page == "graficos":
                 st.error(f"Erro ao gerar gráficos: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ... (Page: Busca) ...
+# -------------------------
+# Page: Busca
+# -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
     tab_busca, tab_favoritos = st.tabs([f"🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"])
@@ -1450,7 +1594,9 @@ elif st.session_state.page == "busca":
                         safe_rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
-# ... (Page: Mensagens) ...
+# -------------------------
+# Page: Mensagens
+# -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("✉️ Mensagens")
@@ -1577,7 +1723,9 @@ elif st.session_state.page == "mensagens":
 
     st.markdown("</div>", unsafe_allow_html=True)
     
-# ... (Page: Configurações) ...
+# -------------------------
+# Page: Configurações
+# -------------------------
 elif st.session_state.page == "config":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("⚙️ Configurações")
