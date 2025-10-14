@@ -1,4 +1,5 @@
-# NUGEP-PQR — versão atualizada (corrige busca por novos temas; fallback web; metadados enriquecidos)
+# app_nugep_pqr_full.py
+# NUGEP-PQR — versão completa com Favoritos integrado na página "Recomendações"
 import os
 import re
 import io
@@ -8,9 +9,6 @@ import random
 import string
 import unicodedata
 import html
-import math
-import base64
-import hashlib
 from pathlib import Path
 from datetime import datetime
 
@@ -33,6 +31,14 @@ except Exception:
     joblib = None
     TfidfVectorizer = None
     cosine_similarity = None
+
+# bcrypt for password hashing
+try:
+    import bcrypt
+    BCRYPT_AVAILABLE = True
+except Exception:
+    bcrypt = None
+    BCRYPT_AVAILABLE = False
 
 # -------------------------
 # Config & helpers
@@ -79,6 +85,7 @@ body { transition: background-color .25s ease, color .25s ease; }
 
 DEFAULT_CSS = r"""
 .css-1d391kg { background: linear-gradient(180deg,#071428 0%, #031926 100%) !important; }
+/* CAIXAS COM FUNDO SÓLIDO (SEM EFEITO TRANSLÚCIDO) */
 .glass-box{ background: #0E192A; border:1px solid #2A3B52; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
 .stButton>button, .stDownloadButton>button{ background:#1C2D4A !important; color:#bfc6cc !important; border:1px solid #2A3B52 !important; padding:8px 12px !important; border-radius:10px !important; }
 .stButton>button:hover, .stDownloadButton>button:hover {
@@ -93,7 +100,6 @@ DEFAULT_CSS = r"""
 
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
-
 st.markdown("<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'><h1 style='font-weight:800;font-size:40px; background:linear-gradient(90deg,#8e44ad,#2979ff,#1abc9c,#ff8a00); -webkit-background-clip:text; color:transparent; margin:0;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
 
 # -------------------------
@@ -107,16 +113,56 @@ BACKUPS_DIR.mkdir(exist_ok=True)
 ATTACHMENTS_DIR.mkdir(exist_ok=True)
 
 # -------------------------
-# Supabase stub (opcional)
+# Utilities: CPF / hashing / formatting
 # -------------------------
-try:
-    from supabase import create_client
-except Exception:
-    create_client = None
-_supabase = None
+def normalize_cpf(raw_cpf: str) -> str:
+    if not raw_cpf:
+        return ""
+    return re.sub(r'\D', '', str(raw_cpf))
+
+def format_cpf_display(cpf: str) -> str:
+    s = normalize_cpf(cpf)
+    if len(s) != 11:
+        return cpf or ""
+    return f"{s[0:3]}.{s[3:6]}.{s[6:9]}-{s[9:11]}"
+
+def is_valid_cpf(cpf: str) -> bool:
+    s = normalize_cpf(cpf)
+    if len(s) != 11:
+        return False
+    if s == s[0] * 11:
+        return False
+    nums = [int(ch) for ch in s]
+    sum1 = sum([(10 - i) * nums[i] for i in range(9)])
+    r1 = sum1 % 11
+    d1 = 0 if r1 < 2 else 11 - r1
+    if nums[9] != d1:
+        return False
+    sum2 = sum([(11 - i) * nums[i] for i in range(10)])
+    r2 = sum2 % 11
+    d2 = 0 if r2 < 2 else 11 - r2
+    if nums[10] != d2:
+        return False
+    return True
+
+def hash_password(plain: str) -> str:
+    if BCRYPT_AVAILABLE:
+        return bcrypt.hashpw(plain.encode(), bcrypt.gensalt()).decode()
+    return plain
+
+def check_password(stored_hash_or_plain: str, plain: str) -> bool:
+    if not stored_hash_or_plain:
+        return False
+    s = str(stored_hash_or_plain)
+    if BCRYPT_AVAILABLE and (s.startswith("$2b$") or s.startswith("$2y$") or s.startswith("$2a$")):
+        try:
+            return bcrypt.checkpw(plain.encode(), s.encode())
+        except Exception:
+            return False
+    return s == plain
 
 # -------------------------
-# Utilidades gerais
+# Small helpers
 # -------------------------
 def normalize_text(text):
     if not isinstance(text, str):
@@ -125,10 +171,6 @@ def normalize_text(text):
 
 def escape_html(s):
     return html.escape(str(s) if s is not None else "")
-
-def hex_to_rgba(h, alpha):
-    h = h.lstrip('#')
-    return f"rgba({', '.join(str(i) for i in tuple(int(h[i:i+2], 16) for i in (0, 2, 4)))}, {alpha})"
 
 def gen_password(length=8):
     choices = string.ascii_letters + string.digits
@@ -148,7 +190,7 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
     st.success("Usuário criado com sucesso — anote/guarde a senha abaixo:")
     col1, col2 = st.columns([3,1])
     with col1:
-        st.text_input("CPF", value=username, key=f"{key_prefix}_user", disabled=True)
+        st.text_input("CPF", value=format_cpf_display(username), key=f"{key_prefix}_user", disabled=True)
         st.text_input("Senha gerada", value=password, key=f"{key_prefix}_pwd", disabled=True)
         if note:
             st.info(note)
@@ -170,7 +212,7 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
     st.markdown("---")
 
 # -------------------------
-# Recomendação: stop-words em português
+# Stop words
 # -------------------------
 PORTUGUESE_STOP_WORDS = [
     'de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'uma', 'os', 'no', 'se', 'na', 
@@ -185,7 +227,182 @@ PORTUGUESE_STOP_WORDS = [
 ]
 
 # -------------------------
-# Funções de Busca & Recomendação
+# Storage helpers
+# -------------------------
+def load_users():
+    users_path = Path.cwd() / USERS_FILE
+    if users_path.exists():
+        try:
+            with users_path.open("r", encoding="utf-8") as f:
+                data = json.load(f)
+                return data if isinstance(data, dict) else {}
+        except (json.JSONDecodeError, Exception) as e:
+            print(f"[load_users] Erro: {e}")
+            return {}
+    return {}
+
+def save_users(users: dict):
+    users_path = Path.cwd() / USERS_FILE
+    try:
+        tmp_path = users_path.with_suffix(".tmp")
+        with tmp_path.open("w", encoding="utf-8") as f:
+            json.dump(users, f, ensure_ascii=False, indent=2)
+            f.flush(); os.fsync(f.fileno())
+        tmp_path.replace(users_path)
+        return True
+    except Exception as e:
+        print(f"[save_users] Erro: {e}")
+        return False
+
+def get_session_favorites(): return st.session_state.get("favorites", [])
+
+def add_to_favorites(result_data):
+    favorites = get_session_favorites()
+    favorite_item = {"id": f"{int(time.time())}_{random.randint(1000,9999)}", "data": result_data, "added_at": datetime.utcnow().isoformat()}
+    temp_data_to_check = {k: v for k, v in result_data.items() if k not in ['_artemis_username', 'similarity']}
+    existing_contents = [json.dumps({k: v for k, v in fav["data"].items() if k not in ['_artemis_username', 'similarity']}, sort_keys=True) for fav in favorites]
+    if json.dumps(temp_data_to_check, sort_keys=True) not in existing_contents:
+        favorites.append(favorite_item)
+        st.session_state.favorites = favorites
+        return True
+    return False
+
+def remove_from_favorites(favorite_id):
+    favorites = get_session_favorites()
+    new_favorites = [fav for fav in favorites if fav["id"] != favorite_id]
+    st.session_state.favorites = new_favorites
+    return len(new_favorites) != len(favorites)
+
+def clear_all_favorites():
+    st.session_state.favorites = []
+    return True
+
+def _local_load_all_messages():
+    p = Path.cwd() / MESSAGES_FILE
+    if p.exists():
+        try:
+            with p.open("r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return []
+    return []
+
+def _local_save_all_messages(msgs):
+    p = Path.cwd() / MESSAGES_FILE
+    try:
+        tmp = p.with_suffix(".tmp")
+        with tmp.open("w", encoding="utf-8") as f:
+            json.dump(msgs, f, ensure_ascii=False, indent=2)
+            f.flush(); os.fsync(f.fileno())
+        tmp.replace(p)
+    except Exception as e:
+        print(f"[save_messages] erro: {e}")
+
+def _local_upload_attachment(sender, attachment_file):
+    safe_filename = re.sub(r'[^\w\.\-]', '_', attachment_file.name)
+    unique_filename = f"{int(time.time())}_{sender}_{safe_filename}"
+    save_path = ATTACHMENTS_DIR / unique_filename
+    with open(save_path, "wb") as f:
+        f.write(attachment_file.getbuffer())
+    return {"name": attachment_file.name, "path": str(save_path)}
+
+def _local_remove_attachment(path):
+    try:
+        if os.path.exists(path):
+            os.remove(path)
+            return True
+    except Exception:
+        return False
+
+def load_all_messages():
+    return _local_load_all_messages()
+
+def send_message(sender, recipient, subject, body, attachment_file=None):
+    entry = {
+        "id": f"m_{int(time.time())}_{random.randint(1000,9999)}", 
+        "from": sender, "to": recipient, "subject": subject or "(sem assunto)", 
+        "body": body, "ts": datetime.utcnow().isoformat(), "read": False, "attachment": None
+    }
+    if attachment_file:
+        try:
+            entry["attachment"] = _local_upload_attachment(sender, attachment_file)
+        except Exception:
+            pass
+    msgs = _local_load_all_messages()
+    msgs.append(entry)
+    _local_save_all_messages(msgs)
+    return entry
+
+def get_user_messages(username, box_type='inbox'):
+    msgs = load_all_messages()
+    key = "to" if box_type == 'inbox' else "from"
+    user_msgs = sorted([m for m in msgs if m.get(key) == username], key=lambda x: x.get("ts", ""), reverse=True)
+    return user_msgs
+
+def mark_message_read(message_id, username):
+    msgs = _local_load_all_messages()
+    changed = False
+    for m in msgs:
+        if m.get("id") == message_id and m.get("to") == username and not m.get("read"):
+            m["read"] = True; changed = True
+            break
+    if changed:
+        _local_save_all_messages(msgs)
+    return changed
+
+def delete_message(message_id, username):
+    msgs = _local_load_all_messages()
+    msg_to_delete = next((m for m in msgs if m.get("id") == message_id and (m.get("to") == username or m.get("from") == username)), None)
+    if msg_to_delete:
+        if msg_to_delete.get("attachment", {}).get('path'):
+            _local_remove_attachment(msg_to_delete["attachment"]["path"])
+        new_msgs = [m for m in msgs if m.get("id") != message_id]
+        _local_save_all_messages(new_msgs)
+        return True
+    return False
+
+def read_spreadsheet(uploaded_file):
+    buf = io.BytesIO(uploaded_file.read())
+    name = uploaded_file.name.lower()
+    if name.endswith(".csv"):
+        for enc in ("utf-8", "latin1", "cp1252"):
+            try:
+                buf.seek(0)
+                return pd.read_csv(buf, encoding=enc)
+            except Exception:
+                continue
+        buf.seek(0)
+        return pd.read_csv(buf, engine="python", on_bad_lines="skip")
+    else:
+        buf.seek(0)
+        return pd.read_excel(buf)
+
+def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=12)
+    pdf.add_page()
+    pdf.set_font("Arial", size=12)
+    for linha in (texto or "").split("\n"):
+        parts = re.split(r"(==.*?==)", linha)
+        for part in parts:
+            if not part: continue
+            if part.startswith("==") and part.endswith("=="):
+                inner = part[2:-2].replace("—", "-").replace("–", "-").encode("latin-1", "replace").decode("latin-1")
+                hexv = (highlight_hex or "#ffd600").lstrip("#")
+                if len(hexv) == 3: hexv = ''.join([c*2 for c in hexv])
+                try: r, g, b = int(hexv[0:2], 16), int(hexv[2:4], 16), int(hexv[4:6], 16)
+                except Exception: r, g, b = (255, 214, 0)
+                pdf.set_fill_color(r, g, b)
+                pdf.set_text_color(0, 0, 0)
+                pdf.multi_cell(0, 6, txt=inner, border=0, fill=True)
+            else:
+                safe_part = part.replace("—", "-").replace("–", "-").encode("latin-1", "replace").decode("latin-1")
+                pdf.set_text_color(0, 0, 0)
+                pdf.multi_cell(0, 6, txt=safe_part, border=0)
+    return pdf.output(dest="S").encode("latin-1")
+
+# -------------------------
+# Recommendation & search
 # -------------------------
 @st.cache_data(ttl=600)
 def collect_latest_backups():
@@ -295,14 +512,7 @@ def extract_popular_themes_from_data(df_total, top_n=30):
         print(f"Erro ao extrair temas populares: {e}")
         return []
 
-# -------------------------
-# CrossRef search (onboarding external)
-# -------------------------
 def search_crossref(query, rows=6):
-    """
-    Busca metadados no CrossRef (works) por query.
-    Retorna lista de dicts: {título, autor, ano, doi, url, resumo}
-    """
     url = "https://api.crossref.org/works"
     params = {"query.title": query, "rows": rows, "sort": "relevance"}
     try:
@@ -338,7 +548,7 @@ def search_crossref(query, rows=6):
     return results
 
 # -------------------------
-# Enriquecer metadados & formatação de detalhe bonitinha
+# Metadata enrichment
 # -------------------------
 import html as _html
 
@@ -356,16 +566,9 @@ def _format_authors_field(auth_field):
     return s or "— Autor(es) não informado(s) —"
 
 def enrich_article_metadata(det):
-    """
-    Tenta preencher 'título', 'autor' e 'resumo' em det (dict).
-    1) se tiver doi -> consulta CrossRef
-    2) senão, se tiver url -> tenta extrair og:title / og:description
-    Retorna dict atualizado (modifica in-place também).
-    """
     if not isinstance(det, dict):
         return det or {}
 
-    # normalize keys lowercase
     lower_map = {}
     for k in list(det.keys()):
         if isinstance(k, str) and k.lower() != k:
@@ -444,190 +647,7 @@ def enrich_article_metadata(det):
     return det
 
 # -------------------------
-# User / messages / storage
-# -------------------------
-def load_users():
-    if _supabase: return None
-    users_path = Path.cwd() / USERS_FILE
-    if users_path.exists():
-        try:
-            with users_path.open("r", encoding="utf-8") as f:
-                data = json.load(f)
-                return data if isinstance(data, dict) else {}
-        except (json.JSONDecodeError, Exception) as e:
-            print(f"[load_users] Erro: {e}")
-            return {}
-    return {}
-
-def save_users(users: dict):
-    if _supabase: return False
-    users_path = Path.cwd() / USERS_FILE
-    try:
-        tmp_path = users_path.with_suffix(".tmp")
-        with tmp_path.open("w", encoding="utf-8") as f:
-            json.dump(users, f, ensure_ascii=False, indent=2)
-            f.flush(); os.fsync(f.fileno())
-        tmp_path.replace(users_path)
-        return True
-    except Exception as e:
-        print(f"[save_users] Erro: {e}")
-        return False
-
-def get_session_favorites(): return st.session_state.get("favorites", [])
-
-def add_to_favorites(result_data):
-    favorites = get_session_favorites()
-    favorite_item = {"id": f"{int(time.time())}_{random.randint(1000,9999)}", "data": result_data, "added_at": datetime.utcnow().isoformat()}
-    temp_data_to_check = {k: v for k, v in result_data.items() if k not in ['_artemis_username', 'similarity']}
-    existing_contents = [json.dumps({k: v for k, v in fav["data"].items() if k not in ['_artemis_username', 'similarity']}, sort_keys=True) for fav in favorites]
-    if json.dumps(temp_data_to_check, sort_keys=True) not in existing_contents:
-        favorites.append(favorite_item)
-        st.session_state.favorites = favorites
-        return True
-    return False
-
-def remove_from_favorites(favorite_id):
-    favorites = get_session_favorites()
-    new_favorites = [fav for fav in favorites if fav["id"] != favorite_id]
-    st.session_state.favorites = new_favorites
-    return len(new_favorites) != len(favorites)
-
-def clear_all_favorites():
-    st.session_state.favorites = []
-    return True
-
-def _local_load_all_messages():
-    p = Path.cwd() / MESSAGES_FILE
-    if p.exists():
-        try:
-            with p.open("r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception:
-            return []
-    return []
-
-def _local_save_all_messages(msgs):
-    p = Path.cwd() / MESSAGES_FILE
-    try:
-        tmp = p.with_suffix(".tmp")
-        with tmp.open("w", encoding="utf-8") as f:
-            json.dump(msgs, f, ensure_ascii=False, indent=2)
-            f.flush(); os.fsync(f.fileno())
-        tmp.replace(p)
-    except Exception as e:
-        print(f"[save_messages] erro: {e}")
-
-def _local_upload_attachment(sender, attachment_file):
-    safe_filename = re.sub(r'[^\w\.\-]', '_', attachment_file.name)
-    unique_filename = f"{int(time.time())}_{sender}_{safe_filename}"
-    save_path = ATTACHMENTS_DIR / unique_filename
-    with open(save_path, "wb") as f:
-        f.write(attachment_file.getbuffer())
-    return {"name": attachment_file.name, "path": str(save_path)}
-
-def _local_remove_attachment(path):
-    try:
-        if os.path.exists(path):
-            os.remove(path)
-            return True
-    except Exception:
-        return False
-
-def load_all_messages():
-    if _supabase:
-        try:
-            res = _supabase.table("messages").select("*").order("ts", desc=True).execute()
-            return getattr(res, "data", None) or []
-        except Exception:
-            pass
-    return _local_load_all_messages()
-
-def send_message(sender, recipient, subject, body, attachment_file=None):
-    entry = {
-        "id": f"m_{int(time.time())}_{random.randint(1000,9999)}", 
-        "from": sender, "to": recipient, "subject": subject or "(sem assunto)", 
-        "body": body, "ts": datetime.utcnow().isoformat(), "read": False, "attachment": None
-    }
-    if attachment_file:
-        try:
-            entry["attachment"] = _local_upload_attachment(sender, attachment_file)
-        except Exception:
-            pass
-    msgs = _local_load_all_messages()
-    msgs.append(entry)
-    _local_save_all_messages(msgs)
-    return entry
-
-def get_user_messages(username, box_type='inbox'):
-    msgs = load_all_messages()
-    key = "to" if box_type == 'inbox' else "from"
-    user_msgs = sorted([m for m in msgs if m.get(key) == username], key=lambda x: x.get("ts", ""), reverse=True)
-    return user_msgs
-
-def mark_message_read(message_id, username):
-    msgs = _local_load_all_messages()
-    changed = False
-    for m in msgs:
-        if m.get("id") == message_id and m.get("to") == username and not m.get("read"):
-            m["read"] = True; changed = True
-            break
-    if changed:
-        _local_save_all_messages(msgs)
-    return changed
-
-def delete_message(message_id, username):
-    msgs = _local_load_all_messages()
-    msg_to_delete = next((m for m in msgs if m.get("id") == message_id and (m.get("to") == username or m.get("from") == username)), None)
-    if msg_to_delete:
-        if msg_to_delete.get("attachment", {}).get('path'):
-            _local_remove_attachment(msg_to_delete["attachment"]["path"])
-        new_msgs = [m for m in msgs if m.get("id") != message_id]
-        _local_save_all_messages(new_msgs)
-        return True
-    return False
-
-def read_spreadsheet(uploaded_file):
-    buf = io.BytesIO(uploaded_file.read())
-    name = uploaded_file.name.lower()
-    if name.endswith(".csv"):
-        for enc in ("utf-8", "latin1", "cp1252"):
-            try:
-                buf.seek(0)
-                return pd.read_csv(buf, encoding=enc)
-            except Exception:
-                continue
-        buf.seek(0)
-        return pd.read_csv(buf, engine="python", on_bad_lines="skip")
-    else:
-        buf.seek(0)
-        return pd.read_excel(buf)
-
-def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=12)
-    pdf.add_page()
-    pdf.set_font("Arial", size=12)
-    for linha in (texto or "").split("\n"):
-        parts = re.split(r"(==.*?==)", linha)
-        for part in parts:
-            if not part: continue
-            if part.startswith("==") and part.endswith("=="):
-                inner = part[2:-2].replace("—", "-").replace("–", "-").encode("latin-1", "replace").decode("latin-1")
-                hexv = (highlight_hex or "#ffd600").lstrip("#")
-                if len(hexv) == 3: hexv = ''.join([c*2 for c in hexv])
-                try: r, g, b = int(hexv[0:2], 16), int(hexv[2:4], 16), int(hexv[4:6], 16)
-                except Exception: r, g, b = (255, 214, 0)
-                pdf.set_fill_color(r, g, b)
-                pdf.set_text_color(0, 0, 0)
-                pdf.multi_cell(0, 6, txt=inner, border=0, fill=True)
-            else:
-                safe_part = part.replace("—", "-").replace("–", "-").encode("latin-1", "replace").decode("latin-1")
-                pdf.set_text_color(0, 0, 0)
-                pdf.multi_cell(0, 6, txt=safe_part, border=0)
-    return pdf.output(dest="S").encode("latin-1")
-
-# -------------------------
-# Defaults & session
+# Defaults & session state
 # -------------------------
 _defaults = {
     "authenticated": False, "username": None, "user_obj": None, "df": None,
@@ -682,7 +702,7 @@ def save_user_state_minimal(USER_STATE):
         return False
 
 # -------------------------
-# Authentication (login / register)
+# Authentication UI (login & register) with CPF normalization + bcrypt migration
 # -------------------------
 if not st.session_state.authenticated:
     st.markdown("<div class='glass-box auth' style='max-width:1100px;margin:0 auto;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -690,24 +710,52 @@ if not st.session_state.authenticated:
     tabs = st.tabs(["Entrar", "Cadastrar"])
 
     with tabs[0]:
-        login_cpf = st.text_input("CPF", key="ui_login_user")
+        login_cpf_raw = st.text_input("CPF", key="ui_login_user")
         login_pass = st.text_input("Senha", type="password", key="ui_login_pass")
 
         users = load_users() or {}
         if not users:
             admin_user = "admin"
             admin_pwd = "admin123"
-            users[admin_user] = {"name": "Administrador", "scholarship": "Admin", "password": admin_pwd, "created_at": datetime.utcnow().isoformat()}
+            users[admin_user] = {"name": "Administrador", "scholarship": "Admin", "password_hash": hash_password(admin_pwd), "created_at": datetime.utcnow().isoformat()}
             save_users(users)
             st.warning("Nenhum usuário local encontrado. Um usuário administrativo foi criado temporariamente.")
             st.session_state.new_user_created = {"user": admin_user, "pwd": admin_pwd, "note": "Este é um usuário administrativo temporário. Para testes, use 'admin' como CPF."}
 
         if st.button("Entrar", "btn_login_main"):
+            login_cpf_norm = normalize_cpf(login_cpf_raw)
             users = load_users() or {}
-            if login_cpf in users and users[login_cpf].get("password") == login_pass:
+
+            matched_user = None
+            candidate_keys = []
+            if login_cpf_norm:
+                candidate_keys.append(login_cpf_norm)
+            if login_cpf_raw:
+                candidate_keys.append(login_cpf_raw)
+            candidate_keys.append("admin")
+            for key in candidate_keys:
+                if not key: continue
+                if key in users:
+                    u = users[key]
+                    if u.get("password_hash"):
+                        if check_password(u.get("password_hash"), login_pass):
+                            matched_user = key
+                            break
+                    if u.get("password") and check_password(u.get("password"), login_pass):
+                        matched_user = key
+                        if BCRYPT_AVAILABLE:
+                            try:
+                                users[key]["password_hash"] = hash_password(login_pass)
+                                users[key].pop("password", None)
+                                save_users(users)
+                            except Exception:
+                                pass
+                        break
+
+            if matched_user:
                 st.session_state.authenticated = True
-                st.session_state.username = login_cpf
-                st.session_state.user_obj = users[login_cpf]
+                st.session_state.username = matched_user
+                st.session_state.user_obj = users[matched_user]
                 st.success("Login efetuado (local).")
                 safe_rerun()
             else:
@@ -723,27 +771,36 @@ if not st.session_state.authenticated:
     with tabs[1]:
         reg_name = st.text_input("Nome completo", key="ui_reg_name")
         reg_bolsa = st.selectbox("Tipo de bolsa", ["IC - Iniciação Científica", "BIA - Bolsa de Incentivo Acadêmico", "Extensão", "Doutorado"], key="ui_reg_bolsa")
-        reg_cpf = st.text_input("CPF", key="ui_reg_user")
+        reg_cpf_raw = st.text_input("CPF", key="ui_reg_user")
         reg_pass = st.text_input("Crie sua senha", type="password", key="ui_reg_pass")
         reg_pass_confirm = st.text_input("Confirme sua senha", type="password", key="ui_reg_pass_confirm")
 
         if st.button("Cadastrar", "btn_register_main"):
-            new_cpf = (reg_cpf or "").strip()
+            new_cpf_norm = normalize_cpf(reg_cpf_raw)
             new_pass = (reg_pass or "").strip()
 
-            if not new_cpf: st.warning("Informe um CPF válido.")
-            elif len(new_pass) < 6: st.warning("A senha deve ter pelo menos 6 caracteres.")
-            elif new_pass != reg_pass_confirm: st.error("As senhas não coincidem. Tente novamente.")
+            if not new_cpf_norm:
+                st.warning("Informe um CPF (somente números).")
+            elif len(new_cpf_norm) != 11:
+                st.warning("CPF deve ter 11 dígitos (apenas números).")
+            elif not is_valid_cpf(new_cpf_norm):
+                st.error("CPF inválido (verificador incorreto). Verifique os números.")
+            elif len(new_pass) < 6:
+                st.warning("A senha deve ter pelo menos 6 caracteres.")
+            elif new_pass != reg_pass_confirm:
+                st.error("As senhas não coincidem. Tente novamente.")
             else:
                 users = load_users() or {}
-                if new_cpf in users:
+                if new_cpf_norm in users:
                     st.warning("CPF já cadastrado (local).")
                 else:
-                    users[new_cpf] = {"name": reg_name or new_cpf, "scholarship": reg_bolsa, "password": new_pass, "created_at": datetime.utcnow().isoformat()}
+                    password_hash = hash_password(new_pass)
+                    users[new_cpf_norm] = {"name": reg_name or new_cpf_norm, "scholarship": reg_bolsa, "password_hash": password_hash, "created_at": datetime.utcnow().isoformat()}
                     if save_users(users):
                         st.success("Usuário cadastrado com sucesso! Você já pode fazer o login na aba 'Entrar'.")
                         if "new_user_created" in st.session_state:
                             del st.session_state["new_user_created"]
+                        _render_credentials_box(new_cpf_norm, new_pass, note="Guarde sua senha. Ela é salva de forma segura (hash).", key_prefix=f"cred_{new_cpf_norm}")
                     else:
                         st.error("Falha ao salvar o usuário localmente.")
 
@@ -751,7 +808,7 @@ if not st.session_state.authenticated:
     st.stop()
 
 # -------------------------
-# Post-login: restore user state
+# After login: restore, settings, onboarding, pages...
 # -------------------------
 USERNAME = st.session_state.username
 USER_OBJ = st.session_state.user_obj or load_users().get(USERNAME, {})
@@ -791,7 +848,7 @@ st.session_state.last_unread_count = UNREAD_COUNT
 mens_label = f"✉️ Mensagens ({UNREAD_COUNT})" if UNREAD_COUNT > 0 else "✉️ Mensagens"
 
 # -------------------------
-# Onboarding de recomendações (primeiro contato — antes de planilha)
+# Onboarding (first contact)
 # -------------------------
 if st.session_state.authenticated and not st.session_state.recommendation_onboarding_complete:
     st.markdown("<div class='glass-box' style='position:relative;margin-bottom:12px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -832,7 +889,7 @@ if st.session_state.authenticated and not st.session_state.recommendation_onboar
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Top navigation / header (após onboarding)
+# Top navigation and pages
 # -------------------------
 st.markdown("<div class='glass-box' style='padding-top:10px; padding-bottom:10px;'><div class='specular'></div>", unsafe_allow_html=True)
 top1, top2 = st.columns([0.6, 0.4])
@@ -870,7 +927,8 @@ if not st.session_state.get("tutorial_completed"):
         * **📄 Planilha**: Carregue sua planilha (.csv ou .xlsx). Os dados dela alimentarão os gráficos e as buscas.
         * **💡 Recomendações**: Explore artigos e trabalhos de outros usuários com base em temas de interesse.
         * **🞠 Mapa**: Visualize e edite um mapa de ideias no formato hierárquico. Você pode adicionar, conectar e remover nós.
-        * **📝 Anotações**: Um bloco de notas para destacar texto com `==sinais de igual==` e exportar como PDF.
+        * **📝 Anotações**: Um bloc
+        o de notas para destacar texto com `==sinais de igual==` e exportar como PDF.
         * **📊 Gráficos**: Gere gráficos personalizados a partir da sua planilha.
         * **🔍 Busca**: Pesquise em todas as planilhas carregadas na plataforma.
         * **✉️ Mensagens**: Comunique-se com outros pesquisadores.
@@ -884,7 +942,7 @@ if not st.session_state.get("tutorial_completed"):
     st.markdown("---")
 
 # -------------------------
-# Páginas
+# Page: planilha
 # -------------------------
 if st.session_state.page == "planilha":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -930,6 +988,9 @@ if st.session_state.page == "planilha":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+# -------------------------
+# Page: recomendacoes (agora inclui Favoritos)
+# -------------------------
 elif st.session_state.page == "recomendacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("💡 Recomendações de Artigos")
@@ -943,10 +1004,41 @@ elif st.session_state.page == "recomendacoes":
 
     temas_populares = extract_popular_themes_from_data(df_total) if not df_total.empty else []
 
-    # Se onboarding não completou, mostramos o onboarding (já aplicado no topo também)
+    # favorites panel (moved here)
+    with st.expander(f"⭐ Favoritos ({len(get_session_favorites())})", expanded=False):
+        favorites = get_session_favorites()
+        if not favorites:
+            st.info("Nenhum favorito salvo.")
+        else:
+            if st.button("🗑️ Limpar Todos os Favoritos", key=f"clear_favs_rec_{USERNAME}"):
+                clear_all_favorites(); st.session_state.recommendation_page = 1; safe_rerun()
+            for fav in sorted(favorites, key=lambda x: x['added_at'], reverse=True):
+                fav_data = fav['data']
+                st.markdown(f"""
+                <div class="card">
+                    <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
+                    <div class="small-muted">De <strong>{escape_html(fav_data.get('_artemis_username', 'N/A'))}</strong></div>
+                </div>""", unsafe_allow_html=True)
+                c1, c2 = st.columns([0.75, 0.25])
+                with c1:
+                    if st.button("Ver", key=f"fav_view_rec_{fav['id']}_{USERNAME}", use_container_width=True):
+                        st.session_state.fav_detail = fav['data']
+                with c2:
+                    if st.button("Remover", key=f"fav_del_rec_{fav['id']}_{USERNAME}", use_container_width=True):
+                        remove_from_favorites(fav['id']); safe_rerun()
+            if 'fav_detail' in st.session_state and st.session_state.fav_detail:
+                det_fav = st.session_state.pop("fav_detail")
+                det_fav = enrich_article_metadata(det_fav)
+                st.markdown("## Detalhes do Favorito")
+                st.markdown(f"**{escape_html(det_fav.get('título','— Sem título —'))}**")
+                st.markdown(f"_Autor(es):_ {escape_html(det_fav.get('autor','— —'))}")
+                st.markdown("---")
+                st.markdown(escape_html(det_fav.get('resumo','Resumo não disponível.')))
+
+    # recommendation onboarding or refine
     if not st.session_state.recommendation_onboarding_complete:
         if df_total.empty:
-            st.warning("Ainda não há dados suficientes para gerar recomendações automaticamente. Use o onboarding no topo para obter recomendações inicial.")
+            st.warning("Ainda não há dados suficientes para gerar recomendações automaticamente. Use o onboarding no topo para obter recomendações iniciais.")
         elif not temas_populares:
             st.warning("Não foi possível identificar temas populares.")
         else:
@@ -973,7 +1065,6 @@ elif st.session_state.page == "recomendacoes":
         
         col1, col2 = st.columns([3, 2])
         with col1:
-            # se df_total vazio, ainda deixamos o usuário digitar temas livres
             temas_options = temas_populares or []
             temas_selecionados = st.multiselect("Selecione temas:", options=temas_options, key="temas_recomendacao", help="Se não houver dados locais, use temas livres na caixa ao lado")
         with col2:
@@ -982,15 +1073,11 @@ elif st.session_state.page == "recomendacoes":
         if st.button("🔍 Buscar Recomendações", use_container_width=True, key=f"btn_recom_search_{USERNAME}"):
             if temas_selecionados or palavra_chave:
                 with st.spinner("Analisando..."):
-                    # Primeiro: se existem dados locais, usamos TF-IDF sobre df_total
                     if not df_total.empty:
-                        # se usuário não selecionou temas mas digitou palavra-chave -> usar a palavra-chave como query
                         q_parts = temas_selecionados[:] if temas_selecionados else []
                         if palavra_chave: q_parts.append(palavra_chave)
                         recommended_df = recomendar_artigos(q_parts, df_total, palavra_chave if palavra_chave else None)
-                        # se resultado estiver vazio, fallback para busca web
                         if recommended_df.empty:
-                            # fallback web
                             hits = []
                             queries = temas_selecionados if temas_selecionados else ([palavra_chave] if palavra_chave else [])
                             for q in queries:
@@ -1004,7 +1091,6 @@ elif st.session_state.page == "recomendacoes":
                         else:
                             st.session_state.recommendations = recommended_df
                     else:
-                        # não há dados locais -> buscar na web via CrossRef
                         hits = []
                         if temas_selecionados:
                             for t in temas_selecionados:
@@ -1026,7 +1112,6 @@ elif st.session_state.page == "recomendacoes":
     results_df = st.session_state.get('recommendations', pd.DataFrame())
     
     if not results_df.empty:
-        # view individual recommendation (index in session is index of results_df)
         if st.session_state.get("recommendation_view_index") is not None:
             vi = st.session_state.recommendation_view_index
             if 0 <= vi < len(results_df):
@@ -1038,7 +1123,6 @@ elif st.session_state.page == "recomendacoes":
                     st.session_state.recommendation_view_index = None
                     safe_rerun()
 
-                # título / subtítulo
                 st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
                 st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— Não informado —'))} • _Ano:_ {escape_html(str(det.get('ano', det.get('year','— —'))))}")
                 st.markdown("---")
@@ -1116,13 +1200,8 @@ elif st.session_state.page == "recomendacoes":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-# (rest of pages: mapa, anotacoes, graficos, busca, mensagens, config)...
-# For brevity and correctness, the rest of the file below is the same as previously provided,
-# but with detail rendering enhanced to call enrich_article_metadata() where appropriate
-# and with node font color forced to white in the mapa section.
-
 # -------------------------
-# Mapa (com texto branco garantido)
+# Page: mapa (força texto branco)
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1240,6 +1319,9 @@ elif st.session_state.page == "mapa":
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+# -------------------------
+# Page: anotacoes
+# -------------------------
 elif st.session_state.page == "anotacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("📝 Anotações")
@@ -1250,6 +1332,9 @@ elif st.session_state.page == "anotacoes":
     st.download_button("Baixar Anotações (PDF)", data=pdf_bytes, file_name="anotacoes.pdf", mime="application/pdf")
     st.markdown("</div>", unsafe_allow_html=True)
 
+# -------------------------
+# Page: graficos
+# -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("📊 Gráficos Personalizados")
@@ -1270,9 +1355,12 @@ elif st.session_state.page == "graficos":
                 st.error(f"Erro ao gerar gráficos: {e}")
     st.markdown("</div>", unsafe_allow_html=True)
 
+# -------------------------
+# Page: busca (SEM painel de favoritos — favoritos agora ficam em Recomendações)
+# -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
-    tab_busca, tab_favoritos = st.tabs([f"🔍 Busca Inteligente", f"⭐ Favoritos ({len(get_session_favorites())})"])
+    st.subheader("🔍 Busca Inteligente")
 
     def extract_keywords(text, n=6):
         if not text: return []
@@ -1282,145 +1370,117 @@ elif st.session_state.page == "busca":
         freq = {w: words.count(w) for w in set(words)}
         return [w for w, _ in sorted(freq.items(), key=lambda item: item[1], reverse=True)][:n]
 
-    with tab_busca:
-        col_q, col_meta, col_actions = st.columns([0.6, 0.25, 0.15])
-        with col_q: query = st.text_input("Termo de busca", key="ui_query_search", placeholder="...")
-        with col_meta:
-            backups_df_tmp = collect_latest_backups()
-            all_cols = list(backups_df_tmp.columns) if not backups_df_tmp.empty else []
-            search_col = st.selectbox("Buscar em", options=[c for c in all_cols if c != '_artemis_username'] or ["(sem dados)"], key="ui_search_col")
-        with col_actions:
-            per_page = st.selectbox("Por página", [5, 8, 12, 20], index=1, key="ui_search_pp")
-            search_clicked = st.button("🔎 Buscar", use_container_width=True, key=f"ui_search_btn_{USERNAME}")
+    col_q, col_meta, col_actions = st.columns([0.6, 0.25, 0.15])
+    with col_q: query = st.text_input("Termo de busca", key="ui_query_search", placeholder="...")
+    with col_meta:
+        backups_df_tmp = collect_latest_backups()
+        all_cols = list(backups_df_tmp.columns) if not backups_df_tmp.empty else []
+        search_col = st.selectbox("Buscar em", options=[c for c in all_cols if c != '_artemis_username'] or ["(sem dados)"], key="ui_search_col")
+    with col_actions:
+        per_page = st.selectbox("Por página", [5, 8, 12, 20], index=1, key="ui_search_pp")
+        search_clicked = st.button("🔎 Buscar", use_container_width=True, key=f"ui_search_btn_{USERNAME}")
 
-        if search_clicked:
-            st.session_state.search_view_index = None
-            if not query or backups_df_tmp.empty:
-                st.info("Digite um termo e certifique-se de que há dados para pesquisar.")
+    if search_clicked:
+        st.session_state.search_view_index = None
+        if not query or backups_df_tmp.empty:
+            st.info("Digite um termo e certifique-se de que há dados para pesquisar.")
+            st.session_state.search_results = pd.DataFrame()
+        else:
+            norm_query = normalize_text(query)
+            if search_col not in backups_df_tmp.columns:
+                st.info("Coluna inválida para busca. Selecione outra coluna.")
                 st.session_state.search_results = pd.DataFrame()
             else:
-                norm_query = normalize_text(query)
-                if search_col not in backups_df_tmp.columns:
-                    st.info("Coluna inválida para busca. Selecione outra coluna.")
-                    st.session_state.search_results = pd.DataFrame()
-                else:
-                    ser = backups_df_tmp[search_col].astype(str).apply(normalize_text)
-                    hits = backups_df_tmp[ser.str.contains(norm_query, na=False)]
-                    st.session_state.search_results = hits.reset_index(drop=True)
-                    st.session_state.search_query_meta = {"col": search_col, "query": query}
-                    st.session_state.search_page = 1
-        
-        results_df = st.session_state.get('search_results', pd.DataFrame())
-        if not results_df.empty:
-            total = len(results_df)
-            max_pages = max(1, (total + per_page - 1) // per_page)
-            page = max(1, min(st.session_state.get("search_page", 1), max_pages))
-            start, end = (page - 1) * per_page, min(page * per_page, total)
-            page_df = results_df.iloc[start:end]
+                ser = backups_df_tmp[search_col].astype(str).apply(normalize_text)
+                hits = backups_df_tmp[ser.str.contains(norm_query, na=False)]
+                st.session_state.search_results = hits.reset_index(drop=True)
+                st.session_state.search_query_meta = {"col": search_col, "query": query}
+                st.session_state.search_page = 1
 
-            st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {end}.")
-            for orig_i in page_df.index:
-                result_data = results_df.loc[orig_i].to_dict()
-                user_src = result_data.get("_artemis_username", "N/A")
-                initials = "".join([p[0] for p in str(user_src).split()[:2]]).upper() or "U"
-                title_raw = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
-                resumo_raw = str(result_data.get('resumo') or result_data.get('abstract') or "")
-                
-                st.markdown(f"""
-                <div class="card">
-                    <div style="display:flex; gap:12px; align-items:center;">
-                        <div class="avatar">{escape_html(initials)}</div>
-                        <div style="flex:1;">
-                            <div class="card-title">{highlight_search_terms(title_raw, query)}</div>
-                            <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • {escape_html(result_data.get('autor', ''))}</div>
-                            <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{highlight_search_terms(resumo_raw, query) if resumo_raw else ''}</div>
-                        </div>
-                    </div>
-                </div>""", unsafe_allow_html=True)
-                
-                a1, a2 = st.columns([0.28, 0.72])
-                with a1:
-                    if st.button("⭐ Favoritar", key=f"fav_{orig_i}_{USERNAME}", use_container_width=True):
-                        if add_to_favorites(result_data): st.toast("Adicionado!", icon="⭐")
-                        else: st.toast("Já está nos favoritos.")
-                with a2:
-                    if st.button("🔎 Ver detalhes", key=f"view_{orig_i}_{USERNAME}", use_container_width=True):
-                        st.session_state.search_view_index = int(orig_i)
-                        safe_rerun()
+    results_df = st.session_state.get('search_results', pd.DataFrame())
+    if not results_df.empty:
+        total = len(results_df)
+        max_pages = max(1, (total + per_page - 1) // per_page)
+        page = max(1, min(st.session_state.get("search_page", 1), max_pages))
+        start, end = (page - 1) * per_page, min(page * per_page, total)
+        page_df = results_df.iloc[start:end]
+
+        st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {end}.")
+        for orig_i in page_df.index:
+            result_data = results_df.loc[orig_i].to_dict()
+            user_src = result_data.get("_artemis_username", "N/A")
+            initials = "".join([p[0] for p in str(user_src).split()[:2]]).upper() or "U"
+            title_raw = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
+            resumo_raw = str(result_data.get('resumo') or result_data.get('abstract') or "")
             
-            st.markdown("---")
-            p1, p2, p3 = st.columns([1,1,1])
-            with p1: 
-                if st.button("◀", disabled=(page <= 1), key=f"search_prev_{USERNAME}"):
-                    st.session_state.search_page -= 1; safe_rerun()
-            with p2: st.markdown(f"<div style='text-align:center; padding-top:8px'><b>Página {page}/{max_pages}</b></div>", unsafe_allow_html=True)
-            with p3: 
-                if st.button("▶", disabled=(page >= max_pages), key=f"search_next_{USERNAME}"):
-                    st.session_state.search_page += 1; safe_rerun()
+            st.markdown(f"""
+            <div class="card">
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <div class="avatar">{escape_html(initials)}</div>
+                    <div style="flex:1;">
+                        <div class="card-title">{highlight_search_terms(title_raw, query)}</div>
+                        <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • {escape_html(result_data.get('autor', ''))}</div>
+                        <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{highlight_search_terms(resumo_raw, query) if resumo_raw else ''}</div>
+                    </div>
+                </div>
+            </div>""", unsafe_allow_html=True)
+            
+            a1, a2 = st.columns([0.28, 0.72])
+            with a1:
+                if st.button("⭐ Favoritar", key=f"fav_search_{orig_i}_{USERNAME}", use_container_width=True):
+                    if add_to_favorites(result_data): st.toast("Adicionado!", icon="⭐")
+                    else: st.toast("Já está nos favoritos.")
+            with a2:
+                if st.button("🔎 Ver detalhes", key=f"view_search_{orig_i}_{USERNAME}", use_container_width=True):
+                    st.session_state.search_view_index = int(orig_i)
+                    safe_rerun()
+        
+        st.markdown("---")
+        p1, p2, p3 = st.columns([1,1,1])
+        with p1: 
+            if st.button("◀", disabled=(page <= 1), key=f"search_prev_{USERNAME}"):
+                st.session_state.search_page -= 1; safe_rerun()
+        with p2: st.markdown(f"<div style='text-align:center; padding-top:8px'><b>Página {page}/{max_pages}</b></div>", unsafe_allow_html=True)
+        with p3: 
+            if st.button("▶", disabled=(page >= max_pages), key=f"search_next_{USERNAME}"):
+                st.session_state.search_page += 1; safe_rerun()
 
-            if st.session_state.get("search_view_index") is not None:
-                vi = int(st.session_state.search_view_index)
-                if 0 <= vi < len(results_df):
-                    det = results_df.loc[vi].to_dict()
-                    det = enrich_article_metadata(det)
-                    origin_user = det.get("_artemis_username", "N/A")
-                    st.markdown("## Detalhes do Registro")
-                    st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
-                    st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— —'))} • _Ano:_ {escape_html(str(det.get('ano', '—')))}")
-                    st.markdown("---")
-                    st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
-                    st.markdown("---")
-                    st.markdown("### ✉️ Contatar autor")
-                    if origin_user != "N/A":
-                        with st.form(key=f"inline_compose_{vi}_{USERNAME}"):
-                            subj_fill = st.text_input("Assunto:", value=f"Sobre: {det.get('título', '')[:50]}...")
-                            body_fill = st.text_area("Mensagem:", value=f"Olá {origin_user},\n\nVi seu registro na plataforma e gostaria de conversar.\n\n")
-                            c1, c2 = st.columns(2)
-                            with c1:
-                                if st.form_submit_button("✉️ Enviar"):
-                                    send_message(USERNAME, origin_user, subj_fill, body_fill)
-                                    st.success(f"Mensagem enviada para {origin_user}.")
-                                    time.sleep(2); safe_rerun()
-                            with c2:
-                                if st.form_submit_button("Cancelar"):
-                                    st.session_state.search_view_index = None; safe_rerun()
-                    else:
-                        st.warning("Origem indisponível para contato.")
-
-    with tab_favoritos:
-        st.header("Seus Resultados Salvos")
-        favorites = get_session_favorites()
-        if not favorites:
-            st.info("Nenhum resultado salvo.")
-        else:
-            if st.button("🗑️ Limpar Todos", key=f"clear_favs_{USERNAME}"):
-                clear_all_favorites(); safe_rerun()
-            st.markdown("---")
-            for fav in sorted(favorites, key=lambda x: x['added_at'], reverse=True):
-                fav_data = fav['data']
-                st.markdown(f"""
-                <div class="card">
-                    <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
-                    <div class="small-muted">De <strong>{escape_html(fav_data.get('_artemis_username', 'N/A'))}</strong></div>
-                </div>""", unsafe_allow_html=True)
-                c1, c2 = st.columns([0.75, 0.25])
-                with c1:
-                    if st.button("Ver", key=f"fav_view_{fav['id']}_{USERNAME}", use_container_width=True):
-                        st.session_state.fav_detail = fav['data']
-                with c2:
-                    if st.button("Remover", key=f"fav_del_{fav['id']}_{USERNAME}", use_container_width=True):
-                        remove_from_favorites(fav['id']); safe_rerun()
-            if 'fav_detail' in st.session_state and st.session_state.fav_detail:
-                det = st.session_state.pop("fav_detail")
+        if st.session_state.get("search_view_index") is not None:
+            vi = int(st.session_state.search_view_index)
+            if 0 <= vi < len(results_df):
+                det = results_df.loc[vi].to_dict()
                 det = enrich_article_metadata(det)
-                st.markdown("## Detalhes do Favorito")
+                origin_user = det.get("_artemis_username", "N/A")
+                st.markdown("## Detalhes do Registro")
                 st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
-                st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— —'))}")
+                st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— —'))} • _Ano:_ {escape_html(str(det.get('ano', '—')))}")
                 st.markdown("---")
                 st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
+                st.markdown("---")
+                st.markdown("### ✉️ Contatar autor")
+                if origin_user != "N/A":
+                    with st.form(key=f"inline_compose_{vi}_{USERNAME}"):
+                        subj_fill = st.text_input("Assunto:", value=f"Sobre: {det.get('título', '')[:50]}...")
+                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_user},\n\nVi seu registro na plataforma e gostaria de conversar.\n\n")
+                        c1, c2 = st.columns(2)
+                        with c1:
+                            if st.form_submit_button("✉️ Enviar"):
+                                send_message(USERNAME, origin_user, subj_fill, body_fill)
+                                st.success(f"Mensagem enviada para {origin_user}.")
+                                time.sleep(2); safe_rerun()
+                        with c2:
+                            if st.form_submit_button("Cancelar"):
+                                st.session_state.search_view_index = None; safe_rerun()
+                else:
+                    st.warning("Origem indisponível para contato.")
+    else:
+        st.info("Nenhum resultado de busca (executar uma pesquisa com dados carregados).")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
+# -------------------------
+# Page: mensagens
+# -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("✉️ Mensagens")
@@ -1511,7 +1571,10 @@ elif st.session_state.page == "mensagens":
                     else:
                         st.warning("Selecione um destinatário.")
     st.markdown("</div>", unsafe_allow_html=True)
-    
+
+# -------------------------
+# Page: config
+# -------------------------
 elif st.session_state.page == "config":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("⚙️ Configurações")
