@@ -15,10 +15,11 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
-import plotly.graph_objects as go
 import networkx as nx
-from networkx.readwrite import json_graph
 from fpdf import FPDF
+
+# Importe a nova biblioteca para o mapa mental
+from streamlit_agraph import agraph, Node, Edge, Config
 
 # optional ML libs (silenciosamente não-fatal)
 try:
@@ -224,7 +225,7 @@ def highlight_search_terms(text, query):
     )
     return highlighted_text
 
-def recomendar_artigos(temas_selecionados, df_total, top_n=10):
+def recomendar_artigos(temas_selecionados, df_total, top_n=50): # Aumentado para ter mais resultados para paginar
     """
     Recomenda artigos de um DataFrame com base em temas, usando TF-IDF e similaridade de cosseno.
     """
@@ -235,8 +236,6 @@ def recomendar_artigos(temas_selecionados, df_total, top_n=10):
     if df_total.empty or not temas_selecionados:
         return pd.DataFrame()
 
-    # --- INÍCIO DA CORREÇÃO (AttributeError) ---
-    # Inicializa um Pandas Series vazio para garantir que o tipo seja consistente
     corpus_series = pd.Series([''] * len(df_total), index=df_total.index, dtype=str)
     
     if 'título' in df_total.columns:
@@ -247,38 +246,30 @@ def recomendar_artigos(temas_selecionados, df_total, top_n=10):
         corpus_series += df_total['resumo'].fillna('')
     
     df_total['corpus'] = corpus_series.str.lower()
-    # --- FIM DA CORREÇÃO ---
     
-    # Se o corpus estiver vazio após a tentativa, retorna um DataFrame vazio
     if df_total['corpus'].str.strip().eq('').all():
         st.warning("Nenhum conteúdo textual (título, tema, resumo) encontrado nos dados para gerar recomendações.")
         return pd.DataFrame()
     
-    # Vetorizar o corpus
     vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
     tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
     
-    # Criar um vetor para a consulta (temas selecionados)
     query_text = ' '.join(temas_selecionados).lower()
     query_vector = vectorizer.transform([query_text])
     
-    # Calcular a similaridade de cosseno
     cosine_similarities = cosine_similarity(query_vector, tfidf_matrix).flatten()
     
-    # Obter os índices dos artigos mais similares
     related_docs_indices = cosine_similarities.argsort()[:-top_n-1:-1]
     
-    # Filtrar para mostrar apenas os resultados com alguma similaridade
     similar_indices = [i for i in related_docs_indices if cosine_similarities[i] > 0.05]
     
     if not similar_indices:
         return pd.DataFrame()
 
-    # Retornar o DataFrame com os artigos recomendados
     recomendados_df = df_total.iloc[similar_indices].copy()
     recomendados_df['similarity'] = cosine_similarities[similar_indices]
     
-    return recomendados_df.drop(columns=['corpus'])
+    return recomendados_df.drop(columns=['corpus']).reset_index(drop=True)
 
 # Lista de stop words para melhorar a extração de temas
 PORTUGUESE_STOP_WORDS = [
@@ -338,23 +329,19 @@ def extract_popular_themes_from_data(df_total, top_n=30):
         vectorizer = TfidfVectorizer(stop_words=PORTUGUESE_STOP_WORDS, max_features=1000, ngram_range=(1, 2))
         tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
         
-        # Soma os scores de TF-IDF de cada termo em todos os documentos
         sum_tfidf = tfidf_matrix.sum(axis=0)
         
-        # Mapeia os índices dos termos para seus nomes
         words = vectorizer.get_feature_names_out()
         tfidf_scores = [(words[i], sum_tfidf[0, i]) for i in range(len(words))]
         
-        # Ordena por score e retorna os top_n termos
         sorted_scores = sorted(tfidf_scores, key=lambda x: x[1], reverse=True)
         
         return [word for word, score in sorted_scores[:top_n]]
     except Exception as e:
         print(f"Erro ao extrair temas populares: {e}")
-        return [] # Em caso de erro, retorna uma lista vazia
-# -------------------------
-# load/save users (atomic)
-# -------------------------
+        return []
+
+# ... (O resto das funções de `load_users` até `generate_pdf_with_highlights` permanece o mesmo) ...
 def load_users():
     if _supabase:
         return None
@@ -622,7 +609,9 @@ _defaults = {
     "search_results": pd.DataFrame(), "search_page": 1, "search_query_meta": {"col": None,"query":""},
     "search_view_index": None, "compose_inline": False, "compose_open": False,
     "last_backup_path": None, "selected_node": None,
-    "tutorial_completed": False, # Flag para o novo tutorial
+    "tutorial_completed": False, 
+    # NOVOS ESTADOS PARA A PÁGINA DE RECOMENDAÇÕES
+    "recommendations": pd.DataFrame(), "recommendation_page": 1, "recommendation_view_index": None,
     "settings": {
         "plot_height": 720,
         "font_scale": 1.0,
@@ -633,6 +622,7 @@ for k, v in _defaults.items():
     if k not in st.session_state:
         st.session_state[k] = v
 
+# ... (O resto do código até a definição da página "recomendacoes" permanece o mesmo) ...
 def get_settings():
     return st.session_state.get("settings", _defaults["settings"])
 
@@ -873,7 +863,7 @@ if not st.session_state.get("tutorial_completed"):
         
         * **💡 Recomendações**: Explore artigos e trabalhos de outros usuários com base em temas de interesse. Na sua primeira visita, sugerimos os temas mais populares para você começar!
         
-        * **🞠 Mapa**: Visualize as conexões da sua planilha como um **mapa mental 3D interativo**. Clique nos pontos (nós) para ver como os diferentes autores, temas e anos se relacionam.
+        * **🞠 Mapa**: Visualize as conexões da sua planilha como um **mapa mental 2D interativo**. Clique e arraste os pontos (nós) para organizar o mapa como quiser.
         
         * **📝 Anotações**: Um bloco de notas simples e útil. Para destacar um texto, coloque-o entre `==sinais de igual==`. Você pode baixar suas anotações como um PDF com os destaques.
         
@@ -947,137 +937,157 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Recomendações (VERSÃO MELHORADA COM DESCOBERTA INTELIGENTE)
+# Page: Recomendações (NOVA VERSÃO COM UI DE BUSCA)
 # -------------------------
 elif st.session_state.page == "recomendacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("💡 Recomendações de Artigos")
 
+    # Coleta os dados uma vez
     with st.spinner("Analisando o conhecimento da plataforma..."):
         df_total = collect_latest_backups()
-        
-    # Extrai temas populares de todos os backups para sugerir ao usuário
+    
     temas_populares = extract_popular_themes_from_data(df_total, top_n=50)
 
-    # --- INÍCIO DA LÓGICA DE DESCOBERTA INTELIGENTE (ESTILO SPOTIFY) ---
-    # Verifica se o usuário já fez uma busca nesta sessão
+    # Lógica de Onboarding (primeira visita)
     if 'recommendation_onboarding_complete' not in st.session_state:
         st.session_state.recommendation_onboarding_complete = False
 
-    # Se não há temas populares, significa que não há dados na plataforma
     if not temas_populares:
-        st.warning("Ainda não há dados de outros usuários para gerar recomendações. Carregue uma planilha na aba '📄 Planilha' para começar e ver a mágica acontecer!")
-    # Se é o primeiro acesso do usuário, mostra a interface de descoberta
+        st.warning("Ainda não há dados de outros usuários para gerar recomendações. Carregue uma planilha para começar!")
     elif not st.session_state.recommendation_onboarding_complete:
         st.markdown("#### Bem-vindo à Descoberta Inteligente!")
-        st.write("Para começar, selecione alguns tópicos de seu interesse abaixo. Eles foram extraídos dos trabalhos mais relevantes da plataforma. Com base na sua seleção, encontraremos os melhores artigos para você.")
+        st.write("Selecione alguns tópicos de seu interesse para encontrarmos os melhores artigos para você.")
         
         temas_selecionados = st.multiselect(
-            "Selecione um ou mais temas para começar:",
-            options=temas_populares,
-            key="temas_onboarding"
+            "Selecione um ou mais temas:", options=temas_populares, key="temas_onboarding"
         )
         
-        if st.button("Gerar minhas primeiras recomendações", key="btn_onboarding_recomendar"):
-            if not temas_selecionados:
-                st.error("Por favor, selecione pelo menos um tema para continuar.")
-            else:
-                with st.spinner("Analisando artigos e buscando as melhores recomendações..."):
-                    df_total.rename(columns={'titulo': 'título', 'resumo': 'resumo', 'abstract': 'resumo', 'autor': 'autor', 'ano': 'ano', 'tema':'tema'}, inplace=True, errors='ignore')
+        if st.button("Gerar minhas primeiras recomendações"):
+            if temas_selecionados:
+                with st.spinner("Buscando as melhores recomendações..."):
+                    df_total.rename(columns={'titulo': 'título'}, inplace=True, errors='ignore')
                     recommended_df = recomendar_artigos(temas_selecionados, df_total)
                     st.session_state.recommendations = recommended_df
-                    # Marca que o onboarding foi concluído para não mostrar novamente na mesma sessão
+                    st.session_state.recommendation_page = 1
+                    st.session_state.recommendation_view_index = None
                     st.session_state.recommendation_onboarding_complete = True
-                    safe_rerun() # Recarrega a página para mostrar os resultados
-    # Se o usuário já passou pela descoberta, mostra a interface padrão
+                    safe_rerun()
+            else:
+                st.error("Por favor, selecione pelo menos um tema.")
     else:
-        st.write("Explore artigos de outros usuários com base nos seus temas de interesse. Selecione um ou mais temas abaixo.")
+        # Interface principal após o onboarding
+        st.write("Refine suas recomendações ou explore novos temas.")
         temas_selecionados = st.multiselect(
-            "Selecione seus temas de interesse:",
-            options=temas_populares,
-            key="temas_recomendacao"
+            "Selecione temas de interesse:", options=temas_populares, key="temas_recomendacao"
         )
-        
-        if st.button("Buscar Novas Recomendações", key="btn_recomendar"):
-            with st.spinner("Analisando artigos e buscando as melhores recomendações..."):
-                if df_total.empty:
-                    st.warning("Ainda não há dados de outros usuários para gerar recomendações.")
-                else:
-                    df_total.rename(columns={'titulo': 'título', 'resumo': 'resumo', 'abstract': 'resumo', 'autor': 'autor', 'ano': 'ano', 'tema':'tema'}, inplace=True, errors='ignore')
-                    recommended_df = recomendar_artigos(temas_selecionados, df_total)
-                    st.session_state.recommendations = recommended_df
-    # --- FIM DA LÓGICA DE DESCOBERTA INTELIGENTE ---
 
-    # Lógica para exibir os resultados (permanece a mesma)
-    if 'recommendations' in st.session_state:
-        if not st.session_state.recommendations.empty:
+        if st.button("Buscar Novas Recomendações"):
+            with st.spinner("Analisando artigos..."):
+                df_total.rename(columns={'titulo': 'título'}, inplace=True, errors='ignore')
+                recommended_df = recomendar_artigos(temas_selecionados, df_total)
+                st.session_state.recommendations = recommended_df
+                st.session_state.recommendation_page = 1
+                st.session_state.recommendation_view_index = None
+                safe_rerun()
+
+    # Exibição dos resultados (estilo página de busca)
+    results_df = st.session_state.get('recommendations', pd.DataFrame())
+    
+    if not results_df.empty:
+        # Se um item está selecionado para detalhes, mostra apenas ele
+        if st.session_state.get("recommendation_view_index") is not None:
+            vi = st.session_state.recommendation_view_index
+            if 0 <= vi < len(results_df):
+                det = results_df.loc[vi].to_dict()
+                st.markdown("---")
+                st.markdown("### Detalhes do Artigo Recomendado")
+
+                if st.button("⬅️ Voltar para a lista"):
+                    st.session_state.recommendation_view_index = None
+                    safe_rerun()
+
+                for k, v in det.items():
+                    if k not in ['similarity', 'corpus']:
+                        st.markdown(f"**{str(k).capitalize()}:** {escape_html(v)}")
+                
+                st.markdown("---")
+                if st.button("⭐ Favoritar este artigo", key=f"fav_detail_rec_{vi}"):
+                    if add_to_favorites(det): st.toast("Adicionado aos favoritos!", icon="⭐")
+                    else: st.toast("Já está nos favoritos.")
+
+        # Exibição da lista paginada
+        else:
+            per_page = 5
+            total = len(results_df)
+            max_pages = max(1, (total + per_page - 1) // per_page)
+            page = st.session_state.get("recommendation_page", 1)
+            page = max(1, min(page, max_pages))
+            start = (page - 1) * per_page
+            end = min(start + per_page, total)
+            page_df = results_df.iloc[start:end]
+
             st.markdown("---")
-            st.markdown(f"**Encontramos {len(st.session_state.recommendations)} artigos recomendados para você:**")
-            
-            for i, row in st.session_state.recommendations.iterrows():
-                result_data = row.to_dict()
-                user_src = result_data.get("_artemis_username", "N/A")
+            st.markdown(f"**{total}** artigo(s) recomendado(s) — exibindo {start+1} a {end}.")
+
+            for i in page_df.index:
+                row = results_df.loc[i]
+                user_src = row.get("_artemis_username", "N/A")
                 initials = "".join([p[0].upper() for p in str(user_src).split()[:2]])[:2] or "U"
-                title_raw = str(result_data.get('título') or '(Sem título)')
-                resumo_raw = (str(result_data.get('resumo') or "")[:200] + "...") if result_data.get('resumo') else ""
-                author = str(result_data.get('autor') or '')
-                year = str(result_data.get('ano') or '')
+                title = str(row.get('título', '(Sem título)'))
                 
                 card_html = f"""
                 <div class="card">
-                    <div style="display:flex; gap:12px; align-items:center;">
-                        <div class="avatar">{escape_html(initials)}</div>
-                        <div style="flex:1;">
-                            <div class="card-title">{escape_html(title_raw)}</div>
-                            <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • {escape_html(author)} ({escape_html(year)})</div>
-                            <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{escape_html(resumo_raw)}</div>
-                        </div>
-                    </div>
+                    <div class="card-title">{escape_html(title)}</div>
+                    <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • Similaridade: {row.get('similarity', 0):.2f}</div>
                 </div>"""
                 st.markdown(card_html, unsafe_allow_html=True)
-                if st.button("⭐ Favoritar este artigo", key=f"fav_rec_{i}", use_container_width=True):
-                    if add_to_favorites(result_data): st.toast("Adicionado aos favoritos!", icon="⭐")
-                    else: st.toast("Já está nos favoritos.")
-        else:
-            # Garante que a mensagem de "nenhum resultado" apareça após uma busca, não no carregamento inicial
-            if st.session_state.get('recommendations') is not None:
-                st.info("Nenhum artigo relevante encontrado para os temas selecionados. Tente outra combinação.")
+
+                b_col1, b_col2 = st.columns([1, 1])
+                with b_col1:
+                    if st.button("⭐ Favoritar", key=f"fav_rec_{i}", use_container_width=True):
+                        if add_to_favorites(row.to_dict()): st.toast("Adicionado aos favoritos!", icon="⭐")
+                        else: st.toast("Já está nos favoritos.")
+                with b_col2:
+                    if st.button("🔎 Ver detalhes", key=f"view_rec_{i}", use_container_width=True):
+                        st.session_state.recommendation_view_index = i
+                        safe_rerun()
+            
+            # Paginação
+            st.markdown("---")
+            p1, p2, p3 = st.columns([1, 1, 1])
+            with p1:
+                if st.button("◀ Anterior", key="rec_prev", disabled=(page <= 1)):
+                    st.session_state.recommendation_page -= 1
+                    safe_rerun()
+            with p2:
+                st.markdown(f"<div style='text-align:center; padding-top:8px'><b>Página {page} / {max_pages}</b></div>", unsafe_allow_html=True)
+            with p3:
+                if st.button("Próxima ▶", key="rec_next", disabled=(page >= max_pages)):
+                    st.session_state.recommendation_page += 1
+                    safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Mapa Interativo (VERSÃO MELHORADA E CORRIGIDA)
+# Page: Mapa Mental (NOVA VERSÃO COM AGRAph)
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🞠 Mapa Mental 3D Interativo")
-    st.info("Clique em um nó (ponto) para focar em suas conexões. Use o menu de opções para editar o mapa.")
+    st.subheader("🞠 Mapa Mental Interativo")
+    st.info("Clique e arraste os nós para organizar o mapa. Clique em um nó para ver seus detalhes e conexões.")
     
-    G = st.session_state.G or nx.Graph()
-    nodes_list = list(G.nodes()) # Lista de nós para selects
+    G = st.session_state.get("G", nx.Graph())
+    nodes_list = list(G.nodes())
 
-    tipo_color_map = {
-        "Autor": "#2979ff", "Tema": "#1abc9c", "Ano": "#ff8a00", "País": "#8e44ad", "Título": "#d63384",
-    }
-
-    with st.expander("Opções do Mapa e Edição Avançada do Grafo"):
-        st.write("**Opções de Visualização**")
-        c1, c2 = st.columns(2)
-        with c1:
-            show_labels = st.checkbox("Mostrar rótulos fixos (pode sobrepor)", value=False, key=f"show_labels_{USERNAME}")
-        with c2:
-            iterations = st.slider("Qualidade do Layout (Iterações)", min_value=50, max_value=500, value=200, step=10, key="layout_iterations")
-        
-        st.markdown("---")
-        st.write("**Edição Avançada do Grafo**")
-        
+    # Opções e edição do grafo
+    with st.expander("Opções e Edição do Mapa Mental"):
         edit_c1, edit_c2 = st.columns(2)
-
         with edit_c1:
             with st.form("create_node_form", clear_on_submit=True):
                 st.write("**1. Criar Novo Nó**")
                 new_node_label = st.text_input("Rótulo do nó")
-                new_node_type = st.selectbox("Tipo do nó", options=list(tipo_color_map.keys()))
+                new_node_type = st.selectbox("Tipo do nó", options=["Autor", "Tema", "Ano", "País", "Título"])
                 if st.form_submit_button("➕ Criar Nó"):
                     if new_node_label and new_node_type:
                         node_id = f"{new_node_type}: {new_node_label.strip()}"
@@ -1086,35 +1096,12 @@ elif st.session_state.page == "mapa":
                             st.success(f"Nó '{node_id}' criado!")
                             if st.session_state.autosave: save_user_state_minimal(USER_STATE)
                             time.sleep(0.5); safe_rerun()
-                        else:
-                            st.warning("Este nó já existe.")
-                    else:
-                        st.warning("Preencha o rótulo e o tipo.")
-            
-            with st.form("rename_node_form"):
-                st.write("**2. Renomear Nó**")
-                node_to_rename = st.selectbox("Nó para renomear", options=[""] + nodes_list, key="rename_select")
-                new_label = st.text_input("Novo rótulo")
-                if st.form_submit_button("✏️ Renomear"):
-                    if node_to_rename and new_label:
-                        old_type = G.nodes[node_to_rename].get('tipo', '')
-                        new_node_id = f"{old_type}: {new_label.strip()}"
-                        if new_node_id != node_to_rename:
-                           nx.relabel_nodes(G, {node_to_rename: new_node_id}, copy=False)
-                           G.nodes[new_node_id]['label'] = new_label.strip()
-                           st.success(f"Nó renomeado para '{new_node_id}'")
-                           if st.session_state.selected_node == node_to_rename:
-                               st.session_state.selected_node = new_node_id
-                           if st.session_state.autosave: save_user_state_minimal(USER_STATE)
-                           time.sleep(0.5); safe_rerun()
-                        else:
-                           st.info("O novo nome é igual ao antigo.")
-                    else:
-                        st.warning("Selecione um nó e digite o novo rótulo.")
+                        else: st.warning("Este nó já existe.")
+                    else: st.warning("Preencha o rótulo e o tipo.")
 
         with edit_c2:
             with st.form("connect_nodes_form", clear_on_submit=True):
-                st.write("**3. Conectar Nós**")
+                st.write("**2. Conectar Nós**")
                 node1 = st.selectbox("Primeiro nó", options=[""] + nodes_list, key="connect1")
                 node2 = st.selectbox("Segundo nó", options=[""] + nodes_list, key="connect2")
                 if st.form_submit_button("🔗 Conectar"):
@@ -1124,168 +1111,76 @@ elif st.session_state.page == "mapa":
                            st.success(f"Nós '{node1}' e '{node2}' conectados.")
                            if st.session_state.autosave: save_user_state_minimal(USER_STATE)
                            time.sleep(0.5); safe_rerun()
-                        else:
-                           st.info("Esses nós já estão conectados.")
-                    else:
-                        st.warning("Selecione dois nós diferentes para conectar.")
+                        else: st.info("Esses nós já estão conectados.")
+                    else: st.warning("Selecione dois nós diferentes para conectar.")
 
-            with st.form("delete_node_form"):
-                st.write("**4. Excluir Nó**")
-                del_n = st.selectbox("Nó para excluir", [""] + nodes_list, key=f"del_{USERNAME}")
-                if st.form_submit_button("🗑️ Excluir Nó Selecionado"):
-                    if del_n and del_n in G:
-                        G.remove_node(del_n)
-                        st.success(f"Nó '{del_n}' removido.")
-                        if st.session_state.selected_node == del_n:
-                            st.session_state.selected_node = None
-                        if st.session_state.autosave: save_user_state_minimal(USER_STATE)
-                        time.sleep(0.5); safe_rerun()
-    
-    st.info(f"O grafo atual tem **{G.number_of_nodes()}** nós e **{G.number_of_edges()}** arestas.")
+    # Renderização do mapa mental
+    if G.number_of_nodes() > 0:
+        nodes = []
+        edges = []
+        for node_id, data in G.nodes(data=True):
+            nodes.append(Node(id=node_id, 
+                               label=data.get("label", node_id), 
+                               shape="box",
+                               font={"color": "#343434", "size": 18},
+                               color="#E0B0FF", # Cor de fundo roxo claro
+                               borderWidth=2,
+                               borderRadius=10))
+        for u, v in G.edges():
+            edges.append(Edge(source=u, target=v, color="#C9A0DC", width=2))
 
-    legend_html = "<div style='display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 10px;'>"
-    for tipo, color in tipo_color_map.items():
-        legend_html += f"<div style='display: flex; align-items: center; gap: 5px;'><div style='width: 15px; height: 15px; background-color: {color}; border-radius: 50%;'></div><span style='color: #d6d9dc;'>{tipo}</span></div>"
-    legend_html += "</div>"
-    st.markdown(legend_html, unsafe_allow_html=True)
-    
-    fig_container = st.empty()
+        # Configurações de layout e física do mapa
+        config = Config(width="100%", 
+                        height=600, 
+                        directed=False, 
+                        physics=True, 
+                        hierarchical=False,
+                        # Melhora o layout
+                        layout={"improvedLayout": True},
+                        interaction={"navigationButtons": True, "keyboard": True})
 
-    try:
-        if G.number_of_nodes() == 0:
-            st.warning("O mapa está vazio. Carregue uma planilha ou crie nós para começar.")
+        # O componente agraph retorna o ID do nó clicado
+        clicked_node_id = agraph(nodes=nodes, edges=edges, config=config)
+        
+        # Atualiza o estado da sessão se um nó foi clicado
+        if clicked_node_id:
+            st.session_state.selected_node = clicked_node_id
+
+    else:
+        st.warning("O mapa está vazio. Carregue uma planilha ou crie nós para começar.")
+
+    # Exibição dos detalhes do nó selecionado
+    selected_node_name = st.session_state.get("selected_node")
+    if selected_node_name and selected_node_name in G:
+        node_data = G.nodes[selected_node_name]
+        neighbors = list(G.neighbors(selected_node_name))
+        
+        st.markdown("---")
+        st.subheader(f"🔍 Detalhes do Nó: {node_data.get('label', selected_node_name)}")
+        
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            st.markdown(f"**Tipo:** {escape_html(node_data.get('tipo', 'N/A'))}")
+            st.markdown(f"**Conexões:** {len(neighbors)}")
+        with col2:
+            if st.button("🗑️ Excluir Nó", use_container_width=True):
+                G.remove_node(selected_node_name)
+                st.session_state.selected_node = None
+                if st.session_state.autosave: save_user_state_minimal(USER_STATE)
+                st.toast(f"Nó '{selected_node_name}' removido.")
+                time.sleep(1); safe_rerun()
+
+        st.write("**Conectado a:**")
+        if neighbors:
+            for neighbor in sorted(neighbors):
+                neighbor_label = G.nodes[neighbor].get('label', neighbor)
+                st.markdown(f"- {neighbor_label}")
         else:
-            with st.spinner("Renderizando mapa interativo..."):
-                # CORREÇÃO: Adicionado `if G.number_of_nodes() > 0 else 1` para evitar ZeroDivisionError
-                k_value = (2.0 / math.sqrt(G.number_of_nodes())) if G.number_of_nodes() > 0 else 1
-                pos = nx.spring_layout(G, dim=3, seed=42, iterations=iterations, k=k_value)
-                
-                selected = st.session_state.get("selected_node")
-                neighbors = list(G.neighbors(selected)) if selected else []
-
-                # Configuração de Arestas
-                faded_edge_color = "rgba(128, 128, 128, 0.2)"
-                main_edge_color = "rgba(136, 136, 136, 0.8)"
-                
-                edge_trace = go.Scatter3d(
-                    x=[p for u, v in G.edges() for p in (pos[u][0], pos[v][0], None)],
-                    y=[p for u, v in G.edges() for p in (pos[u][1], pos[v][1], None)],
-                    z=[p for u, v in G.edges() for p in (pos[u][2], pos[v][2], None)],
-                    mode='lines',
-                    line=dict(
-                        color=main_edge_color if not selected else faded_edge_color,
-                        width=1
-                    ),
-                    hoverinfo='none'
-                )
-                
-                if selected:
-                    focus_edge_trace = go.Scatter3d(
-                        x=[p for u, v in G.edges() if u == selected or v == selected for p in (pos[u][0], pos[v][0], None)],
-                        y=[p for u, v in G.edges() if u == selected or v == selected for p in (pos[u][1], pos[v][1], None)],
-                        z=[p for u, v in G.edges() if u == selected or v == selected for p in (pos[u][2], pos[v][2], None)],
-                        mode='lines',
-                        line=dict(color="#2979ff", width=2.5),
-                        hoverinfo='none'
-                    )
-
-                # Configuração de Nós
-                node_x, node_y, node_z, node_colors, node_sizes, node_texts = [], [], [], [], [], []
-                node_opacity_setting = get_settings().get("node_opacity", 1.0)
-                
-                for node in nodes_list:
-                    data = G.nodes[node]
-                    x, y, z = pos[node]
-                    node_x.append(x); node_y.append(y); node_z.append(z)
-                    
-                    # --- INÍCIO DA CORREÇÃO (Plotly Opacity Error) ---
-                    node_tipo = data.get('tipo', '').capitalize()
-                    hex_color = tipo_color_map.get(node_tipo, "#808080")
-                    is_focus = (selected and (node == selected or node in neighbors))
-                    opacity = node_opacity_setting if not selected or is_focus else 0.25
-                    node_colors.append(hex_to_rgba(hex_color, opacity))
-                    # --- FIM DA CORREÇÃO ---
-                    
-                    degree = G.degree(node)
-                    node_sizes.append(18 if node == selected else max(8, (degree + 1) * 4))
-                    
-                    hover_text = f"<b>{escape_html(data.get('label', node))}</b><br>Tipo: {node_tipo}<br>Conexões: {degree}"
-                    node_texts.append(hover_text)
-                
-                node_trace = go.Scatter3d(
-                    x=node_x, y=node_y, z=node_z,
-                    mode='markers+text' if show_labels else 'markers',
-                    text=[d.get('label', '') for n, d in G.nodes(data=True)] if show_labels else None,
-                    textposition="top center",
-                    hoverinfo='text',
-                    hovertext=node_texts,
-                    marker=dict(
-                        color=node_colors, 
-                        size=node_sizes,
-                        line=dict(color='rgba(255, 255, 255, 0.6)', width=0.8)
-                    )
-                )
-
-                fig_data = [edge_trace, node_trace]
-                if selected:
-                    fig_data.append(focus_edge_trace)
-
-                fig = go.Figure(data=fig_data)
-                fig.update_layout(
-                    height=int(get_settings().get("plot_height", 720)), 
-                    showlegend=False, 
-                    paper_bgcolor="rgba(0,0,0,0)", 
-                    plot_bgcolor="rgba(0,0,0,0)",
-                    scene=dict(xaxis=dict(visible=False), yaxis=dict(visible=False), zaxis=dict(visible=False), aspectmode='data'),
-                    margin=dict(l=0, r=0, b=0, t=0), 
-                    uirevision='constant'
-                )
-                
-                selection = fig_container.plotly_chart(fig, use_container_width=True, on_select="rerun", key="mapa_3d")
-                
-                if selection and selection.get("points"):
-                    point = selection["points"][0]
-                    if point['curveNumber'] == 1:
-                        node_index = point['pointNumber']
-                        clicked_node = nodes_list[node_index]
-                        if st.session_state.get("selected_node") == clicked_node:
-                            st.session_state.selected_node = None
-                        else:
-                            st.session_state.selected_node = clicked_node
-                        safe_rerun()
-                        
-    except Exception as e:
-        st.error(f"Ocorreu um erro inesperado ao renderizar o grafo: {e}")
-    
-    if st.session_state.get("selected_node"):
-        selected_node_name = st.session_state.selected_node
-        if selected_node_name in G:
-            node_data = G.nodes[selected_node_name]
-            neighbors = list(G.neighbors(selected_node_name))
-            
-            st.markdown("---")
-            st.subheader("🔍 Detalhes do Nó Selecionado")
-            
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.markdown(f"**Nó:** `{escape_html(selected_node_name)}`")
-                st.markdown(f"**Tipo:** {escape_html(node_data.get('tipo', 'N/A'))}")
-                st.markdown(f"**Número de Conexões (Grau):** {len(neighbors)}")
-            with col2:
-                if st.button("Limpar Seleção", use_container_width=True):
-                    st.session_state.selected_node = None
-                    safe_rerun()
-
-            st.write("**Conectado a:**")
-            if neighbors:
-                for neighbor in sorted(neighbors):
-                    neighbor_tipo = G.nodes[neighbor].get('tipo', 'N/A')
-                    st.markdown(f"- `{neighbor}` (Tipo: *{neighbor_tipo}*)")
-            else:
-                st.write("Este nó não possui conexões.")
+            st.write("Este nó não possui conexões.")
 
     st.markdown("</div>", unsafe_allow_html=True)
-
+    
+# ... (O resto do código para as outras páginas permanece o mesmo) ...
 
 # -------------------------
 # Page: Anotações
