@@ -1,5 +1,5 @@
 # app_nugep_pqr_full.py
-# NUGEP-PQR — Versão completa e corrigida (tratamento robusto de mensagens)
+# NUGEP-PQR — Versão completa com correções nas Recomendações e CSS do título
 
 import os
 import re
@@ -42,7 +42,11 @@ except Exception as _e:
     MATPLOTLIB_AVAILABLE = False
     print(f"matplotlib não disponível: {_e}")
 
+# -------------------------
+# Config & helpers
+# -------------------------
 st.set_page_config(page_title="NUGEP-PQR", layout="wide", initial_sidebar_state="expanded")
+
 
 def safe_rerun():
     try:
@@ -60,7 +64,9 @@ def safe_rerun():
     except Exception:
         raise RuntimeError("safe_rerun falhou e não foi possível chamar st.stop()")
 
-# CSS (título azul + card-title com gradiente azul)
+# -------------------------
+# Base CSS
+# -------------------------
 BASE_CSS = r"""
 :root{ --glass-bg-dark: rgba(255,255,255,0.03); --muted-text-dark:#bfc6cc; }
 body { transition: background-color .25s ease, color .25s ease; }
@@ -68,8 +74,10 @@ body { transition: background-color .25s ease, color .25s ease; }
 .card, .msg-card { border-radius:10px; padding:12px; margin-bottom:10px; }
 .avatar{width:40px;height:40px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;margin-right:8px}
 .small-muted{font-size:12px;}
-.card-title{font-weight:700;font-size:15px; background: linear-gradient(90deg,#0077ff,#00a3ff); -webkit-background-clip: text; color: transparent;}
+/* evita barra azul larga: título como texto inline */
+.card-title{display:inline-block;font-weight:700;font-size:15px; background: linear-gradient(90deg,#0077ff,#00a3ff); -webkit-background-clip: text; color: transparent; margin:0; padding:0;}
 .card-mark{ background: rgba(255,255,0,0.12); padding: 0 2px; border-radius:2px; }
+/* Estilos para botões interativos */
 .stButton>button, .stDownloadButton>button {
     transition: transform 0.1s ease, opacity 0.1s ease, background-color 0.15s ease !important;
 }
@@ -79,24 +87,33 @@ body { transition: background-color .25s ease, color .25s ease; }
 }
 """
 
+# default dark CSS
 DEFAULT_CSS = r"""
 .css-1d391kg { background: linear-gradient(180deg,#071428 0%, #031926 100%) !important; }
+/* CAIXAS COM FUNDO SÓLIDO (SEM EFEITO TRANSLÚCIDO) */
 .glass-box{ background: #0E192A; border:1px solid #2A3B52; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
 .stButton>button, .stDownloadButton>button{ background:#1C2D4A !important; color:#bfc6cc !important; border:1px solid #2A3B52 !important; padding:8px 12px !important; border-radius:10px !important; }
-.stButton>button:hover, .stDownloadButton>button:hover { background: #2A3B52 !important; border-color: #3C5070 !important; }
+.stButton>button:hover, .stDownloadButton>button:hover {
+    background: #2A3B52 !important;
+    border-color: #3C5070 !important;
+}
 .card, .msg-card { background: #0E192A; border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid #2A3B52; }
 .avatar{color:#fff;background:#6c5ce7}
 .small-muted{color:#bfc6cc;}
 .card-title{color:transparent}
 """
 
+# inject base CSS
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
+# inject dark default
 st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
 
-# header azul
+# header
 st.markdown("<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'><h1 style='font-weight:800;font-size:40px; background:linear-gradient(90deg,#0077ff,#00a3ff); -webkit-background-clip:text; color:transparent; margin:0;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
 
-# paths
+# -------------------------
+# Storage & fallback paths
+# -------------------------
 USERS_FILE = "users.json"
 MESSAGES_FILE = "messages.json"
 BACKUPS_DIR = Path("backups")
@@ -104,7 +121,9 @@ ATTACHMENTS_DIR = Path("user_files")
 BACKUPS_DIR.mkdir(exist_ok=True)
 ATTACHMENTS_DIR.mkdir(exist_ok=True)
 
-# helpers
+# -------------------------
+# Utilidades gerais
+# -------------------------
 def normalize_text(text):
     if not isinstance(text, str):
         return ""
@@ -112,6 +131,11 @@ def normalize_text(text):
 
 def escape_html(s):
     return html.escape(str(s) if s is not None else "")
+
+def hex_to_rgba(h, alpha):
+    h = h.lstrip('#')
+    return f"rgba({', '.join(str(i) for i in tuple(int(h[i:i+2], 16) for i in (0, 2, 4)))}, {alpha})"
+
 
 def gen_password(length=8):
     choices = string.ascii_letters + string.digits
@@ -126,6 +150,7 @@ def apply_global_styles(font_scale=1.0):
     except Exception:
         pass
 
+# helper: render credential box with copy & download
 def _render_credentials_box(username, password, note=None, key_prefix="cred"):
     st.markdown("---")
     st.success("Usuário criado com sucesso — anote/guarde a senha abaixo:")
@@ -152,13 +177,17 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
         st.markdown(js, unsafe_allow_html=True)
     st.markdown("---")
 
-# recommendation/search utilities
+
+# -------------------------
+# Funções de Busca & Recomendação
+# -------------------------
 @st.cache_data(ttl=600)
 def collect_latest_backups():
     all_dfs = []
     base_path = Path(BACKUPS_DIR)
     if not base_path.exists():
         return pd.DataFrame()
+
     for user_dir in base_path.iterdir():
         if user_dir.is_dir():
             username = user_dir.name
@@ -171,8 +200,10 @@ def collect_latest_backups():
                 except Exception as e:
                     print(f"Skipping unreadable backup {csv_file}: {e}")
                     continue
+    
     if not all_dfs:
         return pd.DataFrame()
+
     try:
         return pd.concat(all_dfs, ignore_index=True)
     except Exception as e:
@@ -187,56 +218,73 @@ def highlight_search_terms(text, query):
     return highlighted_text
 
 def recomendar_artigos(temas_selecionados, df_total, query_text=None, top_n=50):
+    # se sklearn não está disponível, retorna DataFrame vazio
     if TfidfVectorizer is None or cosine_similarity is None:
         st.error("Bibliotecas de Machine Learning (scikit-learn) não estão instaladas.")
         return pd.DataFrame()
+
     if df_total.empty or (not temas_selecionados and not query_text):
         return pd.DataFrame()
+
     corpus_series = pd.Series([''] * len(df_total), index=df_total.index, dtype=str)
+    
     for col in ['título', 'tema', 'resumo', 'titulo', 'abstract']:
         if col in df_total.columns:
             corpus_series += df_total[col].fillna('') + ' '
+    
     df_total['corpus'] = corpus_series.str.lower()
+    
     if df_total['corpus'].str.strip().eq('').all():
         return pd.DataFrame()
+    
     vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
     tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
+    
     query_parts = []
     if temas_selecionados: query_parts.extend(temas_selecionados)
     if query_text: query_parts.append(query_text)
+    
     query_final = ' '.join(query_parts).lower()
     query_vector = vectorizer.transform([query_final])
+    
     cosine_similarities = cosine_similarity(query_vector, tfidf_matrix).flatten()
     related_docs_indices = cosine_similarities.argsort()[:-top_n-1:-1]
     similar_indices = [i for i in related_docs_indices if cosine_similarities[i] > 0.05]
+    
     if not similar_indices:
         return pd.DataFrame()
+
     recomendados_df = df_total.iloc[similar_indices].copy()
     recomendados_df['similarity'] = cosine_similarities[similar_indices]
+    
     return recomendados_df.drop(columns=['corpus']).reset_index(drop=True)
 
 PORTUGUESE_STOP_WORDS = [
-    'de','a','o','que','e','do','da','em','um','para','é','com','não','uma','os','no','se','na',
-    'por','mais','as','dos','como','mas','foi','ao','ele','das','tem','à','seu','sua','ou','ser',
-    'quando','muito','há','nos','já','está','eu','também','só','pelo','pela','até','isso','ela',
-    'entre','era','depois','sem','mesmo','aos','ter','seus','quem','nas','me','esse','eles','estão',
-    'você','tinha','foram','essa','num','nem','suas','meu','às','minha','têm','numa','pelos','elas',
-    'havia','seja','qual','será','nós','tenho','lhe','deles','essas','esses','pelas','este','fosse',
-    'dele','tu','te','vocês','vos','lhes','meus','minhas','teu','tua','teus','tuas','nosso','nossa',
-    'nossos','nossas','dela','delas','esta','estes','estas','aquele','aquela','aqueles','aquelas',
-    'isto','aquilo'
+    'de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'uma', 'os', 'no', 'se', 'na', 
+    'por', 'mais', 'as', 'dos', 'como', 'mas', 'foi', 'ao', 'ele', 'das', 'tem', 'à', 'seu', 'sua', 'ou', 'ser', 
+    'quando', 'muito', 'há', 'nos', 'já', 'está', 'eu', 'também', 'só', 'pelo', 'pela', 'até', 'isso', 'ela', 
+    'entre', 'era', 'depois', 'sem', 'mesmo', 'aos', 'ter', 'seus', 'quem', 'nas', 'me', 'esse', 'eles', 'estão', 
+    'você', 'tinha', 'foram', 'essa', 'num', 'nem', 'suas', 'meu', 'às', 'minha', 'têm', 'numa', 'pelos', 'elas', 
+    'havia', 'seja', 'qual', 'será', 'nós', 'tenho', 'lhe', 'deles', 'essas', 'esses', 'pelas', 'este', 'fosse', 
+    'dele', 'tu', 'te', 'vocês', 'vos', 'lhes', 'meus', 'minhas', 'teu', 'tua', 'teus', 'tuas', 'nosso', 'nossa', 
+    'nossos', 'nossas', 'dela', 'delas', 'esta', 'estes', 'estas', 'aquele', 'aquela', 'aqueles', 'aquelas', 
+    'isto', 'aquilo'
 ]
 
 @st.cache_data(ttl=600)
 def extract_popular_themes_from_data(df_total, top_n=30):
     if TfidfVectorizer is None: return []
     if df_total.empty: return []
+
     corpus_series = pd.Series([''] * len(df_total), index=df_total.index, dtype=str)
     for col in ['título', 'tema', 'resumo', 'titulo', 'abstract']:
         if col in df_total.columns:
             corpus_series += df_total[col].fillna('') + ' '
+    
     df_total['corpus'] = corpus_series.str.lower()
+
     if df_total['corpus'].str.strip().eq('').all(): return []
+
     try:
         vectorizer = TfidfVectorizer(stop_words=PORTUGUESE_STOP_WORDS, max_features=1000, ngram_range=(1, 2))
         tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
@@ -249,7 +297,6 @@ def extract_popular_themes_from_data(df_total, top_n=30):
         print(f"Erro ao extrair temas populares: {e}")
         return []
 
-# users/messages/backups
 def load_users():
     users_path = Path.cwd() / USERS_FILE
     if users_path.exists():
@@ -280,8 +327,11 @@ def get_session_favorites(): return st.session_state.get("favorites", [])
 def add_to_favorites(result_data):
     favorites = get_session_favorites()
     favorite_item = {"id": f"{int(time.time())}_{random.randint(1000,9999)}", "data": result_data, "added_at": datetime.utcnow().isoformat()}
+    
     temp_data_to_check = {k: v for k, v in result_data.items() if k not in ['_artemis_username', 'similarity']}
+    
     existing_contents = [json.dumps({k: v for k, v in fav["data"].items() if k not in ['_artemis_username', 'similarity']}, sort_keys=True) for fav in favorites]
+    
     if json.dumps(temp_data_to_check, sort_keys=True) not in existing_contents:
         favorites.append(favorite_item)
         st.session_state.favorites = favorites
@@ -340,8 +390,8 @@ def load_all_messages():
 
 def send_message(sender, recipient, subject, body, attachment_file=None):
     entry = {
-        "id": f"m_{int(time.time())}_{random.randint(1000,9999)}",
-        "from": sender, "to": recipient, "subject": subject or "(sem assunto)",
+        "id": f"m_{int(time.time())}_{random.randint(1000,9999)}", 
+        "from": sender, "to": recipient, "subject": subject or "(sem assunto)", 
         "body": body, "ts": datetime.utcnow().isoformat(), "read": False, "attachment": None
     }
     if attachment_file:
@@ -427,6 +477,7 @@ def export_graph_png_bytes(G):
     if not MATPLOTLIB_AVAILABLE:
         print("Exportação PNG requisitada, mas matplotlib não está instalado.")
         return None
+
     try:
         fig, ax = plt.subplots(figsize=(12, 7))
         fig.patch.set_facecolor('#071428')
@@ -435,10 +486,12 @@ def export_graph_png_bytes(G):
             pos = nx.spring_layout(G, seed=42, k=1.2)
         except Exception:
             pos = nx.random_layout(G, seed=42)
+
         node_labels = {n: G.nodes[n].get('label', n) for n in G.nodes()}
         nx.draw_networkx_edges(G, pos, ax=ax, arrows=True, edge_color="#B0B0B0")
         nx.draw_networkx_nodes(G, pos, ax=ax, node_color="#22252A", node_size=3000)
         nx.draw_networkx_labels(G, pos, labels=node_labels, font_color="white", font_size=10)
+
         ax.axis('off')
         plt.tight_layout()
         buf = io.BytesIO()
@@ -450,7 +503,6 @@ def export_graph_png_bytes(G):
         print(f"Erro exportando PNG: {e}")
         return None
 
-# defaults / session init
 _defaults = {
     "authenticated": False, "username": None, "user_obj": None, "df": None,
     "notes": "", "autosave": False, "page": "planilha",
@@ -459,7 +511,7 @@ _defaults = {
     "search_results": pd.DataFrame(), "search_page": 1, "search_query_meta": {"col": None,"query":""},
     "search_view_index": None, "compose_inline": False, "compose_open": False,
     "last_backup_path": None, "selected_node": None,
-    "tutorial_completed": False,
+    "tutorial_completed": False, 
     "recommendations": pd.DataFrame(), "recommendation_page": 1, "recommendation_view_index": None,
     "recommendation_onboarding_complete": False,
     "settings": {
@@ -492,6 +544,7 @@ def save_user_state_minimal(USER_STATE):
             "recommendation_onboarding_complete": st.session_state.get("recommendation_onboarding_complete", False)
         }
         clean_data = clean_for_json(data)
+
         tmp = USER_STATE.with_suffix(".tmp")
         with tmp.open("w", encoding="utf-8") as f:
             json.dump(clean_data, f, ensure_ascii=False, indent=2)
@@ -502,7 +555,9 @@ def save_user_state_minimal(USER_STATE):
         st.error(f"FALHA AO SALVAR O ESTADO: {e}")
         return False
 
-# --------------- Auth (CPF numeric 11 digits)
+# -------------------------
+# Autenticação (com validação de CPF - apenas números e 11 dígitos)
+# -------------------------
 if not st.session_state.authenticated:
     st.markdown("<div class='glass-box auth' style='max-width:1100px;margin:0 auto;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("Acesso — Faça login ou cadastre-se")
@@ -576,7 +631,6 @@ if not st.session_state.authenticated:
     st.markdown("</div>", unsafe_allow_html=True)
     st.stop()
 
-# After login: restore state if any
 USERNAME = st.session_state.username
 USER_OBJ = st.session_state.user_obj or load_users().get(USERNAME, {})
 USER_STATE = Path.cwd() / f"artemis_state_{USERNAME}.json"
@@ -588,6 +642,7 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
             if key in st.session_state:
                 st.session_state[key] = value
         if "settings" in meta: st.session_state.settings.update(meta.get("settings", {}))
+        
         backup_path = st.session_state.get("last_backup_path")
         if backup_path and Path(backup_path).exists():
             try:
@@ -596,6 +651,7 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
             except Exception as e:
                 st.error(f"Falha ao restaurar backup: {e}")
                 st.session_state.last_backup_path = None
+        
         st.session_state.restored_from_saved = True
         st.toast("Progresso anterior restaurado.", icon="👍")
     except Exception as e:
@@ -628,7 +684,6 @@ with top2:
             safe_rerun()
 st.markdown("</div>", unsafe_allow_html=True)
 
-# navigation
 st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
 nav_buttons = {"planilha": "📄 Planilha", "recomendacoes": "💡 Recomendações", "mapa": "🞠 Mapa",
                "anotacoes": "📝 Anotações", "graficos": "📊 Gráficos", "busca": "🔍 Busca",
@@ -638,11 +693,10 @@ for i, (page_key, page_label) in enumerate(nav_buttons.items()):
     with nav_cols[i]:
         if st.button(page_label, key=f"nav_{page_key}", use_container_width=True):
             st.session_state.page = page_key
-            st.session_state.selected_node = None
+            st.session_state.selected_node = None 
             safe_rerun()
 st.markdown("</div></div><hr>", unsafe_allow_html=True)
 
-# tutorial
 if not st.session_state.get("tutorial_completed"):
     with st.expander("👋 Bem-vindo ao NUGEP-PQR! Um Guia Rápido Para Você", expanded=True):
         st.markdown("""
@@ -658,24 +712,25 @@ if not st.session_state.get("tutorial_completed"):
         """)
         if st.button("Entendido, começar a usar!", use_container_width=True):
             st.session_state.tutorial_completed = True
-            save_user_state_minimal(USER_STATE)
+            save_user_state_minimal(USER_STATE) 
             st.balloons()
             time.sleep(1); safe_rerun()
     st.markdown("---")
 
-# Páginas: planilha, recomendações, mapa, anotacoes, graficos, busca, mensagens, config
-# (IMPLEMENTAÇÕES completas — seguem a lógica discutida anteriormente)
-
+# -------------------------
+# Páginas
+# -------------------------
 if st.session_state.page == "planilha":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("📄 Planilha / Backup")
-
+    
     uploaded = st.file_uploader("Carregue .csv ou .xlsx para usar nas buscas e gráficos", type=["csv", "xlsx"], key=f"u_{USERNAME}")
     if uploaded:
         try:
             df = read_spreadsheet(uploaded)
             st.session_state.df = df
             st.session_state.uploaded_name = uploaded.name
+            
             try:
                 ts = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
                 safe_name = re.sub(r"[^\w\-_.]", "_", uploaded.name)
@@ -684,6 +739,7 @@ if st.session_state.page == "planilha":
                 p.mkdir(parents=True, exist_ok=True)
                 path = p / backup_filename
                 df.to_csv(path, index=False, encoding="utf-8")
+                
                 st.session_state.last_backup_path = str(path)
                 st.success(f"Backup '{backup_filename}' criado com sucesso.")
                 if st.session_state.autosave: save_user_state_minimal(USER_STATE)
@@ -696,6 +752,7 @@ if st.session_state.page == "planilha":
     if st.session_state.df is not None:
         st.write("Visualização da planilha em uso:")
         st.dataframe(st.session_state.df, use_container_width=True)
+        
         current_backup_path = st.session_state.get("last_backup_path")
         if current_backup_path and Path(current_backup_path).exists():
             st.write("Backup CSV em uso:")
@@ -704,12 +761,14 @@ if st.session_state.page == "planilha":
                 st.download_button("⬇ Baixar backup CSV", data=fp, file_name=Path(current_backup_path).name, mime="text/csv")
     else:
         st.info("Nenhuma planilha carregada.")
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 elif st.session_state.page == "recomendacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("💡 Recomendações de Artigos")
 
+    # Coleta sempre os backups mais recentes ao abrir a aba
     try:
         with st.spinner("Analisando..."):
             df_total = collect_latest_backups()
@@ -719,50 +778,32 @@ elif st.session_state.page == "recomendacoes":
 
     temas_populares = extract_popular_themes_from_data(df_total) if not df_total.empty else []
 
-    if not st.session_state.recommendation_onboarding_complete:
-        if df_total.empty:
-            st.warning("Ainda não há dados suficientes para gerar recomendações.")
-        elif not temas_populares:
-            st.warning("Não foi possível identificar temas populares.")
-        else:
-            st.markdown("#### Bem-vindo à Descoberta Inteligente!")
-            st.write("Selecione tópicos de interesse para encontrarmos artigos para você.")
-            temas_selecionados = st.multiselect("Selecione um ou mais temas:", options=temas_populares, key="temas_onboarding")
-            if st.button("🔍 Gerar Recomendações"):
-                if temas_selecionados:
-                    with st.spinner("Buscando..."):
-                        if 'titulo' in df_total.columns and 'título' not in df_total.columns:
-                            df_total = df_total.rename(columns={'titulo': 'título'})
-                        recommended_df = recomendar_artigos(temas_selecionados, df_total)
-                        st.session_state.recommendations = recommended_df
-                        st.session_state.recommendation_page = 1
-                        st.session_state.recommendation_view_index = None
-                        st.session_state.recommendation_onboarding_complete = True
-                        safe_rerun()
-                else:
-                    st.error("Selecione pelo menos um tema.")
-    else:
-        st.write("Refine suas recomendações ou explore novos temas.")
-        col1, col2 = st.columns([3, 2])
-        with col1:
-            temas_selecionados = st.multiselect("Selecione temas:", options=temas_populares, key="temas_recomendacao")
-        with col2:
-            palavra_chave = st.text_input("Buscar por palavra-chave:", placeholder="...", key="palavra_chave_recomendacao")
-        if st.button("🔍 Buscar Recomendações", use_container_width=True):
-            if temas_selecionados or palavra_chave:
-                with st.spinner("Analisando..."):
-                    if 'titulo' in df_total.columns and 'título' not in df_total.columns:
-                        df_total = df_total.rename(columns={'titulo': 'título'})
-                    recommended_df = recomendar_artigos(temas_selecionados, df_total, palavra_chave)
-                    st.session_state.recommendations = recommended_df
-                    st.session_state.recommendation_page = 1
-                    st.session_state.recommendation_view_index = None
-                    safe_rerun()
-            else:
-                st.warning("Selecione um tema ou digite uma palavra-chave.")
+    # Sempre exibe a seleção de temas e busca (evita travar por flag)
+    st.markdown("#### Descoberta Inteligente")
+    st.write("Selecione tópicos de interesse ou busque por palavra-chave para gerar recomendações.")
+    # uso de keys únicas por usuário para evitar retenção de valores entre sessões/abas
+    temas_key = f"temas_recomendacao_{USERNAME}"
+    palavra_key = f"palavra_chave_recomendacao_{USERNAME}"
+    temas_selecionados = st.multiselect("Selecione um ou mais temas:", options=temas_populares, key=temas_key)
+    palavra_chave = st.text_input("Buscar por palavra-chave:", placeholder="...", key=palavra_key)
 
+    if st.button("🔍 Buscar Recomendações", use_container_width=True, key=f"buscar_rec_btn_{USERNAME}"):
+        # garante que sempre use o df_total atual
+        if temas_selecionados or palavra_chave:
+            with st.spinner("Analisando..."):
+                if 'titulo' in df_total.columns and 'título' not in df_total.columns:
+                    df_total = df_total.rename(columns={'titulo': 'título'})
+                recommended_df = recomendar_artigos(temas_selecionados, df_total, palavra_chave)
+                st.session_state.recommendations = recommended_df
+                st.session_state.recommendation_page = 1
+                st.session_state.recommendation_view_index = None
+                # não alteramos a flag de onboarding aqui (mantemos para UX, mas não dependemos dela)
+                safe_rerun()
+        else:
+            st.warning("Selecione um tema ou digite uma palavra-chave.")
+
+    # Mostrar resultados + favoritos integrados
     results_df = st.session_state.get('recommendations', pd.DataFrame())
-    # Mostrar recomendações + favoritos integrados
     if not results_df.empty:
         if st.session_state.get("recommendation_view_index") is not None:
             vi = st.session_state.recommendation_view_index
@@ -772,14 +813,17 @@ elif st.session_state.page == "recomendacoes":
                 if st.button("⬅️ Voltar para a lista"):
                     st.session_state.recommendation_view_index = None
                     safe_rerun()
-                # Campos principais: título, autor, ano, tema, resumo
+
+                # campos importantes: título, autor, ano, tema, resumo
                 for campo in ['título', 'autor', 'ano', 'tema', 'resumo']:
                     if campo in det and pd.notna(det[campo]):
                         st.markdown(f"**{campo.capitalize()}:** {escape_html(str(det[campo]))}")
+                
                 st.markdown("**Outras informações:**")
                 for k, v in det.items():
                     if k not in ['similarity', 'corpus', 'título', 'autor', 'ano', 'tema', 'resumo'] and pd.notna(v):
                         st.markdown(f"- **{str(k).capitalize()}:** {escape_html(str(v))}")
+                
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
                     if st.button("⭐ Adicionar aos Favoritos", use_container_width=True, key=f"fav_detail_rec_{vi}"):
@@ -789,6 +833,7 @@ elif st.session_state.page == "recomendacoes":
                     if st.button("📝 Ver Anotações", use_container_width=True, key=f"notes_rec_{vi}"):
                         st.session_state.page = "anotacoes"
                         safe_rerun()
+
         else:
             per_page = 5
             total = len(results_df)
@@ -796,22 +841,35 @@ elif st.session_state.page == "recomendacoes":
             page = max(1, min(st.session_state.get("recommendation_page", 1), max_pages))
             start, end = (page - 1) * per_page, min(page * per_page, total)
             page_df = results_df.iloc[start:end]
+
             st.markdown(f"**🎯 {total}** artigo(s) recomendado(s) — exibindo {start+1} a {end}.")
+
             for idx, row in page_df.iterrows():
                 user_src = row.get("_artemis_username", "N/A")
-                initials = "".join([p[0] for p in str(user_src).split()[:2]]).upper() or "U"
+                # buscar nome do usuário se existir nos users
+                users_map = load_users()
+                if user_src == "web":
+                    user_display = "Fonte: Web"
+                    initials = "W"
+                else:
+                    uobj = users_map.get(str(user_src), {})
+                    user_display = uobj.get("name") if uobj and uobj.get("name") else str(user_src)
+                    initials = "".join([p[0] for p in str(user_display).split()[:2]]).upper() or "U"
+
                 title = str(row.get('título') or row.get('titulo') or '(Sem título)')
                 similarity = row.get('similarity', 0)
+                
                 st.markdown(f"""
                 <div class="card">
                     <div style="display:flex; gap:12px; align-items:flex-start;">
                         <div class="avatar" style="background:#6c5ce7; color:white; font-weight:bold;">{escape_html(initials)}</div>
                         <div style="flex:1;">
                             <div class="card-title">{escape_html(title)}</div>
-                            <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • Similaridade: <strong>{similarity:.2f}</strong></div>
+                            <div class="small-muted">De <strong>{escape_html(user_display)}</strong> • Similaridade: <strong>{similarity:.2f}</strong></div>
                         </div>
                     </div>
                 </div>""", unsafe_allow_html=True)
+
                 b_col1, b_col2 = st.columns(2)
                 with b_col1:
                     if st.button("⭐ Favoritar", key=f"fav_rec_{idx}", use_container_width=True):
@@ -822,6 +880,7 @@ elif st.session_state.page == "recomendacoes":
                         st.session_state.recommendation_view_index = idx
                         safe_rerun()
                 st.markdown("---")
+            
             p1, p2, p3 = st.columns([1, 1, 1])
             with p1:
                 if st.button("◀ Anterior", key="rec_prev", disabled=(page <= 1), use_container_width=True):
@@ -832,8 +891,50 @@ elif st.session_state.page == "recomendacoes":
                 if st.button("Próxima ▶", key="rec_next", disabled=(page >= max_pages), use_container_width=True):
                     st.session_state.recommendation_page += 1
                     safe_rerun()
-    elif st.session_state.recommendation_onboarding_complete:
-        st.info("Nenhum resultado encontrado. Tente outros temas.")
+
+    else:
+        st.info("Nenhum resultado encontrado. Tente outros temas ou palavras-chave.")
+
+    # seção de favoritos dentro da aba de Recomendações
+    st.markdown("---")
+    st.markdown("### ⭐ Seus Favoritos (Recomendações)")
+    favorites = get_session_favorites()
+    if not favorites:
+        st.info("Nenhum favorito salvo.")
+    else:
+        for fav in sorted(favorites, key=lambda x: x['added_at'], reverse=True):
+            fav_data = fav['data']
+            author_display = fav_data.get('_artemis_username', 'N/A')
+            users_map = load_users()
+            if author_display != "web":
+                user_obj = users_map.get(str(author_display), {})
+                author_display_name = user_obj.get("name") if user_obj and user_obj.get("name") else str(author_display)
+            else:
+                author_display_name = "Fonte: Web"
+            st.markdown(f"""
+            <div class="card">
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <div class="avatar"> {escape_html('★')}</div>
+                    <div style="flex:1;">
+                        <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
+                        <div class="small-muted">De <strong>{escape_html(author_display_name)}</strong></div>
+                    </div>
+                </div>
+            </div>""", unsafe_allow_html=True)
+            c1, c2 = st.columns([0.8, 0.2])
+            with c1:
+                if st.button("Ver detalhes", key=f"favrec_view_{fav['id']}"):
+                    st.session_state.recommendation_view_index = None
+                    st.session_state.fav_detail = fav['data']
+            with c2:
+                if st.button("Remover", key=f"favrec_del_{fav['id']}"):
+                    remove_from_favorites(fav['id'])
+                    safe_rerun()
+        if 'fav_detail' in st.session_state and st.session_state.fav_detail:
+            det = st.session_state.pop("fav_detail")
+            st.markdown("## Detalhes do Favorito")
+            for k, v in det.items(): st.markdown(f"- **{escape_html(k)}:** {escape_html(v)}")
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 elif st.session_state.page == "mapa":
@@ -842,6 +943,7 @@ elif st.session_state.page == "mapa":
 
     if 'mapa_G' not in st.session_state:
         st.session_state.mapa_G = nx.DiGraph()
+
     G = st.session_state.mapa_G
 
     if not G.nodes():
@@ -859,17 +961,14 @@ elif st.session_state.page == "mapa":
         }
         for node_id, attrs in default_nodes.items():
             G.add_node(node_id, **attrs)
+        
         default_edges = [
             ("ALTO", "Open Access"), ("ALTO", "IA Curadoria"), ("ALTO", "Ferramentas Interativas"),
             ("MÉDIO-ALTO", "Foco Educacional"), ("MÉDIO-ALTO", "Digitalização Técnica"),
             ("MÉDIO", "Projetos VR"), ("MÉDIO", "Falta Transparência")
         ]
         G.add_edges_from(default_edges)
-        st.session_state.mapa_G = G
-
-    # export PNG helper
-    def export_graph_png_bytes_local(G_local):
-        return export_graph_png_bytes(G_local)
+        st.session_state.mapa_G = G 
 
     with st.expander("Opções e Edição do Mapa"):
         edit_c1, edit_c2 = st.columns(2)
@@ -888,31 +987,9 @@ elif st.session_state.page == "mapa":
                             time.sleep(0.5); safe_rerun()
                         else: st.warning("Este ID de nó já existe.")
                     else: st.warning("Preencha todos os campos.")
-
-            # renomear form
-            with st.form("rename_node_form", clear_on_submit=True):
-                st.write("**2. Renomear Nó (altera o rótulo visível)**")
-                nodes_list = list(G.nodes()) if G.nodes() else []
-                if nodes_list:
-                    node_to_rename = st.selectbox("Escolha o nó a renomear:", options=[""] + nodes_list, key=f"rename_select_{USERNAME}")
-                    new_label_for_node = st.text_input("Novo rótulo (texto visível)")
-                    if st.form_submit_button("✏️ Renomear Nó"):
-                        if node_to_rename and new_label_for_node:
-                            if node_to_rename in G:
-                                G.nodes[node_to_rename]['label'] = new_label_for_node
-                                st.success(f"Nó '{node_to_rename}' renomeado para '{new_label_for_node}'.")
-                                st.session_state.mapa_G = G
-                                time.sleep(0.5); safe_rerun()
-                            else:
-                                st.warning("Nó selecionado não existe.")
-                        else:
-                            st.warning("Selecione um nó e informe o novo rótulo.")
-                else:
-                    st.info("Sem nós para renomear.")
-
         with edit_c2:
             with st.form("connect_nodes_form", clear_on_submit=True):
-                st.write("**3. Conectar Nós**")
+                st.write("**2. Conectar Nós**")
                 nodes_list = list(G.nodes())
                 node1 = st.selectbox("De:", options=[""] + nodes_list, key="connect1")
                 node2 = st.selectbox("Para:", options=[""] + nodes_list, key="connect2")
@@ -926,57 +1003,26 @@ elif st.session_state.page == "mapa":
                         else: st.info("Esses nós já estão conectados.")
                     else: st.warning("Selecione dois nós diferentes.")
 
-            with st.form("delete_node_form", clear_on_submit=True):
-                st.write("**4. Excluir Nó**")
-                nodes_list2 = list(G.nodes()) if G.nodes() else []
-                if nodes_list2:
-                    node_to_delete = st.selectbox("Escolha o nó para excluir:", options=[""] + nodes_list2, key=f"del_select_{USERNAME}")
-                    if st.form_submit_button("🗑️ Excluir Nó"):
-                        if node_to_delete:
-                            if node_to_delete in G:
-                                # remove attachments? not needed here
-                                G.remove_node(node_to_delete)
-                                st.success(f"Nó '{node_to_delete}' removido.")
-                                st.session_state.selected_node = None
-                                st.session_state.mapa_G = G
-                                time.sleep(0.5); safe_rerun()
-                            else:
-                                st.warning("Nó selecionado não existe.")
-                        else:
-                            st.warning("Selecione um nó para excluir.")
-                else:
-                    st.info("Sem nós para excluir.")
-
-        export_col1, export_col2 = st.columns([2, 1])
-        with export_col1:
-            if st.button("⬇️ Exportar mapa (PNG)", key=f"export_map_btn_{USERNAME}"):
-                png = export_graph_png_bytes_local(G)
-                if png:
-                    st.download_button("⬇️ Baixar PNG do Mapa", data=png, file_name="mapa_ideias.png", mime="image/png")
-                else:
-                    if not MATPLOTLIB_AVAILABLE:
-                        st.error("Não foi possível exportar: pacote 'matplotlib' não está instalado no ambiente.")
-                    else:
-                        st.error("Falha ao gerar o PNG do mapa. Verifique os logs.")
-        with export_col2:
-            st.caption("Exporta uma versão estática (.png) do mapa atual.")
-
     if G.nodes():
         nodes = []
         for node_id, data in G.nodes(data=True):
             node_args = data.copy()
             node_args['id'] = node_id
-            node_args.pop('tipo', None)
+            node_args.pop('tipo', None) # CORREÇÃO DO TypeError
+            # força fonte branca
             if 'font' not in node_args:
                 node_args['font'] = {"color": "#FFFFFF", "size": 16}
             else:
                 node_args['font']['color'] = "#FFFFFF"
             nodes.append(Node(**node_args))
+
         edges = [Edge(source=u, target=v) for u, v in G.edges()]
+        
         config = Config(width="100%", height=800, directed=True, physics=False, hierarchical=True,
                         layout_settings={"hierarchical": {"direction": "LR", "sortMethod": "directed", "levelSeparation": 300, "nodeSpacing": 120}},
                         node_style={"shape": "box", "borderWidth": 2, "color": "#22252A", "font": {"color": "#FFFFFF", "size": 16}},
                         edge_style={"color": "#B0B0B0", "width": 2})
+
         clicked_node_id = agraph(nodes=nodes, edges=edges, config=config)
         if clicked_node_id: st.session_state.selected_node = clicked_node_id
     else:
@@ -1005,6 +1051,7 @@ elif st.session_state.page == "mapa":
                 st.markdown(f"- {G.nodes[neighbor].get('label', neighbor)}")
         else:
             st.write("Este nó não possui conexões.")
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 elif st.session_state.page == "anotacoes":
@@ -1072,7 +1119,7 @@ elif st.session_state.page == "busca":
                 st.session_state.search_results = hits.reset_index(drop=True)
                 st.session_state.search_query_meta = {"col": search_col, "query": query}
                 st.session_state.search_page = 1
-
+        
         results_df = st.session_state.get('search_results', pd.DataFrame())
         if not results_df.empty:
             total = len(results_df)
@@ -1080,20 +1127,22 @@ elif st.session_state.page == "busca":
             page = max(1, min(st.session_state.get("search_page", 1), max_pages))
             start, end = (page - 1) * per_page, min(page * per_page, total)
             page_df = results_df.iloc[start:end]
+
             st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {end}.")
-            users_map = load_users()
             for orig_i in page_df.index:
                 result_data = results_df.loc[orig_i].to_dict()
                 user_src = result_data.get("_artemis_username", "N/A")
                 initials = "".join([p[0] for p in str(user_src).split()[:2]]).upper() or "U"
                 title_raw = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
                 resumo_raw = str(result_data.get('resumo') or result_data.get('abstract') or "")
+                
                 # Mostrar NOME do usuário (se disponível) ou "Fonte: Web"
                 if user_src == "web":
                     user_display_name = "Fonte: Web"
                 else:
-                    user_obj = users_map.get(str(user_src), {})
+                    user_obj = load_users().get(str(user_src), {})
                     user_display_name = user_obj.get("name") if user_obj and user_obj.get("name") else str(user_src)
+
                 st.markdown(f"""
                 <div class="card">
                     <div style="display:flex; gap:12px; align-items:center;">
@@ -1105,6 +1154,7 @@ elif st.session_state.page == "busca":
                         </div>
                     </div>
                 </div>""", unsafe_allow_html=True)
+                
                 a1, a2 = st.columns([0.28, 0.72])
                 with a1:
                     if st.button("⭐ Favoritar", key=f"fav_{orig_i}", use_container_width=True):
@@ -1114,14 +1164,14 @@ elif st.session_state.page == "busca":
                     if st.button("🔎 Ver detalhes", key=f"view_{orig_i}", use_container_width=True):
                         st.session_state.search_view_index = int(orig_i)
                         safe_rerun()
+            
             st.markdown("---")
             p1, p2, p3 = st.columns([1,1,1])
-            with p1:
+            with p1: 
                 if st.button("◀", disabled=(page <= 1), key="search_prev"):
                     st.session_state.search_page -= 1; safe_rerun()
-            with p2:
-                st.markdown(f"<div style='text-align:center; padding-top:8px'><b>Página {page}/{max_pages}</b></div>", unsafe_allow_html=True)
-            with p3:
+            with p2: st.markdown(f"<div style='text-align:center; padding-top:8px'><b>Página {page}/{max_pages}</b></div>", unsafe_allow_html=True)
+            with p3: 
                 if st.button("▶", disabled=(page >= max_pages), key="search_next"):
                     st.session_state.search_page += 1; safe_rerun()
 
@@ -1162,16 +1212,10 @@ elif st.session_state.page == "busca":
             st.markdown("---")
             for fav in sorted(favorites, key=lambda x: x['added_at'], reverse=True):
                 fav_data = fav['data']
-                # Mostrar nome quando possível em vez de CPF
-                author_display = fav_data.get('_artemis_username', 'N/A')
-                users_map = load_users()
-                if author_display != "web":
-                    user_obj = users_map.get(str(author_display), {})
-                    author_display = user_obj.get("name") if user_obj and user_obj.get("name") else str(author_display)
                 st.markdown(f"""
                 <div class="card">
                     <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
-                    <div class="small-muted">De <strong>{escape_html(author_display)}</strong></div>
+                    <div class="small-muted">De <strong>{escape_html(fav_data.get('_artemis_username', 'N/A'))}</strong></div>
                 </div>""", unsafe_allow_html=True)
                 c1, c2 = st.columns([0.75, 0.25])
                 with c1:
@@ -1190,41 +1234,29 @@ elif st.session_state.page == "busca":
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("✉️ Mensagens")
+
     tab_inbox, tab_sent, tab_compose = st.tabs(["Caixa de Entrada", "Enviados", "Escrever Nova"])
 
     with tab_inbox:
         if st.session_state.get("view_message_id"):
-            # protege caso a mensagem não exista
             msg = next((m for m in all_msgs if m.get('id') == st.session_state.view_message_id), None)
             if msg and isinstance(msg, dict):
-                # marca como lida
-                try:
-                    mark_message_read(msg.get('id'), USERNAME)
-                except Exception:
-                    pass
+                mark_message_read(msg.get('id'), USERNAME)
                 st.markdown(f"**De:** {escape_html(msg.get('from'))}\n\n**Assunto:** {escape_html(msg.get('subject'))}")
                 st.markdown(f"<div style='white-space:pre-wrap; padding:10px; border-radius:8px; background:rgba(0,0,0,0.2);'>{escape_html(msg.get('body'))}</div>", unsafe_allow_html=True)
-                # tratamento seguro do anexo
-                attachment = msg.get('attachment')
-                attachment_path = None
-                if isinstance(attachment, dict):
-                    attachment_path = attachment.get('path')
-                if attachment_path and Path(attachment_path).exists():
-                    try:
-                        with open(attachment_path, "rb") as fp:
-                            st.download_button(f"⬇️ Baixar anexo: {attachment.get('name', 'anexo')}", data=fp, file_name=attachment.get('name', 'anexo'))
-                    except Exception:
-                        st.error("Erro ao ler o arquivo de anexo.")
+                if isinstance(msg.get('attachment'), dict) and msg.get('attachment', {}).get('path') and Path(msg['attachment']['path']).exists():
+                    with open(msg['attachment']['path'], "rb") as fp:
+                        st.download_button(f"⬇️ Baixar anexo: {msg['attachment'].get('name','anexo')}", data=fp, file_name=msg['attachment'].get('name','anexo'))
                 c1, c2, c3 = st.columns(3)
                 with c1:
                     if st.button("↩️ Voltar", key="back_inbox"):
                         st.session_state.view_message_id = None; safe_rerun()
                 with c2:
                     if st.button("↪️ Responder", key="reply_msg"):
-                        st.session_state.reply_message_id = msg.get('id'); st.session_state.view_message_id = None; safe_rerun()
+                        st.session_state.reply_message_id = msg['id']; st.session_state.view_message_id = None; safe_rerun()
                 with c3:
                     if st.button("🗑️ Excluir", key="del_inbox_msg"):
-                        delete_message(msg.get('id'), USERNAME); st.session_state.view_message_id = None; st.toast("Excluída."); safe_rerun()
+                        delete_message(msg['id'], USERNAME); st.session_state.view_message_id = None; st.toast("Excluída."); safe_rerun()
             else:
                 st.warning("Mensagem não encontrada."); st.session_state.view_message_id = None
         else:
@@ -1236,16 +1268,10 @@ elif st.session_state.page == "mensagens":
                 with col1:
                     read_marker = "" if msg.get('read', False) else "🔵 "
                     st.markdown(f"**{read_marker}{escape_html(msg.get('subject', '(sem assunto)'))}**")
-                    # protege formato de ts
-                    ts_str = msg.get('ts')
-                    try:
-                        ts_fmt = datetime.fromisoformat(ts_str).strftime('%d/%m/%Y %H:%M') if ts_str else ""
-                    except Exception:
-                        ts_fmt = str(ts_str)
-                    st.markdown(f"<span class='small-muted'>De: {escape_html(msg.get('from', '...'))} em {ts_fmt}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span class='small-muted'>De: {escape_html(msg.get('from', '...'))} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
                 with col2:
-                    if st.button("Ler", key=f"read_{msg.get('id')}", use_container_width=True):
-                        st.session_state.view_message_id = msg.get('id'); safe_rerun()
+                    if st.button("Ler", key=f"read_{msg['id']}", use_container_width=True):
+                        st.session_state.view_message_id = msg['id']; safe_rerun()
                 st.markdown("---")
 
     with tab_sent:
@@ -1254,23 +1280,17 @@ elif st.session_state.page == "mensagens":
             st.info("Nenhuma mensagem enviada.")
         for msg in sent_msgs:
             st.markdown(f"**{escape_html(msg.get('subject', '(sem assunto)'))}**")
-            ts_str = msg.get('ts')
-            try:
-                ts_fmt = datetime.fromisoformat(ts_str).strftime('%d/%m/%Y %H:%M') if ts_str else ""
-            except Exception:
-                ts_fmt = str(ts_str)
-            st.markdown(f"<span class='small-muted'>Para: {escape_html(msg.get('to', '...'))} em {ts_fmt}</span>", unsafe_allow_html=True)
-            if st.button("🗑️ Excluir", key=f"del_sent_{msg.get('id')}"):
-                delete_message(msg.get('id'), USERNAME); st.toast("Excluída."); safe_rerun()
+            st.markdown(f"<span class='small-muted'>Para: {escape_html(msg.get('to', '...'))} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
+            if st.button("🗑️ Excluir", key=f"del_sent_{msg['id']}"):
+                delete_message(msg['id'], USERNAME); st.toast("Excluída."); safe_rerun()
             st.markdown("---")
 
     with tab_compose:
-        # reply handling (proteções)
         if st.session_state.get("reply_message_id"):
             original_msg = next((m for m in all_msgs if m.get('id') == st.session_state.reply_message_id), None)
-            if original_msg and isinstance(original_msg, dict):
-                st.info(f"Respondendo a: {escape_html(original_msg.get('from'))}")
-                default_to, default_subj, default_body = original_msg.get('from'), f"Re: {original_msg.get('subject')}", f"\n\n---\nEm resposta a:\n{original_msg.get('body')}"
+            if original_msg:
+                st.info(f"Respondendo a: {original_msg['from']}")
+                default_to, default_subj, default_body = original_msg['from'], f"Re: {original_msg['subject']}", f"\n\n---\nEm resposta a:\n{original_msg['body']}"
             else:
                 st.session_state.reply_message_id = None; default_to, default_subj, default_body = "", "", ""
         elif st.session_state.get("compose_open"):
@@ -1283,15 +1303,11 @@ elif st.session_state.page == "mensagens":
 
         with st.form("compose_form", clear_on_submit=True):
             all_users = [u for u in load_users().keys() if u != USERNAME]
-            # se lista vazia, mantem campo livre
-            if all_users:
-                to_user = st.selectbox("Para:", options=all_users, index=all_users.index(default_to) if default_to in all_users else 0)
-            else:
-                to_user = st.text_input("Para (insira CPF do destino):", value=default_to)
+            to_user = st.selectbox("Para:", options=all_users, index=all_users.index(default_to) if default_to in all_users else 0) if all_users else st.text_input("Para (CPF):", value=default_to)
             subject = st.text_input("Assunto:", value=default_subj)
             body = st.text_area("Mensagem:", height=200, value=default_body)
             attachment = st.file_uploader("Anexo (opcional)")
-
+            
             if st.form_submit_button("✉️ Enviar Mensagem"):
                 if to_user:
                     send_message(USERNAME, to_user, subject, body, attachment)
@@ -1301,18 +1317,21 @@ elif st.session_state.page == "mensagens":
                 else:
                     st.warning("Selecione um destinatário.")
     st.markdown("</div>", unsafe_allow_html=True)
-
+    
 elif st.session_state.page == "config":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("⚙️ Configurações")
     s = get_settings()
+
     font_scale = st.slider("Escala de fonte", 0.7, 2.0, float(s.get("font_scale",1.0)), 0.1, key="cfg_font_scale")
+
     if st.button("Aplicar configurações"):
         st.session_state.settings["font_scale"] = float(font_scale)
         save_user_state_minimal(USER_STATE)
         apply_global_styles(font_scale)
         st.success("Configurações aplicadas e salvas.")
         time.sleep(0.5); safe_rerun()
+
     st.markdown("---")
     st.markdown("**Acessibilidade**\n\n- Use *Escala de fonte* para aumentar ou diminuir o tamanho do texto.\n- O programa utiliza um tema escuro fixo para garantir bom contraste.")
     st.markdown("</div>", unsafe_allow_html=True)
