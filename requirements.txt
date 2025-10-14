@@ -11,3 +11,14 @@ scikit-learn>=1.1.0
 streamlit>=1.18.0
 streamlit-agraph
 supabase>=2.0.0
+streamlit==1.30.0
+streamlit-agraph
+pandas
+numpy
+plotly
+networkx
+matplotlib
+fpdf
+scikit-learn
+joblib
+requests
