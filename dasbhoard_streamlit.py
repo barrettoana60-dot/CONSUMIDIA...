@@ -1120,14 +1120,15 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Mapa Mental (MODERNO, CLUSTER E EDITÁVEL)
+# Page: Mapa Mental (MODERNO, CLUSTER E EDITÁVEL - VERSÃO CORRIGIDA)
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("🞠 Mapa de Ideias Editável")
 
+    # Usar uma variável de sessão separada e específica para este mapa
     if 'mapa_G' not in st.session_state:
-        st.session_state.mapa_G = nx.Graph() # Usar Graph para conexões não direcionadas
+        st.session_state.mapa_G = nx.Graph() 
 
     G = st.session_state.mapa_G
 
@@ -1139,17 +1140,16 @@ elif st.session_state.page == "mapa":
             "Falta Transparência"
         ]
         
-        # Adiciona um nó central invisível para criar o efeito de cluster
-        G.add_node("centro_invisivel", size=0, label=" ", shape="dot")
+        G.add_node("centro_invisivel") # Nó central para física, mas invisível
 
         for node_id in default_nodes:
-            label_text = node_id.replace(" ", "\n") # Quebra de linha para caber melhor
+            label_text = node_id.replace(" ", "\n")
             if node_id == "IA Curadoria": label_text = "IA para\nCuradoria"
             if node_id == "Ferramentas Interativas": label_text = "Ferramentas\nInterativas"
             if node_id == "Digitalização Técnica": label_text = "Digitalização\nTécnica"
                 
             G.add_node(node_id, label=label_text, tipo="Item")
-            G.add_edge("centro_invisivel", node_id) # Conecta cada item ao centro
+            G.add_edge("centro_invisivel", node_id) 
 
         st.session_state.mapa_G = G 
 
@@ -1164,10 +1164,8 @@ elif st.session_state.page == "mapa":
                     if new_node_label and new_node_id:
                         if new_node_id not in G:
                             G.add_node(new_node_id, label=new_node_label.replace(" ", "\n"), tipo="Item")
-                            # Conecta o novo nó a um nó aleatório existente para mantê-lo no cluster
-                            if len(G.nodes()) > 1:
-                                random_node = random.choice([n for n in G.nodes() if n != new_node_id])
-                                G.add_edge(new_node_id, random_node)
+                            random_node = random.choice([n for n in G.nodes() if n != new_node_id and n != 'centro_invisivel'])
+                            G.add_edge(new_node_id, random_node)
                             st.success(f"Item '{new_node_label}' criado!")
                             st.session_state.mapa_G = G
                             time.sleep(0.5); safe_rerun()
@@ -1193,18 +1191,25 @@ elif st.session_state.page == "mapa":
     if G.nodes():
         nodes = []
         for node_id, data in G.nodes(data=True):
-            # Ocultar o nó central na visualização
-            if node_id == "centro_invisivel":
-                nodes.append(Node(id=node_id, size=0, shape="dot"))
+            # Copia os atributos do nó para um novo dicionário
+            node_args = data.copy()
+            node_args['id'] = node_id
+            node_args['label'] = data.get("label", node_id)
+
+            # Define o estilo do nó invisível
+            if node_id == 'centro_invisivel':
+                node_args['size'] = 0
+                node_args.pop('label', None) # Remove o label para garantir
             else:
-                nodes.append(Node(id=node_id, 
-                                  label=data.get("label", node_id),
-                                  size=25,
-                                  **data)) # Passa outros atributos como 'shape'
+                node_args.setdefault('size', 25)
+
+            # Remove o atributo 'tipo' que causa o TypeError
+            node_args.pop('tipo', None)
+            
+            nodes.append(Node(**node_args))
 
         edges = []
         for u, v in G.edges():
-             # Ocultar arestas conectadas ao centro
             if u == "centro_invisivel" or v == "centro_invisivel":
                 edges.append(Edge(source=u, target=v, color="rgba(0,0,0,0)")) # Cor transparente
             else:
@@ -1221,8 +1226,7 @@ elif st.session_state.page == "mapa":
                             "color": "rgba(43, 102, 159, 0.2)",
                             "borderColor": "#2B669F",
                             "font": {"color": "#E6E6E6", "size": 16, "face": "sans-serif"},
-                            "borderRadius": 10,
-                            "shadow": True
+                            "shadow": True,
                         },
                         edge_style={
                             "color": "rgba(128, 128, 128, 0.5)",
@@ -1273,6 +1277,7 @@ elif st.session_state.page == "mapa":
                 st.markdown(f"- {neighbor_label}")
 
     st.markdown("</div>", unsafe_allow_html=True)
+
 
 # -------------------------
 # Page: Anotações
