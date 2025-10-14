@@ -1,12 +1,7 @@
 # dashboard_nugep_pqr_final.py
-# VERSÃO FINAL CORRIGIDA (13/10/2025) - patch completo com melhorias solicitadas
-# - Hash de senhas (bcrypt se disponível, pbkdf2_hmac fallback)
-# - TF-IDF com stop-words portuguesas
-# - Geração de PDF com tentativa de UTF-8 (fpdf + add_font) e fallback
-# - Não criar admin automaticamente em produção (só com NUGEP_DEV=1)
-# - First-run: escolha de interesses; recomendações filtradas por interesses
-# - Mapa mental editável + anexar arquivos (imagens mostradas)
-# - Removido JS inline de cópia, mantido download_button
+# VERSÃO FINAL CORRIGIDA (13/10/2025)
+# COM: Tutorial de primeiro uso, página de Recomendações dedicada e Mapa Mental Interativo com nós clicáveis.
+# ALTERAÇÕES: Adicionado guia para novos usuários. Refatorada a lógica de Recomendações com descoberta inteligente.
 
 import os
 import re
@@ -18,8 +13,6 @@ import string
 import unicodedata
 import html
 import math
-import base64
-import hashlib
 from pathlib import Path
 from datetime import datetime
 
@@ -30,32 +23,17 @@ import plotly.express as px
 import plotly.graph_objects as go
 import networkx as nx
 from networkx.readwrite import json_graph
-
-# PDF
-try:
-    from fpdf import FPDF
-    FPDF_AVAILABLE = True
-except Exception:
-    FPDF_AVAILABLE = False
+from fpdf import FPDF
 
 # optional ML libs (silenciosamente não-fatal)
 try:
     import joblib
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
-    SKLEARN_AVAILABLE = True
 except Exception:
     joblib = None
     TfidfVectorizer = None
     cosine_similarity = None
-    SKLEARN_AVAILABLE = False
-
-# bcrypt optional
-try:
-    import bcrypt
-    USE_BCRYPT = True
-except Exception:
-    USE_BCRYPT = False
 
 # -------------------------
 # Config & helpers
@@ -78,7 +56,6 @@ def safe_rerun():
         st.stop()
     except Exception:
         raise RuntimeError("safe_rerun falhou e não foi possível chamar st.stop()")
-
 
 # -------------------------
 # Base CSS
@@ -161,7 +138,8 @@ def hex_to_rgba(h, alpha):
     h = h.lstrip('#')
     return f"rgba({', '.join(str(i) for i in tuple(int(h[i:i+2], 16) for i in (0, 2, 4)))}, {alpha})"
 
-def gen_password(length=12):
+
+def gen_password(length=8):
     choices = string.ascii_letters + string.digits
     return ''.join(random.choice(choices) for _ in range(length))
 
@@ -178,37 +156,7 @@ def apply_global_styles(font_scale=1.0):
     except Exception:
         pass
 
-# Password hashing helpers (bcrypt preferred, fallback to PBKDF2)
-def hash_password(password: str) -> str:
-    if USE_BCRYPT:
-        try:
-            h = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-            return h
-        except Exception:
-            pass
-    # fallback: PBKDF2 with random salt
-    salt = os.urandom(16)
-    dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 200_000)
-    return salt.hex() + "$" + dk.hex()
-
-def verify_password(password: str, stored: str) -> bool:
-    if USE_BCRYPT and stored.startswith("$2"):
-        try:
-            return bcrypt.checkpw(password.encode('utf-8'), stored.encode('utf-8'))
-        except Exception:
-            return False
-    if "$" in stored:
-        try:
-            salt_hex, dk_hex = stored.split("$", 1)
-            salt = bytes.fromhex(salt_hex)
-            dk = hashlib.pbkdf2_hmac('sha256', password.encode('utf-8'), salt, 200_000)
-            return dk.hex() == dk_hex
-        except Exception:
-            return False
-    # last-resort plain comparison (legacy)
-    return password == stored
-
-# helper: render credential box with download (removed JS copy)
+# helper: render credential box with copy & download
 def _render_credentials_box(username, password, note=None, key_prefix="cred"):
     st.markdown("---")
     st.success("Usuário criado com sucesso — anote/guarde a senha abaixo:")
@@ -221,13 +169,25 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
     with col2:
         creds_txt = f"cpf: {username}\npassword: {password}\n"
         st.download_button("⬇️ Baixar credenciais", data=creds_txt, file_name=f"credenciais_{username}.txt", mime="text/plain")
+        js = f"""
+        <script>
+        function copyToClipboard_{key_prefix}(){{
+            navigator.clipboard.writeText(`cpf: {username}\\npassword: {password}`);
+            const el = document.getElementById('copy_hint_{key_prefix}');
+            if(el) el.innerText = 'Copiado!';
+        }}
+        </script>
+        <button onclick="copyToClipboard_{key_prefix}()">📋 Copiar para área de transferência</button>
+        <div id='copy_hint_{key_prefix}' style='margin-top:6px;font-size:13px;color:#bfc6cc'></div>
+        """
+        st.markdown(js, unsafe_allow_html=True)
     st.markdown("---")
 
 
 # -------------------------
 # Funções de Busca & Recomendação
 # -------------------------
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600) # Cache para não re-processar a cada clique
 def collect_latest_backups():
     """
     Scans the BACKUPS_DIR, finds all user backup CSVs,
@@ -253,11 +213,7 @@ def collect_latest_backups():
     if not all_dfs:
         return pd.DataFrame()
 
-    try:
-        return pd.concat(all_dfs, ignore_index=True)
-    except Exception:
-        # fallback: try to align columns
-        return pd.DataFrame(pd.concat([df.reindex(sorted(set().union(*(d.columns for d in all_dfs)))) for df in all_dfs], ignore_index=True))
+    return pd.concat(all_dfs, ignore_index=True)
 
 def highlight_search_terms(text, query):
     if not query or not text or not isinstance(text, str):
@@ -277,55 +233,53 @@ def recomendar_artigos(temas_selecionados, df_total, top_n=10):
     """
     Recomenda artigos de um DataFrame com base em temas, usando TF-IDF e similaridade de cosseno.
     """
-    if not SKLEARN_AVAILABLE:
-        st.error("Bibliotecas de Machine Learning (scikit-learn) não estão instaladas. A recomendação avançada não funcionará; usará fallback simples.")
+    if TfidfVectorizer is None or cosine_similarity is None:
+        st.error("Bibliotecas de Machine Learning (scikit-learn) não estão instaladas. A recomendação não funcionará.")
         return pd.DataFrame()
 
     if df_total.empty or not temas_selecionados:
         return pd.DataFrame()
 
-    # --- montagem do corpus ---
+    # --- INÍCIO DA CORREÇÃO (AttributeError) ---
+    # Inicializa um Pandas Series vazio para garantir que o tipo seja consistente
     corpus_series = pd.Series([''] * len(df_total), index=df_total.index, dtype=str)
     
     if 'título' in df_total.columns:
         corpus_series += df_total['título'].fillna('') + ' '
-    if 'titulo' in df_total.columns:
-        corpus_series += df_total['titulo'].fillna('') + ' '
     if 'tema' in df_total.columns:
         corpus_series += df_total['tema'].fillna('') + ' '
     if 'resumo' in df_total.columns:
-        corpus_series += df_total['resumo'].fillna(' ')
-    if 'abstract' in df_total.columns:
-        corpus_series += df_total['abstract'].fillna(' ')
+        corpus_series += df_total['resumo'].fillna('')
     
     df_total['corpus'] = corpus_series.str.lower()
-
+    # --- FIM DA CORREÇÃO ---
+    
+    # Se o corpus estiver vazio após a tentativa, retorna um DataFrame vazio
     if df_total['corpus'].str.strip().eq('').all():
         st.warning("Nenhum conteúdo textual (título, tema, resumo) encontrado nos dados para gerar recomendações.")
         return pd.DataFrame()
     
-    # Vetorizar o corpus -> usar stop_words em PT se possível
-    try:
-        vectorizer = TfidfVectorizer(stop_words=PORTUGUESE_STOP_WORDS if 'PORTUGUESE_STOP_WORDS' in globals() else 'portuguese', max_features=5000)
-        tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
-    except Exception as e:
-        st.warning(f"Falha na vetorização TF-IDF: {e}")
-        return pd.DataFrame()
+    # Vetorizar o corpus
+    vectorizer = TfidfVectorizer(stop_words='english', max_features=5000)
+    tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
     
+    # Criar um vetor para a consulta (temas selecionados)
     query_text = ' '.join(temas_selecionados).lower()
-    try:
-        query_vector = vectorizer.transform([query_text])
-    except Exception as e:
-        st.warning(f"Erro ao transformar query TF-IDF: {e}")
-        return pd.DataFrame()
+    query_vector = vectorizer.transform([query_text])
     
+    # Calcular a similaridade de cosseno
     cosine_similarities = cosine_similarity(query_vector, tfidf_matrix).flatten()
+    
+    # Obter os índices dos artigos mais similares
     related_docs_indices = cosine_similarities.argsort()[:-top_n-1:-1]
+    
+    # Filtrar para mostrar apenas os resultados com alguma similaridade
     similar_indices = [i for i in related_docs_indices if cosine_similarities[i] > 0.05]
     
     if not similar_indices:
         return pd.DataFrame()
 
+    # Retornar o DataFrame com os artigos recomendados
     recomendados_df = df_total.iloc[similar_indices].copy()
     recomendados_df['similarity'] = cosine_similarities[similar_indices]
     
@@ -361,12 +315,12 @@ PORTUGUESE_STOP_WORDS = [
     'teremos', 'terão', 'teria', 'teríamos', 'teriam'
 ]
 
-@st.cache_data(ttl=600)
+@st.cache_data(ttl=600) # Cache para não re-processar a cada clique
 def extract_popular_themes_from_data(df_total, top_n=30):
     """
     Extrai os temas/palavras-chave mais populares de um DataFrame consolidado usando TF-IDF.
     """
-    if not SKLEARN_AVAILABLE:
+    if TfidfVectorizer is None:
         return [] # Retorna vazio se a biblioteca não estiver disponível
 
     if df_total.empty:
@@ -385,17 +339,24 @@ def extract_popular_themes_from_data(df_total, top_n=30):
         return []
 
     try:
+        # Usa TF-IDF para encontrar os termos mais relevantes
         vectorizer = TfidfVectorizer(stop_words=PORTUGUESE_STOP_WORDS, max_features=1000, ngram_range=(1, 2))
         tfidf_matrix = vectorizer.fit_transform(df_total['corpus'])
+        
+        # Soma os scores de TF-IDF de cada termo em todos os documentos
         sum_tfidf = tfidf_matrix.sum(axis=0)
+        
+        # Mapeia os índices dos termos para seus nomes
         words = vectorizer.get_feature_names_out()
         tfidf_scores = [(words[i], sum_tfidf[0, i]) for i in range(len(words))]
+        
+        # Ordena por score e retorna os top_n termos
         sorted_scores = sorted(tfidf_scores, key=lambda x: x[1], reverse=True)
+        
         return [word for word, score in sorted_scores[:top_n]]
     except Exception as e:
         print(f"Erro ao extrair temas populares: {e}")
-        return []
-
+        return [] # Em caso de erro, retorna uma lista vazia
 # -------------------------
 # load/save users (atomic)
 # -------------------------
@@ -621,49 +582,8 @@ def criar_grafo(df, silent=False):
             
     return G
 
-def _find_dejavu_font_path():
-    # tenta localizar DejaVuSans.ttf em caminhos comuns do sistema ou projeto
-    candidates = [
-        "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-        "/usr/share/fonts/dejavu/DejaVuSans.ttf",
-        "./DejaVuSans.ttf",
-        "./fonts/DejaVuSans.ttf"
-    ]
-    for c in candidates:
-        if os.path.exists(c):
-            return c
-    return None
-
 def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
-    """
-    Tenta gerar PDF com suporte a acentuação. Se não houver suporte a fonte unicode,
-    recorre ao método simples com latin-1 (como antes).
-    """
-    if not FPDF_AVAILABLE:
-        # fallback simples: retornar bytes com texto plano
-        return texto.encode("utf-8", "replace")
-
-    pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=12)
-    pdf.add_page()
-
-    font_added = False
-    font_path = _find_dejavu_font_path()
-    if font_path:
-        try:
-            pdf.add_font("DejaVu", "", font_path, uni=True)
-            pdf.set_font("DejaVu", size=12)
-            font_added = True
-        except Exception:
-            font_added = False
-
-    if not font_added:
-        # fallback para fonte básica (latim)
-        try:
-            pdf.set_font("Arial", size=12)
-        except Exception:
-            pdf.set_font("Helvetica", size=12)
-
+    pdf = FPDF(); pdf.set_auto_page_break(auto=True, margin=12); pdf.add_page(); pdf.set_font("Arial", size=12)
     for linha in (texto or "").split("\n"):
         parts = re.split(r"(==.*?==)", linha)
         for part in parts:
@@ -671,7 +591,7 @@ def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
                 continue
             if part.startswith("==") and part.endswith("=="):
                 inner = part[2:-2]
-                inner_safe = inner.replace("—", "-").replace("–", "-")
+                inner_safe = inner.replace("—", "-").replace("–", "-").encode("latin-1", "replace").decode("latin-1")
                 hexv = (highlight_hex or "#ffd600").lstrip("#")
                 if len(hexv) == 3:
                     hexv = ''.join([c*2 for c in hexv])
@@ -679,21 +599,14 @@ def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
                     r, g, b = int(hexv[0:2], 16), int(hexv[2:4], 16), int(hexv[4:6], 16)
                 except Exception:
                     r, g, b = (255, 214, 0)
-                try:
-                    pdf.set_fill_color(r, g, b)
-                    pdf.set_text_color(0, 0, 0)
-                    w = pdf.get_string_width(inner_safe) + 2
-                    pdf.cell(w, 6, txt=inner_safe, border=0, ln=0, fill=True)
-                    pdf.set_text_color(0, 0, 0)
-                except Exception:
-                    # fallback: escrever sem highlight
-                    pdf.cell(pdf.get_string_width(inner_safe), 6, txt=inner_safe, border=0, ln=0)
+                pdf.set_fill_color(r, g, b); pdf.set_text_color(0, 0, 0)
+                w = pdf.get_string_width(inner_safe) + 2
+                pdf.cell(w, 6, txt=inner_safe, border=0, ln=0, fill=True)
+                pdf.set_text_color(0, 0, 0)
             else:
-                safe_part = part.replace("—", "-").replace("–", "-")
-                try:
-                    pdf.cell(pdf.get_string_width(safe_part), 6, txt=safe_part, border=0, ln=0)
-                except Exception:
-                    pdf.cell(0, 6, txt=safe_part, border=0, ln=0)
+                safe_part = part.replace("—", "-").replace("–", "-").encode("latin-1", "replace").decode("latin-1")
+                pdf.set_text_color(0, 0, 0)
+                pdf.cell(pdf.get_string_width(safe_part), 6, txt=safe_part, border=0, ln=0)
         pdf.ln(6)
     raw = pdf.output(dest="S")
     if isinstance(raw, str):
@@ -750,8 +663,7 @@ def save_user_state_minimal(USER_STATE):
             "favorites": st.session_state.get("favorites", []),
             "settings": st.session_state.get("settings", {}),
             "last_backup_path": st.session_state.get("last_backup_path"),
-            "tutorial_completed": st.session_state.get("tutorial_completed", False),
-            "interests": st.session_state.get("user_interests", []),
+            "tutorial_completed": st.session_state.get("tutorial_completed", False) # Salva o estado do tutorial
         }
         clean_data = clean_for_json(data)
 
@@ -766,6 +678,7 @@ def save_user_state_minimal(USER_STATE):
         print(f"Erro ao salvar estado do usuário: {e}")
         return False
 
+
 # -------------------------
 # Authentication UI (local fallback)
 # -------------------------
@@ -779,18 +692,17 @@ if not st.session_state.authenticated:
         login_pass = st.text_input("Senha", type="password", key="ui_login_pass")
 
         users = load_users() or {}
-
-        # Criar admin temporário apenas em modo dev
-        if not users and os.environ.get("NUGEP_DEV") == "1":
+        if not users:
             admin_user = "admin"
-            admin_pwd = gen_password(10)
-            users[admin_user] = {"name": "Administrador", "scholarship": "Admin", "password": hash_password(admin_pwd), "created_at": datetime.utcnow().isoformat()}
+            admin_pwd = "admin123"
+            users[admin_user] = {"name": "Administrador", "scholarship": "Admin", "password": admin_pwd, "created_at": datetime.utcnow().isoformat()}
             save_users(users)
-            st.session_state.new_user_created = {"user": admin_user, "pwd": admin_pwd, "note": "Usuário administrativo temporário (modo DEV)."}
+            st.warning("Nenhum usuário local encontrado. Um usuário administrativo foi criado temporariamente.")
+            st.session_state.new_user_created = {"user": admin_user, "pwd": admin_pwd, "note": "Este é um usuário administrativo temporário. Para testes, use 'admin' como CPF."}
 
         if st.button("Entrar", "btn_login_main"):
             users = load_users() or {}
-            if login_cpf in users and verify_password(login_pass, users[login_cpf].get("password", "")):
+            if login_cpf in users and users[login_cpf].get("password") == login_pass:
                 st.session_state.authenticated = True
                 st.session_state.username = login_cpf
                 st.session_state.user_obj = users[login_cpf]
@@ -830,7 +742,7 @@ if not st.session_state.authenticated:
                 if new_cpf in users:
                     st.warning("CPF já cadastrado (local).")
                 else:
-                    users[new_cpf] = {"name": reg_name or new_cpf, "scholarship": reg_bolsa, "password": hash_password(new_pass), "created_at": datetime.utcnow().isoformat()}
+                    users[new_cpf] = {"name": reg_name or new_cpf, "scholarship": reg_bolsa, "password": new_pass, "created_at": datetime.utcnow().isoformat()}
                     ok = save_users(users)
                     if ok:
                         st.success("Usuário cadastrado com sucesso! Você já pode fazer o login na aba 'Entrar'.")
@@ -865,32 +777,22 @@ if not st.session_state.restored_from_saved and USER_STATE.exists():
         if "settings" in meta:
             st.session_state.settings.update(meta.get("settings", {}))
         
-        # interesses persistidos
-        if "interests" in meta and meta.get("interests"):
-            st.session_state["user_interests"] = meta.get("interests", [])
-
         backup_path = st.session_state.get("last_backup_path")
         if backup_path and os.path.exists(backup_path):
             try:
                 df = pd.read_csv(backup_path)
                 st.session_state.df = df
                 st.session_state.G = criar_grafo(df, silent=True)
-                # st.toast pode não existir; usar fallback
-                try:
-                    st.toast(f"Planilha '{os.path.basename(backup_path)}' restaurada automaticamente.", icon="📄")
-                except Exception:
-                    st.success(f"Planilha '{os.path.basename(backup_path)}' restaurada automaticamente.")
+                st.toast(f"Planilha '{os.path.basename(backup_path)}' restaurada automaticamente.", icon="📄")
             except Exception as e:
                 st.error(f"Falha ao restaurar o backup da sua planilha: {e}")
                 st.session_state.last_backup_path = None
         
         st.session_state.restored_from_saved = True
-        try:
-            st.toast("Progresso anterior restaurado.", icon="👍")
-        except Exception:
-            st.success("Progresso anterior restaurado.")
+        st.toast("Progresso anterior restaurado.", icon="👍")
     except Exception as e:
         st.error(f"Erro ao restaurar seu progresso: o arquivo de estado pode estar corrompido. Erro: {e}")
+
 
 # apply theme and font CSS based on settings immediately
 s = get_settings()
@@ -899,12 +801,11 @@ apply_global_styles(s.get("font_scale", 1.0))
 # -------------------------
 # First-run: garantir interesses do usuário
 # -------------------------
-def ensure_user_interests():
+def ensure_user_interests_fixed():
     users = load_users() or {}
-    user_obj = users.get(USERNAME, {}) if isinstance(users, dict) else {}
-    saved = st.session_state.get("user_interests") or user_obj.get("interests") or []
+    saved = st.session_state.get("user_interests") or users.get(USERNAME, {}).get("interests") or []
 
-    default_opts = [
+    fixed_defaults = [
         "documentação",
         "inovação tecnológica",
         "nft",
@@ -912,71 +813,79 @@ def ensure_user_interests():
         "inovação social"
     ]
 
+    # mostrar apenas se não houver interesses salvos
     if not saved:
         st.markdown("<div class='glass-box' style='max-width:900px;margin:10px auto;padding:12px;'>", unsafe_allow_html=True)
-        st.subheader("Marque seus interesses iniciais")
-        st.caption("Selecione temas que deseja ver priorizados em Recomendações.")
-        sel = st.multiselect("Interesses:", options=default_opts, default=[], key="ui_initial_interests")
-        col1, col2 = st.columns([3,1])
-        with col1:
-            if st.button("Salvar interesses", key="btn_save_interests"):
-                chosen = st.session_state.get("ui_initial_interests", [])
-                # salva em users.json (persistente) e em session_state
-                users = load_users() or {}
-                users.setdefault(USERNAME, {}).update(users.get(USERNAME, {}))
-                users[USERNAME]["interests"] = chosen
-                save_users(users)
-                st.session_state["user_interests"] = chosen
+        st.subheader("Escolha seus interesses iniciais")
+        st.caption("Selecione os temas que deseja priorizar em Recomendações.")
+        chosen = st.multiselect("Interesses (mínimo 1):", options=fixed_defaults, default=[], key="ui_initial_interests_fixed")
+        cols = st.columns([3,1])
+        with cols[0]:
+            if st.button("Salvar interesses"):
+                chosen_list = st.session_state.get("ui_initial_interests_fixed", [])
+                if not chosen_list:
+                    st.warning("Selecione pelo menos um interesse.")
+                else:
+                    users = load_users() or {}
+                    users.setdefault(USERNAME, {}).update(users.get(USERNAME, {}))
+                    users[USERNAME]["interests"] = chosen_list
+                    save_users(users)
+                    st.session_state["user_interests"] = chosen_list
+                    try:
+                        save_user_state_minimal(USER_STATE)
+                    except Exception:
+                        pass
+                    st.success("Interesses salvos — serão usados para filtrar suas recomendações.")
+                    safe_rerun()
+        with cols[1]:
+            if st.button("Pular por enquanto"):
+                st.session_state["user_interests"] = []
                 try:
                     save_user_state_minimal(USER_STATE)
                 except Exception:
                     pass
-                st.success("Interesses salvos — isso será usado para filtrar suas recomendações.")
                 safe_rerun()
-        with col2:
-            st.markdown("Se preferir, você pode pular e definir depois nas configurações.")
         st.markdown("</div>", unsafe_allow_html=True)
     else:
-        # garante a session_state consistente
         st.session_state["user_interests"] = saved
 
-ensure_user_interests()
+# chama no carregamento
+ensure_user_interests_fixed()
 
 # -------------------------
-# Função de recomendações por usuário
+# Função de recomendações por usuário (utilizada na página de Recomendações)
 # -------------------------
 def get_recommendations_for_current_user(df_total, top_n=10):
-    """
-    Gera recomendações levando em conta os interesses salvos do usuário.
-    - tenta usar a pipeline de TF-IDF (recomendar_artigos)
-    - se sklearn não disponível, usa um filtro simples por palavra-chave
-    """
     temas = st.session_state.get("user_interests", []) or []
     if not temas:
         return pd.DataFrame()
 
-    recs = pd.DataFrame()
-    if SKLEARN_AVAILABLE:
-        try:
-            recs = recomendar_artigos(temas, df_total, top_n=top_n)
-        except Exception:
-            recs = pd.DataFrame()
+    # primeiro tenta pipeline TF-IDF se disponível
+    try:
+        recs = recomendar_artigos(temas, df_total, top_n=top_n) if (TfidfVectorizer is not None and cosine_similarity is not None) else pd.DataFrame()
+    except Exception:
+        recs = pd.DataFrame()
 
-    # fallback / garantia: filtrar por presença de palavras-chave nos campos texto
+    # fallback simples: filtrar linhas que contenham qualquer termo em colunas textuais
     if recs.empty:
-        # busca simples dentro dos textos das colunas relevantes
-        def matches_theme(row):
-            text = " ".join(str(row.get(c, "")) for c in ['título', 'titulo', 'tema', 'resumo', 'abstract']).lower()
-            return any(t.lower() in text for t in temas)
-        try:
-            filtered = df_total[df_total.apply(matches_theme, axis=1)]
-        except Exception:
-            filtered = pd.DataFrame()
-        if filtered.empty:
+        cols_to_search = [c for c in ['título','titulo','tema','resumo','abstract'] if c in df_total.columns]
+        if not cols_to_search:
             return pd.DataFrame()
+        mask = pd.Series(False, index=df_total.index)
+        for t in temas:
+            t_low = str(t).lower()
+            for c in cols_to_search:
+                try:
+                    mask = mask | df_total[c].fillna("").astype(str).str.lower().str.contains(re.escape(t_low))
+                except Exception:
+                    try:
+                        mask = mask | df_total[c].fillna("").astype(str).str.lower().str.contains(t_low)
+                    except Exception:
+                        pass
+        filtered = df_total[mask]
         return filtered.head(top_n).copy()
     else:
-        # garante que cada resultado contém ao menos um dos temas (redundância segura)
+        # garante presença de ao menos um tema
         def matches_theme_row(row):
             text = " ".join(str(row.get(c, "")) for c in ['título', 'titulo', 'tema', 'resumo', 'abstract']).lower()
             return any(t.lower() in text for t in temas)
@@ -985,102 +894,10 @@ def get_recommendations_for_current_user(df_total, top_n=10):
         return recs.head(top_n)
 
 # -------------------------
-# Render / Editor do mapa mental
+# (o resto do arquivo segue com suas páginas e lógica originais)
 # -------------------------
-def render_mental_map_editor(G):
-    st.subheader("Mapa Mental — Visualização e Edição")
-    if G is None or G.number_of_nodes() == 0:
-        st.info("Mapa vazio — carregue uma planilha para gerar o grafo.")
-        return
 
-    pos = nx.spring_layout(G, seed=42)
-    # construir traces para arestas
-    edge_x, edge_y = [], []
-    for u, v in G.edges():
-        x0, y0 = pos[u]
-        x1, y1 = pos[v]
-        edge_x += [x0, x1, None]
-        edge_y += [y0, y1, None]
-    edge_trace = go.Scatter(x=edge_x, y=edge_y, mode='lines', hoverinfo='none', line=dict(width=1))
-
-    # nós
-    node_x, node_y, labels = [], [], []
-    for n in G.nodes():
-        x, y = pos[n]
-        node_x.append(x); node_y.append(y)
-        labels.append(G.nodes[n].get('label', n))
-    node_trace = go.Scatter(
-        x=node_x, y=node_y, mode='markers+text', text=labels,
-        textposition="top center",
-        marker=dict(size=18, opacity=float(st.session_state.settings.get("node_opacity", 1.0)))
-    )
-
-    fig = go.Figure(data=[edge_trace, node_trace], layout=go.Layout(showlegend=False, hovermode='closest'))
-    fig.update_layout(height=int(st.session_state.settings.get("plot_height", 720)))
-    st.plotly_chart(fig, use_container_width=True)
-
-    # painel de edição confiável (selectbox em vez de click)
-    node_list = list(G.nodes())
-    sel_index = 0
-    if st.session_state.get("selected_node") in node_list:
-        sel_index = node_list.index(st.session_state.get("selected_node"))
-    sel_node = st.selectbox("Selecionar nó para editar:", options=node_list, index=sel_index)
-    st.session_state.selected_node = sel_node
-
-    new_label = st.text_input("Editar etiqueta do nó:", value=G.nodes[sel_node].get("label", sel_node))
-    col1, col2 = st.columns([1,1])
-    with col1:
-        if st.button("Salvar rótulo"):
-            G.nodes[sel_node]['label'] = new_label
-            st.session_state.G = G
-            save_user_state_minimal(USER_STATE)
-            st.success("Rótulo atualizado.")
-            safe_rerun()
-    with col2:
-        if st.button("Remover nó"):
-            G.remove_node(sel_node)
-            st.session_state.G = G
-            save_user_state_minimal(USER_STATE)
-            st.success("Nó removido.")
-            safe_rerun()
-
-    with st.expander("Adicionar novo nó"):
-        novo_label = st.text_input("Rótulo novo nó:", key="ui_new_node_label")
-        if st.button("Adicionar nó"):
-            nid = f"Custom: {novo_label}"
-            G.add_node(nid, label=novo_label)
-            st.session_state.G = G
-            save_user_state_minimal(USER_STATE)
-            st.success("Nó adicionado.")
-            safe_rerun()
-
-    # Anexar imagem 3D / visualizar (arquivo salvo via _local_upload_attachment)
-    st.markdown("### Anexar imagem / modelo 3D ao nó selecionado")
-    uploaded_3d = st.file_uploader("Enviar imagem/modelo 3D (jpg/png/gltf/obj) - apenas para anexar", type=['jpg','png','gltf','obj'])
-    if uploaded_3d:
-        info = _local_upload_attachment(USERNAME, uploaded_3d)
-        # salva como atributo do nó
-        G.nodes[sel_node]['image'] = info['path']
-        st.session_state.G = G
-        save_user_state_minimal(USER_STATE)
-        st.success("Arquivo anexado ao nó.")
-
-    # se nó tiver imagem, mostra (apenas imagens are display)
-    imgpath = G.nodes[sel_node].get('image')
-    if imgpath and os.path.exists(imgpath):
-        ext = os.path.splitext(imgpath)[1].lower()
-        if ext in ['.jpg', '.jpeg', '.png', '.gif']:
-            st.image(imgpath, caption=f"Anexado ao nó: {sel_node}", use_column_width=True)
-        else:
-            st.info(f"Arquivo anexado ({os.path.basename(imgpath)}). Visualização 3D interativa não implementada neste patch; posso adicionar um viewer three.js se desejar.")
-
-# -------------------------
-# Simple nav and main pages handling
-# -------------------------
-# you can expand nav to include "recomendações", "mapa mental", etc.
-# For simplicity, map your pages to st.session_state.page values.
-
-# Render top navigation (simple)
+# Render top navigation (exemplo simples)
 nav_cols = st.columns([1,1,1,1,1])
 with nav_cols[0]:
     if st.button("Planilha"):
@@ -1139,56 +956,155 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Mapa Mental
+# Page: Mapa Mental (preserva visual e adiciona edição embutida)
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("Mapa Mental Interativo")
-    render_mental_map_editor(st.session_state.get("G", nx.Graph()))
+    st.subheader("Mapa Mental")
+
+    G = st.session_state.get("G", nx.Graph())
+    if G is None or G.number_of_nodes() == 0:
+        st.info("Mapa mental vazio. Carregue uma planilha para gerar o grafo.")
+        st.markdown("</div>", unsafe_allow_html=True)
+    else:
+        # --- visualização (mantida igual ao original) ---
+        pos = nx.spring_layout(G, seed=42)
+        edge_x, edge_y = [], []
+        for u, v in G.edges():
+            x0, y0 = pos[u]; x1, y1 = pos[v]
+            edge_x += [x0, x1, None]; edge_y += [y0, y1, None]
+        edge_trace = go.Scatter(x=edge_x, y=edge_y, mode='lines', hoverinfo='none', line=dict(width=1))
+
+        node_x, node_y, labels = [], [], []
+        for n in G.nodes():
+            x,y = pos[n]
+            node_x.append(x); node_y.append(y); labels.append(G.nodes[n].get('label', n))
+        node_trace = go.Scatter(
+            x=node_x, y=node_y, mode='markers+text', text=labels, textposition="top center",
+            marker=dict(size=16, opacity=float(st.session_state.settings.get("node_opacity",1.0)))
+        )
+
+        fig = go.Figure(data=[edge_trace, node_trace], layout=go.Layout(showlegend=False, hovermode='closest'))
+        fig.update_layout(height=int(st.session_state.settings.get("plot_height",720)))
+        st.plotly_chart(fig, use_container_width=True)
+
+        # --- edição embutida (expander dentro da mesma área) ---
+        with st.expander("Editar nó (edição embutida na visualização)"):
+            node_list = list(G.nodes())
+            if not node_list:
+                st.info("Nenhum nó disponível para edição.")
+            else:
+                selected = st.selectbox("Selecione nó:", options=node_list, index=node_list.index(st.session_state.get("selected_node")) if st.session_state.get("selected_node") in node_list else 0)
+                st.session_state.selected_node = selected
+
+                edit_label = st.text_input("Etiqueta (label):", value=G.nodes[selected].get("label", selected), key="edit_node_label")
+                colA, colB = st.columns([1,1])
+                with colA:
+                    if st.button("Salvar alterações no nó"):
+                        newlabel = st.session_state.get("edit_node_label", G.nodes[selected].get("label", selected))
+                        G.nodes[selected]['label'] = newlabel
+                        st.session_state.G = G
+                        save_user_state_minimal(USER_STATE)
+                        st.success("Rótulo do nó atualizado.")
+                        safe_rerun()
+                with colB:
+                    if st.button("Remover nó selecionado"):
+                        G.remove_node(selected)
+                        st.session_state.G = G
+                        save_user_state_minimal(USER_STATE)
+                        st.success("Nó removido.")
+                        safe_rerun()
+
+                st.markdown("---")
+                st.markdown("### Anexar / ver imagem 3D (apenas visualização de imagem fornecida)")
+                uploaded = st.file_uploader("Enviar imagem (jpg/png) para anexar ao nó", type=['jpg','jpeg','png'])
+                if uploaded:
+                    info = _local_upload_attachment(USERNAME, uploaded)
+                    G.nodes[selected]['image'] = info['path']
+                    st.session_state.G = G
+                    save_user_state_minimal(USER_STATE)
+                    st.success("Imagem anexada ao nó.")
+
+                # mostrar imagem anexada (se houver)
+                imgpath = G.nodes[selected].get('image')
+                if imgpath and os.path.exists(imgpath):
+                    st.image(imgpath, caption=f"Imagem anexada ao nó: {selected}", use_column_width=True)
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: Recomendações
+# Page: Recomendações (varredura filtrada por interesses)
 # -------------------------
 elif st.session_state.page == "recomendações":
     st.markdown("<div class='glass-box' style='padding:12px;'>", unsafe_allow_html=True)
-    st.subheader("🔎 Recomendações personalizadas")
+    st.subheader("🔎 Recomendações filtradas pelos seus interesses")
+    df_total = collect_latest_backups()  # junta backups
+    # também considerar planilha carregada na sessão
+    if st.session_state.get("df") is not None and not st.session_state.df.empty:
+        try:
+            df_total = pd.concat([df_total, st.session_state.df], ignore_index=True) if not df_total.empty else st.session_state.df.copy()
+        except Exception:
+            pass
 
-    df_total = collect_latest_backups()
-    if df_total.empty:
-        st.info("Nenhuma planilha encontrada em backups — faça upload ou restaure uma planilha para gerar recomendações.")
+    if df_total is None or df_total.empty:
+        st.info("Não há planilhas disponíveis (backups ou upload). Faça upload de uma planilha para gerar recomendações.")
+        st.markdown("</div>", unsafe_allow_html=True)
     else:
         user_interests = st.session_state.get("user_interests", [])
-        st.markdown(f"**Seus interesses:** {', '.join(user_interests) if user_interests else 'Nenhum selecionado.'}")
+        if not user_interests:
+            st.info("Você ainda não selecionou interesses. Vá para a tela inicial para marcá-los.")
+            st.markdown("</div>", unsafe_allow_html=True)
+        else:
+            st.markdown(f"**Seus interesses salvos:** {', '.join(user_interests)}")
+            # permitir escolher um subconjunto dos interesses salvos para esta busca
+            chosen_now = st.multiselect("Filtrar por (apenas os selecionados serão usados agora):", options=user_interests, default=user_interests, key="ui_reco_filter_now")
+            if st.button("Mostrar Recomendações"):
+                temas = chosen_now or user_interests
+                # busca simples: qualquer interesse presente em colunas relevantes
+                cols_to_search = [c for c in ['título','titulo','tema','resumo','abstract'] if c in df_total.columns]
+                if not cols_to_search:
+                    st.warning("As planilhas não possuem colunas textuais (título/tema/resumo).")
+                    st.markdown("</div>", unsafe_allow_html=True)
+                else:
+                    mask = pd.Series(False, index=df_total.index)
+                    for tema in temas:
+                        # busca case-insensitive em cada coluna
+                        t = str(tema).lower()
+                        col_mask = pd.Series(False, index=df_total.index)
+                        for c in cols_to_search:
+                            try:
+                                col_mask = col_mask | df_total[c].fillna("").astype(str).str.lower().str.contains(re.escape(t))
+                            except Exception:
+                                # fallback: contains simples sem regex
+                                try:
+                                    col_mask = col_mask | df_total[c].fillna("").astype(str).str.lower().str.contains(t)
+                                except Exception:
+                                    pass
+                        mask = mask | col_mask
 
-        # pequenas opções: escolher quais interesses usar agora
-        chosen_now = st.multiselect("Escolher interesses para esta busca (apenas os marcados serão usados):",
-                                    options=user_interests, default=user_interests, key="ui_reco_pick")
-
-        if st.button("🔁 Atualizar recomendações"):
-            with st.spinner("Gerando recomendações..."):
-                st.session_state.user_interests = chosen_now or user_interests
-                recs = get_recommendations_for_current_user(df_total, top_n=50)
-            if recs is None or recs.empty:
-                st.info("Nenhuma recomendação encontrada para os interesses selecionados.")
-            else:
-                st.write(f"Mostrando {len(recs)} resultados.")
-                # organizar colunas visíveis
-                show_cols = [c for c in ['título','titulo','tema','resumo','similarity','_artemis_username'] if c in recs.columns]
-                st.dataframe(recs[show_cols].head(50))
-                # permitir ações rápidas para cada linha (salvar favorito)
-                for idx, row in recs.head(50).iterrows():
-                    cols = st.columns([4,1])
-                    with cols[0]:
-                        st.write(row.get('título') or row.get('titulo') or row.get('tema') or "—")
-                    with cols[1]:
-                        if st.button(f"⭐ Favorito {idx}", key=f"fav_{idx}"):
-                            added = add_to_favorites(row.to_dict())
-                            if added:
-                                st.success("Adicionado aos favoritos.")
-                            else:
-                                st.info("Já estava nos favoritos.")
-    st.markdown("</div>", unsafe_allow_html=True)
+                    results = df_total[mask].copy()
+                    if results.empty:
+                        st.info("Nenhum item nas planilhas corresponde aos interesses selecionados.")
+                    else:
+                        st.write(f"Resultados encontrados: {len(results)}")
+                        # apresentar colunas relevantes (priorizar título/tema/resumo)
+                        display_cols = [c for c in ['título','titulo','tema','resumo','abstract','_artemis_username'] if c in results.columns]
+                        st.dataframe(results[display_cols].head(200))
+                        # permitir salvar linha nos favoritos
+                        for i, row in results.head(50).iterrows():
+                            cols = st.columns([4,1])
+                            with cols[0]:
+                                st.markdown(f"**{ row.get('título') or row.get('titulo') or row.get('tema') or '—' }**")
+                                if 'resumo' in row and pd.notna(row.get('resumo')):
+                                    st.caption(str(row.get('resumo'))[:200] + "...")
+                            with cols[1]:
+                                if st.button(f"⭐ Favoritar {i}", key=f"fav_reco_{i}"):
+                                    added = add_to_favorites(row.to_dict())
+                                    if added:
+                                        st.success("Adicionado aos favoritos.")
+                                    else:
+                                        st.info("Já estava nos favoritos.")
+            st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
 # Page: Mensagens (inbox + compose)
@@ -1278,7 +1194,7 @@ elif st.session_state.page == "mensagens":
                     safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
-
+    
 # -------------------------
 # Page: Configurações
 # -------------------------
