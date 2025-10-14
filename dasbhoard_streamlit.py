@@ -1,7 +1,7 @@
 # dashboard_nugep_pqr_final.py
-# VERSÃO FINAL CORRIGIDA (13/10/2025)
-# COM: Tutorial de primeiro uso, página de Recomendações dedicada e Mapa Mental Interativo com nós clicáveis.
-# ALTERAÇÕES: Adicionado guia para novos usuários. Refatorada a lógica de Recomendações com descoberta inteligente.
+# VERSÃO FINAL MELHORADA (13/10/2025)
+# COM: Descoberta Inteligente de Recomendações, Mapa Mental 3D Interativo com edições e Tutorial de primeiro uso.
+# ALTERAÇÕES: Refatorada a página de Recomendações com onboarding para novos usuários. Corrigidos bugs de renderização no mapa.
 
 import os
 import re
@@ -972,7 +972,7 @@ elif st.session_state.page == "recomendacoes":
     # Se não há temas populares, significa que não há dados na plataforma
     if not temas_populares:
         st.warning("Ainda não há dados de outros usuários para gerar recomendações. Carregue uma planilha na aba '📄 Planilha' para começar e ver a mágica acontecer!")
-    # Se é o primeiro acesso do usuário, mostra a interface de descoberta
+    # Se é o primeiro acesso do usuário, mostra la interface de descoberta
     elif not st.session_state.recommendation_onboarding_complete:
         st.markdown("#### Bem-vindo à Descoberta Inteligente!")
         st.write("Para começar, selecione alguns tópicos de seu interesse abaixo. Eles foram extraídos dos trabalhos mais relevantes da plataforma. Com base na sua seleção, encontraremos os melhores artigos para você.")
@@ -1125,12 +1125,12 @@ elif st.session_state.page == "mapa":
                 if st.form_submit_button("🔗 Conectar"):
                     if node1 and node2 and node1 != node2:
                         if not G.has_edge(node1, node2):
-                           G.add_edge(node1, node2)
-                           st.success(f"Nós '{node1}' e '{node2}' conectados.")
-                           if st.session_state.autosave: save_user_state_minimal(USER_STATE)
-                           time.sleep(0.5); safe_rerun()
+                            G.add_edge(node1, node2)
+                            st.success(f"Nós '{node1}' e '{node2}' conectados.")
+                            if st.session_state.autosave: save_user_state_minimal(USER_STATE)
+                            time.sleep(0.5); safe_rerun()
                         else:
-                           st.info("Esses nós já estão conectados.")
+                            st.info("Esses nós já estão conectados.")
                     else:
                         st.warning("Selecione dois nós diferentes para conectar.")
 
@@ -1203,13 +1203,12 @@ elif st.session_state.page == "mapa":
                     x, y, z = pos[node]
                     node_x.append(x); node_y.append(y); node_z.append(z)
                     
-                    # --- INÍCIO DA CORREÇÃO (Plotly Opacity Error) ---
+                    # Lógica de cor e opacidade para destacar nós selecionados e seus vizinhos
                     node_tipo = data.get('tipo', '').capitalize()
                     hex_color = tipo_color_map.get(node_tipo, "#808080")
                     is_focus = (selected and (node == selected or node in neighbors))
                     opacity = node_opacity_setting if not selected or is_focus else 0.25
                     node_colors.append(hex_to_rgba(hex_color, opacity))
-                    # --- FIM DA CORREÇÃO ---
                     
                     degree = G.degree(node)
                     node_sizes.append(18 if node == selected else max(8, (degree + 1) * 4))
