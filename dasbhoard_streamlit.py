@@ -1,4 +1,5 @@
 # app_nugep_pqr_full.py
+
 # NUGEP-PQR — versão com busca exibindo NOME do usuário (em vez do CPF) na interface
 
 import os
@@ -20,6 +21,9 @@ import numpy as np
 import plotly.express as px
 import networkx as nx
 from fpdf import FPDF
+import matplotlib.pyplot as plt
+import matplotlib
+matplotlib.use('Agg')  # Para evitar problemas com a interface gráfica
 
 from streamlit_agraph import agraph, Node, Edge, Config
 
@@ -102,8 +106,9 @@ DEFAULT_CSS = r"""
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
 
-# <--- ALTERAÇÃO AQUI: Título restaurado para o topo da página ---
-st.markdown("<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'><h1 style='font-weight:800;font-size:40px; background:linear-gradient(90deg,#8e44ad,#2979ff,#1abc9c,#ff8a00); -webkit-background-clip:text; color:transparent; margin:0;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
+# TÍTULO CORRIGIDO - usando st.title para garantir que apareça
+st.title("NUGEP-PQR")
+st.markdown("---")
 
 # -------------------------
 # Storage & fallback paths
@@ -1203,7 +1208,7 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa (força texto branco)
+# Page: mapa (força texto branco) - COM ALTERAÇÕES
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1236,7 +1241,7 @@ elif st.session_state.page == "mapa":
             ("MÉDIO", "Projetos VR"), ("MÉDIO", "Falta Transparência")
         ]
         G.add_edges_from(default_edges)
-        st.session_state.mapa_G = G 
+        st.session_state.mapa_G = G  
 
     with st.expander("Opções e Edição do Mapa"):
         edit_c1, edit_c2 = st.columns(2)
@@ -1271,23 +1276,85 @@ elif st.session_state.page == "mapa":
                         else: st.info("Esses nós já estão conectados.")
                     else: st.warning("Selecione dois nós diferentes.")
         
-        # <--- ALTERAÇÃO AQUI: Adicionado botão de Download do Mapa ---
+        # Função para exportar o mapa como JPG
+        def export_map_to_jpg(G, filename):
+            plt.figure(figsize=(16, 12))
+            pos = nx.spring_layout(G, k=3, iterations=50)
+            
+            # Cores diferentes para categorias e itens
+            node_colors = []
+            for node in G.nodes():
+                if G.nodes[node].get('tipo') == 'Categoria':
+                    node_colors.append('#FF6B6B')  # Vermelho para categorias
+                else:
+                    node_colors.append('#4ECDC4')  # Verde para itens
+            
+            nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2000, alpha=0.9)
+            nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=20)
+            
+            # Labels com quebra de linha
+            labels = {}
+            for node in G.nodes():
+                label = G.nodes[node].get('label', node)
+                # Substituir \n por quebra de linha real
+                if '\n' in label:
+                    labels[node] = label.replace('\n', '\n')
+                else:
+                    labels[node] = label
+            
+            nx.draw_networkx_labels(G, pos, labels=labels, font_size=8, font_color='white')
+            
+            plt.title("Mapa Mental", color='white', fontsize=16)
+            plt.axis('off')
+            plt.tight_layout()
+            
+            # Salvar como JPG
+            plt.savefig(filename, format='jpg', dpi=300, bbox_inches='tight', 
+                       facecolor='#0E192A', edgecolor='none')
+            plt.close()
+        
         st.markdown("---")
         st.write("**3. Baixar Mapa**")
-        try:
-            # Converte o grafo para um formato JSON que pode ser salvo
-            graph_json_data = json.dumps(nx.node_link_data(G), indent=2)
-            st.download_button(
-                label="⬇️ Baixar Mapa como JSON",
-                data=graph_json_data,
-                file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.json",
-                mime="application/json",
-                use_container_width=True,
-                help="Salva a estrutura atual do mapa em um arquivo .json."
-            )
-        except Exception as e:
-            st.error(f"Não foi possível gerar o arquivo para download: {e}")
-
+        col_download1, col_download2 = st.columns(2)
+        
+        with col_download1:
+            try:
+                # Download como JSON
+                graph_json_data = json.dumps(nx.node_link_data(G), indent=2)
+                st.download_button(
+                    label="⬇️ Baixar Mapa como JSON",
+                    data=graph_json_data,
+                    file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    help="Salva a estrutura atual do mapa em um arquivo .json."
+                )
+            except Exception as e:
+                st.error(f"Não foi possível gerar o arquivo JSON: {e}")
+        
+        with col_download2:
+            try:
+                # Download como JPG
+                jpg_filename = f"mapa_mental_{USERNAME}_{int(time.time())}.jpg"
+                export_map_to_jpg(G, jpg_filename)
+                
+                with open(jpg_filename, "rb") as f:
+                    jpg_data = f.read()
+                
+                st.download_button(
+                    label="⬇️ Baixar Mapa como JPG",
+                    data=jpg_data,
+                    file_name=jpg_filename,
+                    mime="image/jpeg",
+                    use_container_width=True,
+                    help="Salva uma imagem JPG do mapa mental."
+                )
+                
+                # Limpar arquivo temporário
+                os.remove(jpg_filename)
+                
+            except Exception as e:
+                st.error(f"Não foi possível gerar a imagem JPG: {e}")
 
     if G.nodes():
         nodes = []
@@ -1319,7 +1386,7 @@ elif st.session_state.page == "mapa":
         st.markdown("---")
         st.subheader(f"Ações para o Nó: {node_data.get('label', selected_node_name)}")
         
-        # <--- ALTERAÇÃO AQUI: Reorganizado painel de ações com Renomear e Excluir ---
+        # Painel de informações do nó
         col1, col2 = st.columns(2)
         with col1:
             st.markdown(f"**ID:** `{selected_node_name}`")
@@ -1337,6 +1404,7 @@ elif st.session_state.page == "mapa":
             key=f"rename_{selected_node_name}"
         )
         
+        # Botões de Ação em colunas
         action_col1, action_col2 = st.columns(2)
         with action_col1:
             if st.button("✏️ Renomear Nó", use_container_width=True, key=f"rename_btn_{selected_node_name}"):
