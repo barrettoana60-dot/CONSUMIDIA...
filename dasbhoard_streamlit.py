@@ -101,6 +101,8 @@ DEFAULT_CSS = r"""
 
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
+
+# <--- ALTERAÇÃO AQUI: Título restaurado para o topo da página ---
 st.markdown("<div style='max-width:1100px;margin:18px auto 8px;text-align:center;'><h1 style='font-weight:800;font-size:40px; background:linear-gradient(90deg,#8e44ad,#2979ff,#1abc9c,#ff8a00); -webkit-background-clip:text; color:transparent; margin:0;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
 
 # -------------------------
@@ -1268,6 +1270,24 @@ elif st.session_state.page == "mapa":
                            time.sleep(0.5); safe_rerun()
                         else: st.info("Esses nós já estão conectados.")
                     else: st.warning("Selecione dois nós diferentes.")
+        
+        # <--- ALTERAÇÃO AQUI: Adicionado botão de Download do Mapa ---
+        st.markdown("---")
+        st.write("**3. Baixar Mapa**")
+        try:
+            # Converte o grafo para um formato JSON que pode ser salvo
+            graph_json_data = json.dumps(nx.node_link_data(G), indent=2)
+            st.download_button(
+                label="⬇️ Baixar Mapa como JSON",
+                data=graph_json_data,
+                file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.json",
+                mime="application/json",
+                use_container_width=True,
+                help="Salva a estrutura atual do mapa em um arquivo .json."
+            )
+        except Exception as e:
+            st.error(f"Não foi possível gerar o arquivo para download: {e}")
+
 
     if G.nodes():
         nodes = []
@@ -1297,19 +1317,45 @@ elif st.session_state.page == "mapa":
     if selected_node_name and selected_node_name in G:
         node_data = G.nodes[selected_node_name]
         st.markdown("---")
-        st.subheader(f"🔍 Detalhes do Nó: {node_data.get('label', selected_node_name)}")
-        col1, col2 = st.columns([3, 1])
+        st.subheader(f"Ações para o Nó: {node_data.get('label', selected_node_name)}")
+        
+        # <--- ALTERAÇÃO AQUI: Reorganizado painel de ações com Renomear e Excluir ---
+        col1, col2 = st.columns(2)
         with col1:
-            connections = list(nx.all_neighbors(G, selected_node_name))
+            st.markdown(f"**ID:** `{selected_node_name}`")
             st.markdown(f"**Tipo:** {escape_html(node_data.get('tipo', 'N/A'))}")
-            st.markdown(f"**Conexões:** {len(connections)}")
         with col2:
+            connections = list(nx.all_neighbors(G, selected_node_name))
+            st.markdown(f"**Conexões:** {len(connections)}")
+
+        st.markdown("---")
+        
+        # Formulário para Renomear
+        new_label = st.text_input(
+            "Novo Rótulo:", 
+            value=node_data.get('label', selected_node_name), 
+            key=f"rename_{selected_node_name}"
+        )
+        
+        action_col1, action_col2 = st.columns(2)
+        with action_col1:
+            if st.button("✏️ Renomear Nó", use_container_width=True, key=f"rename_btn_{selected_node_name}"):
+                if new_label.strip():
+                    G.nodes[selected_node_name]['label'] = new_label.strip()
+                    st.session_state.mapa_G = G
+                    st.toast(f"Nó renomeado para '{new_label}'.")
+                    time.sleep(1); safe_rerun()
+                else:
+                    st.warning("O rótulo não pode ser vazio.")
+
+        with action_col2:
             if st.button("🗑️ Excluir Nó", use_container_width=True, key=f"del_node_{selected_node_name}_{USERNAME}"):
                 G.remove_node(selected_node_name)
                 st.session_state.selected_node = None
                 st.session_state.mapa_G = G
                 st.toast(f"Nó '{selected_node_name}' removido.")
                 time.sleep(1); safe_rerun()
+
         if connections:
             st.write("**Conectado a:**")
             for neighbor in sorted(connections):
