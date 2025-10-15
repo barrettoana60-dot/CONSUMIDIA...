@@ -1,6 +1,7 @@
-# app_nugep_pqr_full_updated.py
+# app_nugep_pqr_full_final.py
 
-# NUGEP-PQR — versão completa (nome centralizado em azul + edição de nós com renomear/excluir)
+# NUGEP-PQR — versão final com ajustes: título centralizado/branco, remover download JSON, manter apenas PNG,
+# e edição de nós com renomear/excluir diretamente no painel de edição.
 
 import os
 import re
@@ -106,9 +107,9 @@ DEFAULT_CSS = r"""
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
 
-# TÍTULO CORRIGIDO - usando st.title para garantir que apareça
-st.title("NUGEP-PQR")
-st.markdown("---")
+# TÍTULO - centralizado (geral) e estilo padronizado
+st.markdown("<div style='text-align:center; padding-top:8px; padding-bottom:6px;'><h1 style='margin:0;color:#ffffff;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
+st.markdown("<hr style='margin-top:6px;margin-bottom:16px;border-color:#233447'/>", unsafe_allow_html=True)
 
 # -------------------------
 # Storage & fallback paths
@@ -902,8 +903,8 @@ if st.session_state.authenticated and not st.session_state.recommendation_onboar
 st.markdown("<div class='glass-box' style='padding-top:10px; padding-bottom:10px;'><div class='specular'></div>", unsafe_allow_html=True)
 top1, top2 = st.columns([0.6, 0.4])
 with top1:
-    # Alteração pedida: centralizar o nome e mudar a cor para azul (#2979ff)
-    st.markdown(f"<div style='text-align:center;color:#2979ff;font-weight:700;padding-top:8px'>{escape_html(USER_OBJ.get('name',''))} — {escape_html(USER_OBJ.get('scholarship',''))}</div>", unsafe_allow_html=True)
+    # Exibição do nome centralizada e em branco (solicitado)
+    st.markdown(f"<div style='text-align:center;color:#ffffff;font-weight:700;padding-top:4px;padding-bottom:4px'>{escape_html(USER_OBJ.get('name',''))} — {escape_html(USER_OBJ.get('scholarship',''))}</div>", unsafe_allow_html=True)
 with top2:
     nav_right1, nav_right2, nav_right3 = st.columns([1,1,1])
     with nav_right1: st.session_state.autosave = st.checkbox("Auto-save", value=st.session_state.autosave, key="ui_autosave")
@@ -1209,7 +1210,7 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa (força texto branco) - COM ALTERAÇÕES
+# Page: mapa (força texto branco) - COM EDIÇÃO DE NÓS RENOMEAR/EXCLUIR NO PAINEL
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1244,7 +1245,7 @@ elif st.session_state.page == "mapa":
         G.add_edges_from(default_edges)
         st.session_state.mapa_G = G  
 
-    with st.expander("Opções e Edição do Mapa"):
+    with st.expander("Opções e Edição do Mapa", expanded=True):
         edit_c1, edit_c2 = st.columns(2)
         with edit_c1:
             with st.form("create_node_form", clear_on_submit=True):
@@ -1276,12 +1277,52 @@ elif st.session_state.page == "mapa":
                            time.sleep(0.5); safe_rerun()
                         else: st.info("Esses nós já estão conectados.")
                     else: st.warning("Selecione dois nós diferentes.")
-        
-        # Função para exportar o mapa como JPG
-        def export_map_to_jpg(G, filename):
-            plt.figure(figsize=(16, 12))
-            pos = nx.spring_layout(G, k=3, iterations=50)
-            
+
+        st.markdown("---")
+        st.write("**Edição em lote / rápida dos nós**")
+        # Mostrar lista de nós com controle de renomear/excluir direto
+        nodes_list = list(G.nodes())
+        if nodes_list:
+            for nid in nodes_list:
+                nlabel = G.nodes[nid].get('label', nid)
+                col_a, col_b, col_c = st.columns([3,2,1])
+                with col_a:
+                    new_label_tmp = st.text_input(f"Rótulo ({nid})", value=nlabel, key=f"edit_label_{nid}")
+                with col_b:
+                    # renomear botão
+                    if st.button("✏️ Renomear", key=f"btn_rename_inline_{nid}"):
+                        val = st.session_state.get(f"edit_label_{nid}", "").strip()
+                        if val:
+                            G.nodes[nid]['label'] = val
+                            st.session_state.mapa_G = G
+                            st.toast(f"Nó '{nid}' renomeado para '{val}'.")
+                            time.sleep(0.5); safe_rerun()
+                        else:
+                            st.warning("Rótulo vazio não permitido.")
+                with col_c:
+                    if st.button("🗑️ Excluir", key=f"btn_del_inline_{nid}"):
+                        # confirmar exclusão simples
+                        try:
+                            G.remove_node(nid)
+                            st.session_state.mapa_G = G
+                            st.toast(f"Nó '{nid}' excluído.")
+                            time.sleep(0.5); safe_rerun()
+                        except Exception as e:
+                            st.error(f"Erro ao excluir nó: {e}")
+        else:
+            st.info("Nenhum nó para editar.")
+
+        st.markdown("---")
+        st.write("**3. Baixar Mapa (PNG)**")
+
+        # Função para exportar o mapa como PNG (em memória)
+        def export_map_to_png_bytes(G):
+            fig = plt.figure(figsize=(14, 10), dpi=200)
+            try:
+                pos = nx.spring_layout(G, k=1.2, iterations=60)
+            except Exception:
+                pos = nx.spring_layout(G)
+
             # Cores diferentes para categorias e itens
             node_colors = []
             for node in G.nodes():
@@ -1289,73 +1330,42 @@ elif st.session_state.page == "mapa":
                     node_colors.append('#FF6B6B')  # Vermelho para categorias
                 else:
                     node_colors.append('#4ECDC4')  # Verde para itens
-            
-            nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2000, alpha=0.9)
-            nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=20)
-            
+
+            nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2000, alpha=0.95)
+            nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=20, width=1.5, connectionstyle='arc3,rad=0.1')
+
             # Labels com quebra de linha
             labels = {}
             for node in G.nodes():
                 label = G.nodes[node].get('label', node)
-                # Substituir \n por quebra de linha real
-                if '\n' in label:
-                    labels[node] = label.replace('\n', '\n')
-                else:
-                    labels[node] = label
-            
-            nx.draw_networkx_labels(G, pos, labels=labels, font_size=8, font_color='white')
-            
+                labels[node] = label
+
+            nx.draw_networkx_labels(G, pos, labels=labels, font_size=9, font_color='white')
+
             plt.title("Mapa Mental", color='white', fontsize=16)
             plt.axis('off')
             plt.tight_layout()
-            
-            # Salvar como JPG
-            plt.savefig(filename, format='jpg', dpi=300, bbox_inches='tight', 
-                       facecolor='#0E192A', edgecolor='none')
-            plt.close()
-        
-        st.markdown("---")
-        st.write("**3. Baixar Mapa**")
-        col_download1, col_download2 = st.columns(2)
-        
-        with col_download1:
-            try:
-                # Download como JSON
-                graph_json_data = json.dumps(nx.node_link_data(G), indent=2)
-                st.download_button(
-                    label="⬇️ Baixar Mapa como JSON",
-                    data=graph_json_data,
-                    file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.json",
-                    mime="application/json",
-                    use_container_width=True,
-                    help="Salva a estrutura atual do mapa em um arquivo .json."
-                )
-            except Exception as e:
-                st.error(f"Não foi possível gerar o arquivo JSON: {e}")
-        
-        with col_download2:
-            try:
-                # Download como JPG
-                jpg_filename = f"mapa_mental_{USERNAME}_{int(time.time())}.jpg"
-                export_map_to_jpg(G, jpg_filename)
-                
-                with open(jpg_filename, "rb") as f:
-                    jpg_data = f.read()
-                
-                st.download_button(
-                    label="⬇️ Baixar Mapa como JPG",
-                    data=jpg_data,
-                    file_name=jpg_filename,
-                    mime="image/jpeg",
-                    use_container_width=True,
-                    help="Salva uma imagem JPG do mapa mental."
-                )
-                # Limpar arquivo temporário
-                os.remove(jpg_filename)
-                
-            except Exception as e:
-                st.error(f"Não foi possível gerar a imagem JPG: {e}")
+            buf = io.BytesIO()
+            fig.patch.set_facecolor('#0E192A')
+            plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor())
+            plt.close(fig)
+            buf.seek(0)
+            return buf.getvalue()
 
+        try:
+            png_bytes = export_map_to_png_bytes(G)
+            st.download_button(
+                label="⬇️ Baixar Mapa como PNG",
+                data=png_bytes,
+                file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.png",
+                mime="image/png",
+                use_container_width=True,
+                help="Salva uma imagem PNG do mapa mental."
+            )
+        except Exception as e:
+            st.error(f"Não foi possível gerar a imagem PNG: {e}")
+
+    # Visualização interativa
     if G.nodes():
         nodes = []
         for node_id, data in G.nodes(data=True):
@@ -1370,7 +1380,7 @@ elif st.session_state.page == "mapa":
 
         edges = [Edge(source=u, target=v) for u, v in G.edges()]
         
-        config = Config(width="100%", height=800, directed=True, physics=False, hierarchical=True,
+        config = Config(width="100%", height=780, directed=True, physics=False, hierarchical=True,
                         layout_settings={"hierarchical": {"direction": "LR", "sortMethod": "directed", "levelSeparation": 300, "nodeSpacing": 120}},
                         node_style={"shape": "box", "borderWidth": 2, "color": "#22252A", "font": {"color": "#FFFFFF", "size": 16}},
                         edge_style={"color": "#B0B0B0", "width": 2})
