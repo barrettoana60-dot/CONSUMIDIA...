@@ -106,18 +106,8 @@ DEFAULT_CSS = r"""
 st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
 
-# TÍTULO CENTRALIZADO COM COR AZUL
-st.markdown("""
-<div style='text-align: center; margin: 20px 0;'>
-    <h1 style='
-        color: #007CF0;
-        font-weight: 800;
-        font-size: 48px;
-        margin: 0;
-        padding: 0;
-    '>NUGEP-PQR</h1>
-</div>
-""", unsafe_allow_html=True)
+# TÍTULO CORRIGIDO - usando st.title para garantir que apareça
+st.title("NUGEP-PQR")
 st.markdown("---")
 
 # -------------------------
@@ -1218,7 +1208,7 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa (força texto branco) - COM ALTERAÇÕES SOLICITADAS
+# Page: mapa (força texto branco) - COM ALTERAÇÕES
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1325,29 +1315,46 @@ elif st.session_state.page == "mapa":
         
         st.markdown("---")
         st.write("**3. Baixar Mapa**")
+        col_download1, col_download2 = st.columns(2)
         
-        try:
-            # Apenas download como JPG
-            jpg_filename = f"mapa_mental_{USERNAME}_{int(time.time())}.jpg"
-            export_map_to_jpg(G, jpg_filename)
-            
-            with open(jpg_filename, "rb") as f:
-                jpg_data = f.read()
-            
-            st.download_button(
-                label="⬇️ Baixar Mapa como JPG",
-                data=jpg_data,
-                file_name=jpg_filename,
-                mime="image/jpeg",
-                use_container_width=True,
-                help="Salva uma imagem JPG do mapa mental."
-            )
-            
-            # Limpar arquivo temporário
-            os.remove(jpg_filename)
-            
-        except Exception as e:
-            st.error(f"Não foi possível gerar a imagem JPG: {e}")
+        with col_download1:
+            try:
+                # Download como JSON
+                graph_json_data = json.dumps(nx.node_link_data(G), indent=2)
+                st.download_button(
+                    label="⬇️ Baixar Mapa como JSON",
+                    data=graph_json_data,
+                    file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.json",
+                    mime="application/json",
+                    use_container_width=True,
+                    help="Salva a estrutura atual do mapa em um arquivo .json."
+                )
+            except Exception as e:
+                st.error(f"Não foi possível gerar o arquivo JSON: {e}")
+        
+        with col_download2:
+            try:
+                # Download como JPG
+                jpg_filename = f"mapa_mental_{USERNAME}_{int(time.time())}.jpg"
+                export_map_to_jpg(G, jpg_filename)
+                
+                with open(jpg_filename, "rb") as f:
+                    jpg_data = f.read()
+                
+                st.download_button(
+                    label="⬇️ Baixar Mapa como JPG",
+                    data=jpg_data,
+                    file_name=jpg_filename,
+                    mime="image/jpeg",
+                    use_container_width=True,
+                    help="Salva uma imagem JPG do mapa mental."
+                )
+                
+                # Limpar arquivo temporário
+                os.remove(jpg_filename)
+                
+            except Exception as e:
+                st.error(f"Não foi possível gerar a imagem JPG: {e}")
 
     if G.nodes():
         nodes = []
@@ -1397,7 +1404,7 @@ elif st.session_state.page == "mapa":
             key=f"rename_{selected_node_name}"
         )
         
-        # Botões de Ação em colunas - RENOMEAR e EXCLUIR
+        # Botões de Ação em colunas
         action_col1, action_col2 = st.columns(2)
         with action_col1:
             if st.button("✏️ Renomear Nó", use_container_width=True, key=f"rename_btn_{selected_node_name}"):
@@ -1463,7 +1470,7 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: busca
+# Page: busca (AQUI foi a alteração principal)
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1473,7 +1480,7 @@ elif st.session_state.page == "busca":
         if not text: return []
         text = re.sub(r"[^\w\s]", " ", str(text or "")).lower()
         stop = {"de","da","do","e","a","o","em","para","por","com"}
-        words = [w for w in text.split() if len(w) > 2 and w not in stop}
+        words = [w for w in text.split() if len(w) > 2 and w not in stop]
         freq = {w: words.count(w) for w in set(words)}
         return [w for w, _ in sorted(freq.items(), key=lambda item: item[1], reverse=True)][:n]
 
