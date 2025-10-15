@@ -1,6 +1,6 @@
-# app_nugep_pqr_full.py
+# app_nugep_pqr_full_updated.py
 
-# NUGEP-PQR — versão com busca exibindo NOME do usuário (em vez do CPF) na interface
+# NUGEP-PQR — versão completa (nome centralizado em azul + edição de nós com renomear/excluir)
 
 import os
 import re
@@ -902,7 +902,8 @@ if st.session_state.authenticated and not st.session_state.recommendation_onboar
 st.markdown("<div class='glass-box' style='padding-top:10px; padding-bottom:10px;'><div class='specular'></div>", unsafe_allow_html=True)
 top1, top2 = st.columns([0.6, 0.4])
 with top1:
-    st.markdown(f"<div style='color:var(--muted-text-dark);font-weight:700;padding-top:8px;'>Usuário: {USER_OBJ.get('name','')} — {USER_OBJ.get('scholarship','')}</div>", unsafe_allow_html=True)
+    # Alteração pedida: centralizar o nome e mudar a cor para azul (#2979ff)
+    st.markdown(f"<div style='text-align:center;color:#2979ff;font-weight:700;padding-top:8px'>{escape_html(USER_OBJ.get('name',''))} — {escape_html(USER_OBJ.get('scholarship',''))}</div>", unsafe_allow_html=True)
 with top2:
     nav_right1, nav_right2, nav_right3 = st.columns([1,1,1])
     with nav_right1: st.session_state.autosave = st.checkbox("Auto-save", value=st.session_state.autosave, key="ui_autosave")
@@ -1349,7 +1350,6 @@ elif st.session_state.page == "mapa":
                     use_container_width=True,
                     help="Salva uma imagem JPG do mapa mental."
                 )
-                
                 # Limpar arquivo temporário
                 os.remove(jpg_filename)
                 
