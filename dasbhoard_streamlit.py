@@ -20,6 +20,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import plotly.express as px
+import plotly.graph_objects as go
 import networkx as nx
 from fpdf import FPDF
 import matplotlib.pyplot as plt
@@ -224,7 +225,7 @@ def _render_credentials_box(username, password, note=None, key_prefix="cred"):
 # Stop words
 # -------------------------
 PORTUGUESE_STOP_WORDS = [
-    'de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'uma', 'os', 'no', 'se', 'na', 
+    'de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'una', 'os', 'no', 'se', 'na', 
     'por', 'mais', 'as', 'dos', 'como', 'mas', 'foi', 'ao', 'ele', 'das', 'tem', 'à', 'seu', 'sua', 'ou', 'ser', 
     'quando', 'muito', 'há', 'nos', 'já', 'está', 'eu', 'também', 'só', 'pelo', 'pela', 'até', 'isso', 'ela', 
     'entre', 'era', 'depois', 'sem', 'mesmo', 'aos', 'ter', 'seus', 'quem', 'nas', 'me', 'esse', 'eles', 'estão', 
@@ -363,7 +364,7 @@ def delete_message(message_id, username):
     msgs = _local_load_all_messages()
     msg_to_delete = next((m for m in msgs if m.get("id") == message_id and (m.get("to") == username or m.get("from") == username)), None)
     if msg_to_delete:
-        if msg_to_delete.get("attachment", {}).get('path'):
+        if msg_to_delete.get("attachment") and isinstance(msg_to_delete["attachment"], dict) and msg_to_delete["attachment"].get('path'):
             _local_remove_attachment(msg_to_delete["attachment"]["path"])
         new_msgs = [m for m in msgs if m.get("id") != message_id]
         _local_save_all_messages(new_msgs)
@@ -852,7 +853,7 @@ all_msgs = load_all_messages()
 UNREAD_COUNT = sum(1 for m in all_msgs if m.get("to") == USERNAME and not m.get("read"))
 if "last_unread_count" not in st.session_state: st.session_state.last_unread_count = 0
 if UNREAD_COUNT > st.session_state.last_unread_count:
-    st.toast(f"Você tem {UNREAD_COUNT} nova(s) mensagem(ns) não lida(s).", icon="✉️")
+    st.toast(f"Você tem {UNREAD_COUNT} nova(s) mensagem(n) não lida(s).", icon="✉️")
 st.session_state.last_unread_count = UNREAD_COUNT
 mens_label = f"✉️ Mensagens ({UNREAD_COUNT})" if UNREAD_COUNT > 0 else "✉️ Mensagens"
 
@@ -1132,17 +1133,32 @@ elif st.session_state.page == "recomendacoes":
                     st.session_state.recommendation_view_index = None
                     safe_rerun()
 
-                st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
-                st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— Não informado —'))} • _Ano:_ {escape_html(str(det.get('ano', det.get('year','— —'))))}")
-                st.markdown("---")
-                st.markdown("**Resumo**")
-                st.markdown(escape_html(det.get('resumo', 'Resumo não disponível.')))
-                st.markdown("---")
-                if det.get('doi'):
-                    doi_link = f"https://doi.org/{det.get('doi')}"
-                    st.markdown(f"[🔗 Abrir DOI]({doi_link})")
-                elif det.get('url'):
-                    st.markdown(f"[🔗 Ir para fonte]({det.get('url')})")
+                # MELHORIA: Exibição mais organizada dos dados
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
+                    st.markdown(f"**Autor(es):** {escape_html(det.get('autor','— Não informado —'))}")
+                    st.markdown(f"**Ano:** {escape_html(str(det.get('ano', det.get('year','— —'))))}")
+                    st.markdown(f"**País:** {escape_html(det.get('país', det.get('pais', det.get('country','— —'))))}")
+                    
+                    if det.get('doi'):
+                        doi_link = f"https://doi.org/{det.get('doi')}"
+                        st.markdown(f"**DOI:** [{det.get('doi')}]({doi_link})")
+                    elif det.get('url'):
+                        st.markdown(f"**Link:** [{det.get('url')}]({det.get('url')})")
+                    
+                    st.markdown("---")
+                    st.markdown("**Resumo**")
+                    st.markdown(escape_html(det.get('resumo', 'Resumo não disponível.')))
+                
+                with col2:
+                    # Informações adicionais
+                    st.markdown("**Informações Adicionais**")
+                    if det.get('similarity'):
+                        st.metric("Similaridade", f"{det['similarity']:.2f}")
+                    
+                    if det.get('_artemis_username'):
+                        st.write(f"Fonte: {det['_artemis_username']}")
 
                 col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
@@ -1170,7 +1186,11 @@ elif st.session_state.page == "recomendacoes":
                 title = str(row.get('título') or row.get('titulo') or '(Sem título)')
                 similarity = row.get('similarity', 0)
                 author_snippet = row.get('autor') or ""
+                year = row.get('ano') or row.get('year') or ""
+                country = row.get('país') or row.get('pais') or row.get('country') or ""
+                link = row.get('url') or row.get('link') or row.get('doi') or ""
                 
+                # MELHORIA: Card mais informativo
                 st.markdown(f"""
                 <div class="card">
                     <div style="display:flex; gap:12px; align-items:flex-start;">
@@ -1178,6 +1198,8 @@ elif st.session_state.page == "recomendacoes":
                         <div style="flex:1;">
                             <div class="card-title">{escape_html(title)}</div>
                             <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • {escape_html(author_snippet)}</div>
+                            <div class="small-muted">Ano: {escape_html(str(year))} • País: {escape_html(country)}</div>
+                            <div class="small-muted">Link: {escape_html(link)}</div>
                         </div>
                     </div>
                 </div>""", unsafe_allow_html=True)
@@ -1223,15 +1245,15 @@ elif st.session_state.page == "mapa":
 
     if not G.nodes():
         default_nodes = {
-            "ALTO": {"label": "🟢  ALTO", "tipo": "Categoria"},
-            "MÉDIO-ALTO": {"label": "🟡  MÉDIO-ALTO", "tipo": "Categoria"},
-            "MÉDIO": {"label": "🟠  MÉDIO", "tipo": "Categoria"},
+            "ALTO": {"label": "🟢 ALTO", "tipo": "Categoria"},
+            "MÉDIO-ALTO": {"label": "🟡 MÉDIO-ALTO", "tipo": "Categoria"},
+            "MÉDIO": {"label": "🟠 MÉDIO", "tipo": "Categoria"},
             "Open Access": {"label": "Open Access Massivo", "tipo": "Item"},
-            "IA Curadoria": {"label": "IA para\ncuradoria/personalização", "tipo": "Item"},
-            "Ferramentas Interativas": {"label": "Ferramentas interativas\nfísicas-digitais", "tipo": "Item"},
+            "IA Curadoria": {"label": "IA para curadoria", "tipo": "Item"},
+            "Ferramentas Interativas": {"label": "Ferramentas interativas", "tipo": "Item"},
             "Foco Educacional": {"label": "Foco educacional", "tipo": "Item"},
-            "Digitalização Técnica": {"label": "Digitalização técnica\navançada", "tipo": "Item"},
-            "Projetos VR": {"label": "Projetos pontuais de VR", "tipo": "Item"},
+            "Digitalização Técnica": {"label": "Digitalização técnica", "tipo": "Item"},
+            "Projetos VR": {"label": "Projetos de VR", "tipo": "Item"},
             "Falta Transparência": {"label": "Falta de transparência", "tipo": "Item"},
         }
         for node_id, attrs in default_nodes.items():
@@ -1279,36 +1301,51 @@ elif st.session_state.page == "mapa":
                     else: st.warning("Selecione dois nós diferentes.")
 
         st.markdown("---")
-        st.write("**Edição em lote / rápida dos nós**")
+        st.write("**Edição Rápida dos Nós**")
+        
         # Mostrar lista de nós com controle de renomear/excluir direto
         nodes_list = list(G.nodes())
         if nodes_list:
+            st.write(f"Total de {len(nodes_list)} nós no mapa:")
             for nid in nodes_list:
                 nlabel = G.nodes[nid].get('label', nid)
-                col_a, col_b, col_c = st.columns([3,2,1])
+                ntipo = G.nodes[nid].get('tipo', 'Item')
+                
+                col_a, col_b, col_c = st.columns([4, 2, 1])
                 with col_a:
-                    new_label_tmp = st.text_input(f"Rótulo ({nid})", value=nlabel, key=f"edit_label_{nid}")
+                    new_label = st.text_input(f"Rótulo ({nid})", value=nlabel, key=f"edit_label_{nid}")
                 with col_b:
-                    # renomear botão
-                    if st.button("✏️ Renomear", key=f"btn_rename_inline_{nid}"):
-                        val = st.session_state.get(f"edit_label_{nid}", "").strip()
-                        if val:
-                            G.nodes[nid]['label'] = val
-                            st.session_state.mapa_G = G
-                            st.toast(f"Nó '{nid}' renomeado para '{val}'.")
-                            time.sleep(0.5); safe_rerun()
-                        else:
-                            st.warning("Rótulo vazio não permitido.")
+                    # Atualizar tipo
+                    new_tipo = st.selectbox(f"Tipo", options=["Categoria", "Item"], 
+                                          index=0 if ntipo == "Categoria" else 1, 
+                                          key=f"edit_tipo_{nid}")
+                    if new_tipo != ntipo:
+                        G.nodes[nid]['tipo'] = new_tipo
+                        st.session_state.mapa_G = G
+                        st.toast(f"Tipo do nó '{nid}' atualizado.")
                 with col_c:
-                    if st.button("🗑️ Excluir", key=f"btn_del_inline_{nid}"):
-                        # confirmar exclusão simples
+                    if st.button("🗑️", key=f"btn_del_{nid}", help=f"Excluir nó {nid}"):
                         try:
                             G.remove_node(nid)
                             st.session_state.mapa_G = G
+                            if st.session_state.get("selected_node") == nid:
+                                st.session_state.selected_node = None
                             st.toast(f"Nó '{nid}' excluído.")
                             time.sleep(0.5); safe_rerun()
                         except Exception as e:
                             st.error(f"Erro ao excluir nó: {e}")
+                
+                # Botão de renomear separado
+                if st.button("✏️ Renomear", key=f"btn_rename_{nid}", use_container_width=True):
+                    if new_label.strip():
+                        G.nodes[nid]['label'] = new_label.strip()
+                        st.session_state.mapa_G = G
+                        st.toast(f"Nó renomeado para '{new_label}'.")
+                        time.sleep(0.5); safe_rerun()
+                    else:
+                        st.warning("O rótulo não pode ser vazio.")
+                
+                st.markdown("---")
         else:
             st.info("Nenhum nó para editar.")
 
@@ -1319,35 +1356,58 @@ elif st.session_state.page == "mapa":
         def export_map_to_png_bytes(G):
             fig = plt.figure(figsize=(14, 10), dpi=200)
             try:
-                pos = nx.spring_layout(G, k=1.2, iterations=60)
+                pos = nx.spring_layout(G, k=1.5, iterations=100)
             except Exception:
                 pos = nx.spring_layout(G)
 
             # Cores diferentes para categorias e itens
             node_colors = []
+            node_sizes = []
             for node in G.nodes():
                 if G.nodes[node].get('tipo') == 'Categoria':
                     node_colors.append('#FF6B6B')  # Vermelho para categorias
+                    node_sizes.append(3000)
                 else:
                     node_colors.append('#4ECDC4')  # Verde para itens
+                    node_sizes.append(2000)
 
-            nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=2000, alpha=0.95)
-            nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, arrowsize=20, width=1.5, connectionstyle='arc3,rad=0.1')
+            nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=node_sizes, 
+                                 alpha=0.95, edgecolors='white', linewidths=2)
+            
+            nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, 
+                                 arrowsize=25, width=2, connectionstyle='arc3,rad=0.1')
 
             # Labels com quebra de linha
             labels = {}
             for node in G.nodes():
                 label = G.nodes[node].get('label', node)
+                # Quebra de linha automática para labels longos
+                if len(label) > 15:
+                    words = label.split()
+                    lines = []
+                    current_line = []
+                    for word in words:
+                        if len(' '.join(current_line + [word])) <= 15:
+                            current_line.append(word)
+                        else:
+                            if current_line:
+                                lines.append(' '.join(current_line))
+                            current_line = [word]
+                    if current_line:
+                        lines.append(' '.join(current_line))
+                    label = '\n'.join(lines)
                 labels[node] = label
 
-            nx.draw_networkx_labels(G, pos, labels=labels, font_size=9, font_color='white')
+            nx.draw_networkx_labels(G, pos, labels=labels, font_size=8, 
+                                  font_color='white', font_weight='bold')
 
-            plt.title("Mapa Mental", color='white', fontsize=16)
+            plt.title("Mapa Mental", color='white', fontsize=16, pad=20)
             plt.axis('off')
             plt.tight_layout()
             buf = io.BytesIO()
             fig.patch.set_facecolor('#0E192A')
-            plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', facecolor=fig.get_facecolor())
+            plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
+                       facecolor=fig.get_facecolor(), transparent=False)
             plt.close(fig)
             buf.seek(0)
             return buf.getvalue()
@@ -1369,32 +1429,46 @@ elif st.session_state.page == "mapa":
     if G.nodes():
         nodes = []
         for node_id, data in G.nodes(data=True):
-            node_args = data.copy()
-            node_args['id'] = node_id
-            node_args.pop('tipo', None)
-            if 'font' not in node_args:
-                node_args['font'] = {"color": "#FFFFFF", "size": 16}
-            else:
-                node_args['font']['color'] = "#FFFFFF"
+            node_args = {
+                'id': node_id,
+                'label': data.get('label', node_id),
+                'color': '#FF6B6B' if data.get('tipo') == 'Categoria' else '#4ECDC4',
+                'font': {'color': '#FFFFFF', 'size': 16, 'face': 'Arial'},
+                'size': 25 if data.get('tipo') == 'Categoria' else 20
+            }
             nodes.append(Node(**node_args))
 
-        edges = [Edge(source=u, target=v) for u, v in G.edges()]
+        edges = [Edge(source=u, target=v, color='#B0B0B0', width=2) for u, v in G.edges()]
         
-        config = Config(width="100%", height=780, directed=True, physics=False, hierarchical=True,
-                        layout_settings={"hierarchical": {"direction": "LR", "sortMethod": "directed", "levelSeparation": 300, "nodeSpacing": 120}},
-                        node_style={"shape": "box", "borderWidth": 2, "color": "#22252A", "font": {"color": "#FFFFFF", "size": 16}},
-                        edge_style={"color": "#B0B0B0", "width": 2})
+        config = Config(
+            width="100%", 
+            height=780, 
+            directed=True, 
+            physics=True,
+            hierarchical=False,
+            node_highlight_behavior=True,
+            highlight_color="#F8F8F8",
+            collapsible=True,
+            node={'labelProperty': 'label'},
+            link={'labelProperty': 'label', 'renderLabel': True}
+        )
 
-        clicked_node_id = agraph(nodes=nodes, edges=edges, config=config)
-        if clicked_node_id: st.session_state.selected_node = clicked_node_id
+        try:
+            clicked_node_id = agraph(nodes=nodes, edges=edges, config=config)
+            if clicked_node_id: 
+                st.session_state.selected_node = clicked_node_id
+        except Exception as e:
+            st.warning(f"Erro na visualização interativa: {e}")
+            # Fallback para visualização estática
+            st.info("Visualização interativa temporariamente indisponível. Use o download PNG.")
     else:
-        st.warning("O mapa está vazio.")
+        st.warning("O mapa está vazio. Adicione alguns nós para começar.")
 
     selected_node_name = st.session_state.get("selected_node")
     if selected_node_name and selected_node_name in G:
         node_data = G.nodes[selected_node_name]
         st.markdown("---")
-        st.subheader(f"Ações para o Nó: {node_data.get('label', selected_node_name)}")
+        st.subheader(f"🔍 Nó Selecionado: {node_data.get('label', selected_node_name)}")
         
         # Painel de informações do nó
         col1, col2 = st.columns(2)
@@ -1402,42 +1476,63 @@ elif st.session_state.page == "mapa":
             st.markdown(f"**ID:** `{selected_node_name}`")
             st.markdown(f"**Tipo:** {escape_html(node_data.get('tipo', 'N/A'))}")
         with col2:
-            connections = list(nx.all_neighbors(G, selected_node_name))
-            st.markdown(f"**Conexões:** {len(connections)}")
+            # Conexões
+            in_connections = list(G.predecessors(selected_node_name))
+            out_connections = list(G.successors(selected_node_name))
+            st.markdown(f"**Conexões de entrada:** {len(in_connections)}")
+            st.markdown(f"**Conexões de saída:** {len(out_connections)}")
 
         st.markdown("---")
         
-        # Formulário para Renomear
-        new_label = st.text_input(
-            "Novo Rótulo:", 
-            value=node_data.get('label', selected_node_name), 
-            key=f"rename_{selected_node_name}"
-        )
-        
-        # Botões de Ação em colunas
-        action_col1, action_col2 = st.columns(2)
-        with action_col1:
-            if st.button("✏️ Renomear Nó", use_container_width=True, key=f"rename_btn_{selected_node_name}"):
-                if new_label.strip():
-                    G.nodes[selected_node_name]['label'] = new_label.strip()
+        # Formulário para edição avançada
+        with st.form(f"edit_node_{selected_node_name}"):
+            st.write("**Editar Nó**")
+            new_label = st.text_input(
+                "Novo Rótulo:", 
+                value=node_data.get('label', selected_node_name), 
+                key=f"rename_{selected_node_name}"
+            )
+            new_tipo = st.selectbox(
+                "Novo Tipo:",
+                options=["Categoria", "Item"],
+                index=0 if node_data.get('tipo') == "Categoria" else 1,
+                key=f"tipo_{selected_node_name}"
+            )
+            
+            col_edit1, col_edit2 = st.columns(2)
+            with col_edit1:
+                if st.form_submit_button("💾 Atualizar Nó", use_container_width=True):
+                    if new_label.strip():
+                        G.nodes[selected_node_name]['label'] = new_label.strip()
+                        G.nodes[selected_node_name]['tipo'] = new_tipo
+                        st.session_state.mapa_G = G
+                        st.toast("Nó atualizado com sucesso!")
+                        time.sleep(1); safe_rerun()
+                    else:
+                        st.warning("O rótulo não pode ser vazio.")
+            
+            with col_edit2:
+                if st.form_submit_button("🗑️ Excluir Nó", use_container_width=True):
+                    G.remove_node(selected_node_name)
+                    st.session_state.selected_node = None
                     st.session_state.mapa_G = G
-                    st.toast(f"Nó renomeado para '{new_label}'.")
+                    st.toast(f"Nó '{selected_node_name}' removido.")
                     time.sleep(1); safe_rerun()
-                else:
-                    st.warning("O rótulo não pode ser vazio.")
 
-        with action_col2:
-            if st.button("🗑️ Excluir Nó", use_container_width=True, key=f"del_node_{selected_node_name}_{USERNAME}"):
-                G.remove_node(selected_node_name)
-                st.session_state.selected_node = None
-                st.session_state.mapa_G = G
-                st.toast(f"Nó '{selected_node_name}' removido.")
-                time.sleep(1); safe_rerun()
-
-        if connections:
-            st.write("**Conectado a:**")
-            for neighbor in sorted(connections):
-                st.markdown(f"- {G.nodes[neighbor].get('label', neighbor)}")
+        # Mostrar conexões
+        if in_connections or out_connections:
+            st.write("**Conexões:**")
+            col_conn1, col_conn2 = st.columns(2)
+            with col_conn1:
+                if in_connections:
+                    st.write("**Entrada de:**")
+                    for neighbor in sorted(in_connections):
+                        st.markdown(f"- {G.nodes[neighbor].get('label', neighbor)}")
+            with col_conn2:
+                if out_connections:
+                    st.write("**Saída para:**")
+                    for neighbor in sorted(out_connections):
+                        st.markdown(f"- {G.nodes[neighbor].get('label', neighbor)}")
         else:
             st.write("Este nó não possui conexões.")
 
@@ -1457,26 +1552,214 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos
+# Page: graficos (MELHORIA: Gráficos mais inteligentes)
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("📊 Gráficos Personalizados")
+    st.subheader("📊 Gráficos Inteligentes")
+    
     if st.session_state.df is None:
-        st.warning("Carregue uma planilha para gerar gráficos.")
+        st.warning("Carregue uma planilha na página 'Planilha' para gerar gráficos.")
     else:
         df = st.session_state.df.copy()
+        
+        # Análise automática dos dados
+        st.write("### 📈 Análise dos Dados")
+        col1, col2, col3 = st.columns(3)
+        with col1:
+            st.metric("Total de Registros", len(df))
+        with col2:
+            st.metric("Colunas", len(df.columns))
+        with col3:
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            st.metric("Colunas Numéricas", len(numeric_cols))
+        
+        # Seleção de tipo de gráfico
+        st.write("### 🎨 Tipo de Gráfico")
+        chart_type = st.selectbox(
+            "Selecione o tipo de gráfico:",
+            ["Barra", "Linha", "Dispersão", "Histograma", "Pizza", "Boxplot", "Heatmap", "Treemap"],
+            key=f"chart_type_{USERNAME}"
+        )
+        
         cols = df.columns.tolist()
-        c1, c2 = st.columns(2)
-        with c1: eixo_x = st.selectbox("Eixo X", options=cols, key=f"x_{USERNAME}")
-        with c2: eixo_y = st.selectbox("Eixo Y (Opcional)", options=[None] + df.select_dtypes(include=np.number).columns.tolist(), key=f"y_{USERNAME}")
-        if st.button("Gerar Gráfico", key=f"gen_chart_{USERNAME}"):
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+        
+        if chart_type in ["Barra", "Linha"]:
+            col1, col2 = st.columns(2)
+            with col1:
+                eixo_x = st.selectbox("Eixo X", options=categorical_cols + numeric_cols, key=f"x_{USERNAME}")
+            with col2:
+                if numeric_cols:
+                    eixo_y = st.selectbox("Eixo Y", options=[None] + numeric_cols, key=f"y_{USERNAME}")
+                else:
+                    eixo_y = None
+                    st.info("Nenhuma coluna numérica encontrada")
+            
+            # Agrupamento para gráficos de barra
+            if chart_type == "Barra" and eixo_y is None:
+                group_by = st.selectbox("Agrupar por (opcional)", options=[None] + categorical_cols, key=f"group_{USERNAME}")
+            else:
+                group_by = None
+                
+        elif chart_type == "Dispersão":
+            col1, col2, col3 = st.columns(3)
+            with col1:
+                eixo_x = st.selectbox("Eixo X", options=numeric_cols if numeric_cols else cols, key=f"scatter_x_{USERNAME}")
+            with col2:
+                eixo_y = st.selectbox("Eixo Y", options=numeric_cols if numeric_cols else cols, key=f"scatter_y_{USERNAME}")
+            with col3:
+                color_by = st.selectbox("Cor por (opcional)", options=[None] + categorical_cols, key=f"scatter_color_{USERNAME}")
+                
+        elif chart_type == "Histograma":
+            eixo_x = st.selectbox("Selecione a coluna:", options=numeric_cols if numeric_cols else cols, key=f"hist_x_{USERNAME}")
+            bins = st.slider("Número de bins", 5, 100, 20, key=f"bins_{USERNAME}")
+            
+        elif chart_type == "Pizza":
+            eixo_x = st.selectbox("Categorias", options=categorical_cols, key=f"pie_x_{USERNAME}")
+            if numeric_cols:
+                eixo_y = st.selectbox("Valores", options=numeric_cols, key=f"pie_y_{USERNAME}")
+            else:
+                eixo_y = None
+                st.info("Nenhuma coluna numérica para valores")
+                
+        elif chart_type == "Boxplot":
+            eixo_x = st.selectbox("Categorias (opcional)", options=[None] + categorical_cols, key=f"box_x_{USERNAME}")
+            eixo_y = st.selectbox("Valores", options=numeric_cols if numeric_cols else cols, key=f"box_y_{USERNAME}")
+            
+        elif chart_type == "Heatmap":
+            st.info("Heatmap mostra correlação entre variáveis numéricas")
+            if len(numeric_cols) >= 2:
+                selected_cols = st.multiselect("Selecione colunas para heatmap", 
+                                             options=numeric_cols, default=numeric_cols[:5],
+                                             key=f"heatmap_cols_{USERNAME}")
+            else:
+                selected_cols = numeric_cols
+                st.warning("Heatmap requer pelo menos 2 colunas numéricas")
+                
+        elif chart_type == "Treemap":
+            path_cols = st.multiselect("Hierarquia (caminho)", options=categorical_cols, 
+                                     key=f"treemap_path_{USERNAME}", max_selections=3)
+            if numeric_cols:
+                value_col = st.selectbox("Valor", options=numeric_cols, key=f"treemap_value_{USERNAME}")
+            else:
+                value_col = None
+                st.info("Nenhuma coluna numérica para valores")
+
+        if st.button("Gerar Gráfico", key=f"gen_chart_{USERNAME}", use_container_width=True):
             try:
-                fig = px.bar(df, x=eixo_x, y=eixo_y, title=f"{eixo_y} por {eixo_x}") if eixo_y else px.histogram(df, x=eixo_x, title=f"Contagem por {eixo_x}")
-                fig.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)", font=dict(color="#d6d9dc"))
-                st.plotly_chart(fig, use_container_width=True)
+                fig = None
+                
+                if chart_type == "Barra":
+                    if eixo_y is None:
+                        # Gráfico de contagem
+                        if group_by:
+                            fig = px.histogram(df, x=eixo_x, color=group_by, title=f"Contagem de {eixo_x} por {group_by}")
+                        else:
+                            fig = px.histogram(df, x=eixo_x, title=f"Contagem de {eixo_x}")
+                    else:
+                        if group_by:
+                            fig = px.bar(df, x=eixo_x, y=eixo_y, color=group_by, title=f"{eixo_y} por {eixo_x}")
+                        else:
+                            fig = px.bar(df, x=eixo_x, y=eixo_y, title=f"{eixo_y} por {eixo_x}")
+                            
+                elif chart_type == "Linha":
+                    if eixo_y:
+                        fig = px.line(df, x=eixo_x, y=eixo_y, title=f"{eixo_y} por {eixo_x}")
+                    else:
+                        st.error("Selecione uma coluna numérica para o eixo Y")
+                        
+                elif chart_type == "Dispersão":
+                    if color_by:
+                        fig = px.scatter(df, x=eixo_x, y=eixo_y, color=color_by, 
+                                       title=f"{eixo_y} vs {eixo_x}")
+                    else:
+                        fig = px.scatter(df, x=eixo_x, y=eixo_y, 
+                                       title=f"{eixo_y} vs {eixo_x}")
+                                       
+                elif chart_type == "Histograma":
+                    fig = px.histogram(df, x=eixo_x, nbins=bins, 
+                                     title=f"Distribuição de {eixo_x}")
+                                     
+                elif chart_type == "Pizza":
+                    if eixo_y:
+                        fig = px.pie(df, names=eixo_x, values=eixo_y, 
+                                   title=f"Proporção de {eixo_x}")
+                    else:
+                        # Contagem simples
+                        contagem = df[eixo_x].value_counts()
+                        fig = px.pie(values=contagem.values, names=contagem.index,
+                                   title=f"Distribuição de {eixo_x}")
+                                   
+                elif chart_type == "Boxplot":
+                    if eixo_x:
+                        fig = px.box(df, x=eixo_x, y=eixo_y, 
+                                   title=f"Distribuição de {eixo_y} por {eixo_x}")
+                    else:
+                        fig = px.box(df, y=eixo_y, title=f"Distribuição de {eixo_y}")
+                        
+                elif chart_type == "Heatmap" and len(selected_cols) >= 2:
+                    corr_matrix = df[selected_cols].corr()
+                    fig = px.imshow(corr_matrix, 
+                                  title="Matriz de Correlação",
+                                  color_continuous_scale='RdBu_r',
+                                  aspect="auto")
+                    fig.update_layout(height=600)
+                    
+                elif chart_type == "Treemap" and path_cols and value_col:
+                    fig = px.treemap(df, path=path_cols, values=value_col,
+                                   title=f"Treemap de {value_col}")
+                    fig.update_layout(height=600)
+
+                if fig:
+                    fig.update_layout(
+                        plot_bgcolor="rgba(0,0,0,0)", 
+                        paper_bgcolor="rgba(0,0,0,0)", 
+                        font=dict(color="#d6d9dc"),
+                        title_font=dict(size=20, color="#ffffff"),
+                        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#d6d9dc"))
+                    )
+                    st.plotly_chart(fig, use_container_width=True)
+                    
+                    # Estatísticas descritivas
+                    if chart_type in ["Barra", "Linha", "Dispersão", "Histograma", "Boxplot"] and eixo_y in numeric_cols:
+                        with st.expander("📊 Estatísticas Descritivas"):
+                            st.write(f"**Estatísticas para {eixo_y}:**")
+                            stats = df[eixo_y].describe()
+                            st.dataframe(stats)
+                            
+                else:
+                    st.warning("Não foi possível gerar o gráfico com os parâmetros selecionados.")
+
             except Exception as e:
-                st.error(f"Erro ao gerar gráficos: {e}")
+                st.error(f"Erro ao gerar gráfico: {e}")
+                
+        # Gráficos automáticos sugeridos
+        if len(numeric_cols) > 0:
+            with st.expander("🚀 Gráficos Automáticos Sugeridos"):
+                st.write("Gráficos gerados automaticamente com base nos dados:")
+                
+                # Gráfico de correlação
+                if len(numeric_cols) >= 2:
+                    if st.button("📈 Matriz de Correlação", key=f"auto_corr_{USERNAME}"):
+                        corr_matrix = df[numeric_cols].corr()
+                        fig = px.imshow(corr_matrix, 
+                                      title="Matriz de Correlação (Automática)",
+                                      color_continuous_scale='RdBu_r',
+                                      aspect="auto")
+                        fig.update_layout(height=600)
+                        st.plotly_chart(fig, use_container_width=True)
+                
+                # Distribuição das principais colunas numéricas
+                if numeric_cols:
+                    col_numeric = st.selectbox("Selecione coluna para distribuição:", 
+                                             options=numeric_cols, key=f"auto_dist_{USERNAME}")
+                    if st.button("📊 Distribuição", key=f"auto_hist_{USERNAME}"):
+                        fig = px.histogram(df, x=col_numeric, 
+                                         title=f"Distribuição de {col_numeric}")
+                        st.plotly_chart(fig, use_container_width=True)
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
@@ -1545,6 +1828,8 @@ elif st.session_state.page == "busca":
             initials = "".join([p[0] for p in str(user_display_name).split()[:2]]).upper() or "U"
             title_raw = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
             resumo_raw = str(result_data.get('resumo') or result_data.get('abstract') or "")
+            year = result_data.get('ano') or result_data.get('year') or ""
+            country = result_data.get('país') or result_data.get('pais') or result_data.get('country') or ""
             
             st.markdown(f"""
             <div class="card">
@@ -1553,6 +1838,7 @@ elif st.session_state.page == "busca":
                     <div style="flex:1;">
                         <div class="card-title">{highlight_search_terms(title_raw, query)}</div>
                         <div class="small-muted">De <strong>{escape_html(user_display_name)}</strong> • {escape_html(result_data.get('autor', ''))}</div>
+                        <div class="small-muted">Ano: {escape_html(str(year))} • País: {escape_html(country)}</div>
                         <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{highlight_search_terms(resumo_raw, query) if resumo_raw else ''}</div>
                     </div>
                 </div>
@@ -1591,16 +1877,48 @@ elif st.session_state.page == "busca":
                     ou = users_map.get(str(origin_user), {})
                     origin_display = ou.get("name") if ou and ou.get("name") else str(origin_user)
                 st.markdown("## Detalhes do Registro")
-                st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
-                st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— —'))} • _Fonte:_ {escape_html(origin_display)}")
-                st.markdown("---")
-                st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
+                
+                col1, col2 = st.columns([3, 1])
+                with col1:
+                    st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
+                    st.markdown(f"**Autor(es):** {escape_html(det.get('autor','— —'))}")
+                    st.markdown(f"**Ano:** {escape_html(str(det.get('ano', det.get('year','— —'))))}")
+                    st.markdown(f"**País:** {escape_html(det.get('país', det.get('pais', det.get('country','— —'))))}")
+                    st.markdown(f"**Fonte:** {escape_html(origin_display)}")
+                    
+                    if det.get('doi'):
+                        doi_link = f"https://doi.org/{det.get('doi')}"
+                        st.markdown(f"**DOI:** [{det.get('doi')}]({doi_link})")
+                    elif det.get('url'):
+                        st.markdown(f"**Link:** [{det.get('url')}]({det.get('url')})")
+                    
+                    st.markdown("---")
+                    st.markdown("**Resumo**")
+                    st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
+                
+                with col2:
+                    # Informações adicionais
+                    st.markdown("**Informações**")
+                    if det.get('similarity'):
+                        st.metric("Similaridade", f"{det['similarity']:.2f}")
+                    
+                    # Botões de ação
+                    if st.button("⭐ Adicionar aos Favoritos", key=f"fav_search_detail_{vi}", use_container_width=True):
+                        if add_to_favorites(det): 
+                            st.toast("Adicionado aos favoritos!", icon="⭐")
+                        else: 
+                            st.toast("Já está nos favoritos.")
+                    
+                    if st.button("📝 Anotações", key=f"notes_search_{vi}", use_container_width=True):
+                        st.session_state.page = "anotacoes"
+                        safe_rerun()
+
                 st.markdown("---")
                 st.markdown("### ✉️ Contatar autor")
                 if origin_user != "N/A" and origin_user != "web":
                     with st.form(key=f"inline_compose_{vi}_{USERNAME}"):
                         subj_fill = st.text_input("Assunto:", value=f"Sobre: {det.get('título', '')[:50]}...")
-                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_display},\n\nVi seu registro na plataforma e gostaria de conversar.\n\n")
+                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_display},\n\nVi seu registro '{det.get('título', '')}' na plataforma e gostaria de conversar.\n\n")
                         c1, c2 = st.columns(2)
                         with c1:
                             if st.form_submit_button("✉️ Enviar"):
@@ -1609,17 +1927,21 @@ elif st.session_state.page == "busca":
                                 st.success(f"Mensagem enviada para {origin_display}.")
                                 time.sleep(2); safe_rerun()
                         with c2:
-                            if st.form_submit_button("Cancelar"):
+                            if st.form_submit_button("❌ Cancelar"):
                                 st.session_state.search_view_index = None; safe_rerun()
                 else:
                     st.warning("Origem indisponível para contato (registro público/web).")
+                    
+                if st.button("⬅️ Voltar para resultados", key=f"back_search_{vi}"):
+                    st.session_state.search_view_index = None
+                    safe_rerun()
     else:
         st.info("Nenhum resultado de busca (executar uma pesquisa com dados carregados).")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mensagens
+# Page: mensagens (CORREÇÃO do erro de attachment)
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1632,22 +1954,36 @@ elif st.session_state.page == "mensagens":
             msg = next((m for m in all_msgs if m['id'] == st.session_state.view_message_id), None)
             if msg:
                 mark_message_read(msg['id'], USERNAME)
-                st.markdown(f"**De:** {escape_html(msg.get('from'))}\n\n**Assunto:** {escape_html(msg.get('subject'))}")
+                st.markdown(f"**De:** {escape_html(msg.get('from'))}")
+                st.markdown(f"**Assunto:** {escape_html(msg.get('subject'))}")
+                st.markdown(f"**Data:** {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}")
+                st.markdown("---")
                 st.markdown(f"<div style='white-space:pre-wrap; padding:10px; border-radius:8px; background:rgba(0,0,0,0.2);'>{escape_html(msg.get('body'))}</div>", unsafe_allow_html=True)
-                if msg.get('attachment', {}).get('path') and Path(msg['attachment']['path']).exists():
+                
+                # CORREÇÃO: Verificação segura do anexo
+                if msg.get('attachment') and isinstance(msg['attachment'], dict) and msg['attachment'].get('path') and Path(msg['attachment']['path']).exists():
                     with open(msg['attachment']['path'], "rb") as fp:
-                        st.download_button(f"⬇️ Baixar anexo: {msg['attachment']['name']}", data=fp, file_name=msg['attachment']['name'])
+                        st.download_button(
+                            f"⬇️ Baixar anexo: {msg['attachment']['name']}", 
+                            data=fp, 
+                            file_name=msg['attachment']['name'],
+                            use_container_width=True
+                        )
 
+                st.markdown("---")
                 c1, c2, c3 = st.columns(3)
                 with c1:
-                    if st.button("↩️ Voltar", key=f"back_inbox_{USERNAME}"):
+                    if st.button("↩️ Voltar", key=f"back_inbox_{USERNAME}", use_container_width=True):
                         st.session_state.view_message_id = None; safe_rerun()
                 with c2:
-                    if st.button("↪️ Responder", key=f"reply_msg_{USERNAME}"):
+                    if st.button("↪️ Responder", key=f"reply_msg_{USERNAME}", use_container_width=True):
                         st.session_state.reply_message_id = msg['id']; st.session_state.view_message_id = None; safe_rerun()
                 with c3:
-                    if st.button("🗑️ Excluir", key=f"del_inbox_msg_{msg['id']}_{USERNAME}"):
-                        delete_message(msg['id'], USERNAME); st.session_state.view_message_id = None; st.toast("Excluída."); safe_rerun()
+                    if st.button("🗑️ Excluir", key=f"del_inbox_msg_{msg['id']}_{USERNAME}", use_container_width=True):
+                        if delete_message(msg['id'], USERNAME): 
+                            st.session_state.view_message_id = None; 
+                            st.toast("Mensagem excluída.")
+                            safe_rerun()
             else:
                 st.warning("Mensagem não encontrada."); st.session_state.view_message_id = None
         else:
@@ -1670,10 +2006,15 @@ elif st.session_state.page == "mensagens":
         if not sent_msgs:
             st.info("Nenhuma mensagem enviada.")
         for msg in sent_msgs:
-            st.markdown(f"**{escape_html(msg.get('subject', '(sem assunto)'))}**")
-            st.markdown(f"<span class='small-muted'>Para: {escape_html(msg.get('to', '...'))} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
-            if st.button("🗑️ Excluir", key=f"del_sent_{msg['id']}_{USERNAME}"):
-                delete_message(msg['id'], USERNAME); st.toast("Excluída."); safe_rerun()
+            col1, col2 = st.columns([3, 1])
+            with col1:
+                st.markdown(f"**{escape_html(msg.get('subject', '(sem assunto)'))}**")
+                st.markdown(f"<span class='small-muted'>Para: {escape_html(msg.get('to', '...'))} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
+            with col2:
+                if st.button("🗑️ Excluir", key=f"del_sent_{msg['id']}_{USERNAME}", use_container_width=True):
+                    if delete_message(msg['id'], USERNAME): 
+                        st.toast("Mensagem excluída.")
+                        safe_rerun()
             st.markdown("---")
 
     with tab_compose:
@@ -1700,16 +2041,22 @@ elif st.session_state.page == "mensagens":
                 to_user = st.selectbox("Para:", options=all_users, index=all_users.index(default_to) if default_to in all_users else 0)
                 subject = st.text_input("Assunto:", value=default_subj)
                 body = st.text_area("Mensagem:", height=200, value=default_body)
-                attachment = st.file_uploader("Anexo (opcional)")
+                attachment = st.file_uploader("Anexo (opcional)", type=['pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx'])
                 
-                if st.form_submit_button("✉️ Enviar Mensagem"):
-                    if to_user:
-                        send_message(USERNAME, to_user, subject, body, attachment)
-                        st.success(f"Mensagem enviada para {to_user}!")
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True):
+                        if to_user:
+                            send_message(USERNAME, to_user, subject, body, attachment)
+                            st.success(f"Mensagem enviada para {to_user}!")
+                            st.session_state.reply_message_id = None
+                            time.sleep(1); safe_rerun()
+                        else:
+                            st.warning("Selecione um destinatário.")
+                with col2:
+                    if st.form_submit_button("❌ Cancelar", use_container_width=True):
                         st.session_state.reply_message_id = None
-                        time.sleep(1); safe_rerun()
-                    else:
-                        st.warning("Selecione um destinatário.")
+                        safe_rerun()
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
