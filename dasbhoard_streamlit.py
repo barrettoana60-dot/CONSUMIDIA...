@@ -113,13 +113,22 @@ body { transition: background-color .25s ease, color .25s ease; }
     border-radius: 15px;
     padding: 15px;
     margin: 10px 0;
+    border: 2px solid #4ECDC4;
 }
 .flowchart-box {
     background: rgba(255,255,255,0.1);
-    border: 2px solid #4ECDC4;
+    border: 2px solid #FF6B6B;
     border-radius: 8px;
     padding: 12px;
     margin: 8px 0;
+}
+.three-d-effect {
+    background: linear-gradient(145deg, #1a2a6c, #b21f1f);
+    border-radius: 15px;
+    padding: 20px;
+    margin: 10px 0;
+    border: 2px solid #FECA57;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 """
 
@@ -164,7 +173,7 @@ class DataAnalyzer:
     
     def generate_comprehensive_analysis(self):
         """Gera uma análise completa e inteligente dos dados"""
-        analysis = "## 🧠 Análise Inteligente da Sua Pesquisa\n\n"
+        analysis = ""
         
         # Análise básica
         analysis += self._basic_analysis()
@@ -1887,7 +1896,7 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa mental - ATUALIZADO E TRADUZIDO
+# Page: mapa mental - MELHORADO E CORRIGIDO
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1906,16 +1915,16 @@ elif st.session_state.page == "mapa":
     with st.sidebar:
         st.header("🎨 Controles do Mapa")
         
-        # Criar nova ideia
+        # Criar nova ideia - CORRIGIDO: limpa o formulário após criar
         with st.expander("➕ Nova Ideia", expanded=True):
-            with st.form("create_miro_node"):
-                node_label = st.text_input("Título da ideia:", placeholder="Ex: Pesquisa Qualitativa")
-                node_type = st.selectbox("Tipo:", options=list(st.session_state.miro_map.node_types.keys()))
-                node_desc = st.text_area("Descrição:", placeholder="Detalhes sobre esta ideia...", height=100)
+            with st.form("create_miro_node", clear_on_submit=True):
+                node_label = st.text_input("Título da ideia:", placeholder="Ex: Pesquisa Qualitativa", key="new_node_label")
+                node_type = st.selectbox("Tipo:", options=list(st.session_state.miro_map.node_types.keys()), key="new_node_type")
+                node_desc = st.text_area("Descrição:", placeholder="Detalhes sobre esta ideia...", height=100, key="new_node_desc")
                 
                 if st.form_submit_button("🎯 Adicionar Ideia", use_container_width=True):
                     if node_label:
-                        node_id = f"miro_{int(time.time())}_{random.randint(1000,9999)}"
+                        node_id = f"node_{int(time.time())}_{random.randint(1000,9999)}"
                         new_node = st.session_state.miro_map.create_node(
                             node_id, node_label, node_type, node_desc
                         )
@@ -1924,15 +1933,22 @@ elif st.session_state.page == "mapa":
                         st.success("Ideia criada!")
                         safe_rerun()
         
-        # Conectar ideias
+        # Conectar ideias - MELHORADO
         with st.expander("🔗 Conectar Ideias", expanded=False):
             if len(st.session_state.miro_nodes) >= 2:
-                nodes_list = [node["id"] for node in st.session_state.miro_nodes]
+                nodes_list = [(node["id"], node["label"]) for node in st.session_state.miro_nodes]
                 with st.form("connect_nodes"):
-                    source_id = st.selectbox("De:", options=nodes_list, key="connect_source")
-                    target_id = st.selectbox("Para:", options=[n for n in nodes_list if n != source_id], key="connect_target")
+                    # Usar os títulos reais das ideias em vez dos IDs
+                    source_options = {f"{label}": node_id for node_id, label in nodes_list}
+                    target_options = {f"{label}": node_id for node_id, label in nodes_list}
+                    
+                    source_label = st.selectbox("De:", options=list(source_options.keys()), key="connect_source")
+                    target_label = st.selectbox("Para:", options=[k for k in target_options.keys() if k != source_label], key="connect_target")
                     
                     if st.form_submit_button("🔗 Conectar", use_container_width=True):
+                        source_id = source_options[source_label]
+                        target_id = target_options[target_label]
+                        
                         # Verificar se conexão já existe
                         existing = any(e["source"] == source_id and e["target"] == target_id 
                                      for e in st.session_state.miro_edges)
@@ -1954,7 +1970,7 @@ elif st.session_state.page == "mapa":
             # Modos de visualização
             visualization_mode = st.selectbox(
                 "Modo de Visualização:",
-                options=["Mapa Mental 3D", "Mapa Normal", "Fluxograma"],
+                options=["Mapa 3D", "Mapa 2D", "Fluxograma"],
                 index=1,
                 help="Escolha como visualizar seu mapa"
             )
@@ -1991,15 +2007,31 @@ elif st.session_state.page == "mapa":
         
         if st.session_state.miro_nodes:
             # Configurações baseadas no modo de visualização
-            if visualization_mode == "Mapa Mental 3D":
-                # Estilo 3D - bolinhas com texto embaixo, mais dinâmico
-                node_size = 25
+            if visualization_mode == "Mapa 3D":
+                # Estilo 3D - efeito visual melhorado
+                st.markdown('<div class="three-d-effect">', unsafe_allow_html=True)
+                st.info("🌐 **Modo 3D Ativo**: Efeito visual tridimensional com gradiente!")
+                
+                node_size = 30
                 font_size = 16
                 physics_enabled = True
                 hierarchical_enabled = False
                 
+                # Aplicar efeitos 3D nos nós
+                for node in st.session_state.miro_nodes:
+                    # Intensificar cores para efeito 3D
+                    if node["color"] == "#4ECDC4": node["color"] = "#00FFCC"  # Ideia - ciano brilhante
+                    elif node["color"] == "#45B7D1": node["color"] = "#0099FF"  # Tarefa - azul brilhante
+                    elif node["color"] == "#96CEB4": node["color"] = "#66FF99"  # Pergunta - verde brilhante
+                    elif node["color"] == "#FECA57": node["color"] = "#FFCC00"  # Recurso - amarelo brilhante
+                    elif node["color"] == "#FF6B6B": node["color"] = "#FF3366"  # Objetivo - rosa brilhante
+                    elif node["color"] == "#A29BFE": node["color"] = "#9966FF"  # Nota - roxo brilhante
+                    
             elif visualization_mode == "Fluxograma":
                 # Estilo fluxograma - caixas retangulares
+                st.markdown('<div class="flowchart-box">', unsafe_allow_html=True)
+                st.info("📦 **Modo Fluxograma**: Use caixas para processos e decisões!")
+                
                 for node in st.session_state.miro_nodes:
                     node["shape"] = "square"  # Forçar formato quadrado
                 node_size = 25
@@ -2007,7 +2039,7 @@ elif st.session_state.page == "mapa":
                 physics_enabled = False
                 hierarchical_enabled = True
                 
-            else:  # Mapa Normal
+            else:  # Mapa 2D
                 node_size = 20
                 font_size = 14
                 physics_enabled = True
@@ -2040,7 +2072,7 @@ elif st.session_state.page == "mapa":
                     target=edge["target"],
                     label=edge.get("label", ""),
                     color="#B0B0B0",
-                    width=2,
+                    width=3 if visualization_mode == "Mapa 3D" else 2,
                     font={"size": 10, "color": "#bfc6cc"}
                 ))
             
@@ -2059,21 +2091,13 @@ elif st.session_state.page == "mapa":
             )
             
             try:
-                # Adicionar estilo visual baseado no modo
-                if visualization_mode == "Mapa Mental 3D":
-                    st.markdown('<div class="mindmap-3d">', unsafe_allow_html=True)
-                    st.info("🌐 **Modo 3D Ativo**: Arraste as bolinhas para explorar em 3D!")
-                elif visualization_mode == "Fluxograma":
-                    st.markdown('<div class="flowchart-box">', unsafe_allow_html=True)
-                    st.info("📦 **Modo Fluxograma**: Use caixas para processos e decisões!")
-                
                 # Renderizar mapa interativo
                 clicked_node = agraph(nodes=nodes_for_viz, edges=edges_for_viz, config=config)
                 if clicked_node:
                     st.session_state.miro_selected_node = clicked_node
                     safe_rerun()
                     
-                if visualization_mode in ["Mapa Mental 3D", "Fluxograma"]:
+                if visualization_mode in ["Mapa 3D", "Fluxograma"]:
                     st.markdown('</div>', unsafe_allow_html=True)
                     
             except Exception as e:
@@ -2247,7 +2271,7 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos - ANÁLISE MELHORADA
+# Page: graficos - ORGANIZADO COM ABAS
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -2261,45 +2285,18 @@ elif st.session_state.page == "graficos":
         # Inicializar analisador de IA
         analyzer = DataAnalyzer(df)
         
-        # Análise completa automática
-        st.write("### 🧠 Resumo Inteligente da Sua Pesquisa")
-        
-        # Gerar análise completa
-        analysis = analyzer.generate_comprehensive_analysis()
-        st.markdown(analysis)
-        
-        # Assistente de IA MELHORADO
-        st.markdown("---")
-        st.write("### 🤖 Assistente de IA - Análise Personalizada")
-        
-        col_ai1, col_ai2 = st.columns([3, 1])
-        with col_ai1:
-            ai_question = st.text_input(
-                "Pergunte sobre seus dados:",
-                placeholder="Ex: Quais são os autores mais relevantes? Quais temas aparecem juntos?",
-                key="ai_question"
-            )
-        with col_ai2:
-           ai_ask = st.button("🔍 Analisar com IA", use_container_width=True)
-        
-        if ai_ask and ai_question:
-            with st.spinner("🤔 Analisando seus dados..."):
-                time.sleep(1)  # Simular processamento
-                response = get_ai_assistant_response(ai_question, analyzer)
-                st.success("Análise concluída!")
-                st.markdown(f"**Resposta da IA:**")
-                st.markdown(response)
-        
-        # Análises especializadas - REMOVIDA VISUALIZAÇÃO RÁPIDA
-        st.markdown("---")
-        st.write("### 🔍 Análises Especializadas")
-        
-        tab_basic, tab_authors, tab_themes, tab_geo, tab_temp = st.tabs([
-            "📈 Estatísticas", "👥 Autores", "🔤 Temas", "🌎 Geográfica", "📅 Temporal"
+        # Organização com abas
+        tab_overview, tab_authors, tab_themes, tab_geo, tab_temp, tab_collab, tab_ai = st.tabs([
+            "📊 Visão Geral", "👥 Autores", "🔤 Temas", "🌎 Geográfica", "📅 Temporal", "🤝 Colaboração", "🤖 IA"
         ])
         
-        with tab_basic:
-            st.write("#### Estatísticas da Base de Dados")
+        with tab_overview:
+            # Análise completa automática
+            analysis = analyzer.generate_comprehensive_analysis()
+            st.markdown(analysis)
+            
+            # Estatísticas rápidas
+            st.write("#### 📈 Estatísticas da Base")
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Total de Registros", len(df))
@@ -2311,13 +2308,8 @@ elif st.session_state.page == "graficos":
             with col4:
                 text_cols = df.select_dtypes(include=['object']).columns.tolist()
                 st.metric("Colunas Texto", len(text_cols))
-            
-            # REMOVIDO: Visualização rápida dos dados (dataframe)
-            # st.write("#### Visualização Rápida dos Dados")
-            # st.dataframe(df.head(10), use_container_width=True)
         
         with tab_authors:
-            # Usar a análise de autores melhorada
             author_analysis = analyzer._author_analysis()
             st.markdown(author_analysis)
             
@@ -2437,6 +2429,32 @@ elif st.session_state.page == "graficos":
                         yaxis=dict(color="#d6d9dc")
                     )
                     st.plotly_chart(fig_temp, use_container_width=True)
+        
+        with tab_collab:
+            collaboration_analysis = analyzer._collaboration_analysis()
+            st.markdown(collaboration_analysis)
+        
+        with tab_ai:
+            # Assistente de IA MELHORADO
+            st.write("### 🤖 Assistente de IA - Análise Personalizada")
+            
+            col_ai1, col_ai2 = st.columns([3, 1])
+            with col_ai1:
+                ai_question = st.text_input(
+                    "Pergunte sobre seus dados:",
+                    placeholder="Ex: Quais são os autores mais relevantes? Quais temas aparecem juntos?",
+                    key="ai_question"
+                )
+            with col_ai2:
+               ai_ask = st.button("🔍 Analisar com IA", use_container_width=True)
+            
+            if ai_ask and ai_question:
+                with st.spinner("🤔 Analisando seus dados..."):
+                    time.sleep(1)  # Simular processamento
+                    response = get_ai_assistant_response(ai_question, analyzer)
+                    st.success("Análise concluída!")
+                    st.markdown(f"**Resposta da IA:**")
+                    st.markdown(response)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -2758,43 +2776,4 @@ elif st.session_state.page == "mensagens":
                 subject = st.text_input("Assunto:", value=default_subj)
                 body = st.text_area("Mensagem:", height=200, value=default_body)
                 attachment = st.file_uploader("Anexo (opcional)", type=['pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx'])
-                
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True):
-                        if to_user:
-                            send_message(USERNAME, to_user, subject, body, attachment)
-                            st.success(f"Mensagem enviada para {selected_display}!")
-                            st.session_state.reply_message_id = None
-                            time.sleep(1); safe_rerun()
-                        else:
-                            st.warning("Selecione um destinatário.")
-                with col2:
-                    if st.form_submit_button("❌ Cancelar", use_container_width=True):
-                        st.session_state.reply_message_id = None
-                        safe_rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# -------------------------
-# Page: config
-# -------------------------
-elif st.session_state.page == "config":
-    st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("⚙️ Configurações")
-    s = get_settings()
-
-    font_scale = st.slider("Escala de fonte", 0.7, 2.0, float(s.get("font_scale",1.0)), 0.1, key="cfg_font_scale")
-
-    if st.button("Aplicar configurações", key=f"apply_cfg_{USERNAME}"):
-        st.session_state.settings["font_scale"] = float(font_scale)
-        save_user_state_minimal(USER_STATE)
-        apply_global_styles(font_scale)
-        st.success("Configurações aplicadas e salvas.")
-        time.sleep(0.5); safe_rerun()
-
-    st.markdown("---")
-    st.markdown("**Acessibilidade**\n\n- Use *Escala de fonte* para aumentar ou diminuir o tamanho do texto.\n- O programa utiliza um tema escuro fixo para garantir bom contraste.")
-    st.markdown("</div>", unsafe_allow_html=True)
-
-else:
-    st.info("Página não encontrada — selecione uma aba no topo.")
+            
