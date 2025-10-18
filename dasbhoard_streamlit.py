@@ -1,7 +1,6 @@
 # app_nugep_pqr_full_final.py
 
-# NUGEP-PQR — versão final com ajustes: título centralizado/branco, remover download JSON, manter apenas PNG,
-# e edição de nós com renomear/excluir diretamente no painel de edição.
+# NUGEP-PQR — versão final com mapa mental estilo Miro e análise inteligente com IA
 
 import os
 import re
@@ -25,25 +24,27 @@ import networkx as nx
 from fpdf import FPDF
 import matplotlib.pyplot as plt
 import matplotlib
-matplotlib.use('Agg')  # Para evitar problemas com a interface gráfica
+matplotlib.use('Agg')
 
 from streamlit_agraph import agraph, Node, Edge, Config
 
-# optional ML libs (silenciosamente não-fatal)
+# optional ML libs
 try:
     import joblib
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
     from sklearn.cluster import KMeans
     from sklearn.decomposition import LatentDirichletAllocation
+    from sklearn.manifold import TSNE
 except Exception:
     joblib = None
     TfidfVectorizer = None
     cosine_similarity = None
     KMeans = None
     LatentDirichletAllocation = None
+    TSNE = None
 
-# bcrypt for password hashing (optional)
+# bcrypt for password hashing
 try:
     import bcrypt
     BCRYPT_AVAILABLE = True
@@ -92,11 +93,25 @@ body { transition: background-color .25s ease, color .25s ease; }
     transform: scale(0.97);
     opacity: 0.8;
 }
+/* Estilos para o mapa mental */
+.node-editor { 
+    background: rgba(255,255,255,0.05); 
+    border-radius: 10px; 
+    padding: 15px; 
+    margin: 10px 0; 
+    border: 1px solid rgba(255,255,255,0.1);
+}
+.node-preview {
+    background: rgba(255,255,255,0.02);
+    border-radius: 8px;
+    padding: 10px;
+    margin: 5px 0;
+    border-left: 4px solid #6c5ce7;
+}
 """
 
 DEFAULT_CSS = r"""
 .css-1d391kg { background: linear-gradient(180deg,#071428 0%, #031926 100%) !important; }
-/* CAIXAS COM FUNDO SÓLIDO (SEM EFEITO TRANSLÚCIDO) */
 .glass-box{ background: #0E192A; border:1px solid #2A3B52; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
 .stButton>button, .stDownloadButton>button{ background:#1C2D4A !important; color:#bfc6cc !important; border:1px solid #2A3B52 !important; padding:8px 12px !important; border-radius:10px !important; }
 .stButton>button:hover, .stDownloadButton>button:hover {
@@ -125,6 +140,341 @@ BACKUPS_DIR = Path("backups")
 ATTACHMENTS_DIR = Path("user_files")
 BACKUPS_DIR.mkdir(exist_ok=True)
 ATTACHMENTS_DIR.mkdir(exist_ok=True)
+
+# -------------------------
+# AI Helper Functions
+# -------------------------
+class DataAnalyzer:
+    def __init__(self, df):
+        self.df = df.copy()
+        self.insights = []
+    
+    def generate_comprehensive_analysis(self):
+        """Gera uma análise completa e inteligente dos dados"""
+        analysis = "## 🧠 Análise Inteligente da Sua Pesquisa\n\n"
+        
+        # Análise básica
+        analysis += self._basic_analysis()
+        analysis += self._author_analysis()
+        analysis += self._temporal_analysis()
+        analysis += self._thematic_analysis()
+        analysis += self._collaboration_analysis()
+        analysis += self._geographic_analysis()
+        analysis += self._trend_analysis()
+        
+        return analysis
+    
+    def _basic_analysis(self):
+        """Análise básica dos dados"""
+        text = "### 📊 Visão Geral\n\n"
+        text += f"- **Total de registros**: {len(self.df)}\n"
+        text += f"- **Colunas disponíveis**: {', '.join(self.df.columns.tolist())}\n"
+        
+        # Estatísticas por tipo de dado
+        numeric_cols = self.df.select_dtypes(include=[np.number]).columns.tolist()
+        text_cols = self.df.select_dtypes(include=['object']).columns.tolist()
+        text += f"- **Colunas numéricas**: {len(numeric_cols)}\n"
+        text += f"- **Colunas de texto**: {len(text_cols)}\n\n"
+        
+        return text
+    
+    def _author_analysis(self):
+        """Análise de autores e colaborações"""
+        if 'autor' not in self.df.columns:
+            return ""
+            
+        text = "### 👥 Análise de Autores\n\n"
+        
+        # Autores mais produtivos
+        all_authors = []
+        for authors_str in self.df['autor'].dropna():
+            if isinstance(authors_str, str):
+                authors = re.split(r'[;,]|\be\b', authors_str)
+                for author in authors:
+                    author_clean = author.strip()
+                    if author_clean and author_clean not in ['', 'e', 'and']:
+                        all_authors.append(author_clean)
+        
+        if all_authors:
+            author_counts = pd.Series(all_authors).value_counts()
+            text += "**Autores mais produtivos:**\n"
+            for author, count in author_counts.head(5).items():
+                text += f"- {author}: {count} publicação(ões)\n"
+            
+            # Colaborações
+            collaborations = []
+            for authors_str in self.df['autor'].dropna():
+                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b', authors_str)) > 1:
+                    collaborations.append(authors_str)
+            
+            if collaborations:
+                text += f"\n**Colaborações identificadas**: {len(collaborations)} trabalhos com coautoria\n"
+            
+            text += "\n"
+        
+        return text
+    
+    def _temporal_analysis(self):
+        """Análise temporal dos dados"""
+        year_col = None
+        for col in ['ano', 'year', 'data', 'date']:
+            if col in self.df.columns:
+                try:
+                    self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
+                    if not self.df[col].isna().all():
+                        year_col = col
+                        break
+                except:
+                    pass
+        
+        if not year_col:
+            return ""
+            
+        text = "### 📈 Análise Temporal\n\n"
+        years = self.df[year_col].dropna()
+        
+        if not years.empty:
+            min_year = int(years.min())
+            max_year = int(years.max())
+            text += f"- **Período analisado**: {min_year} - {max_year} ({max_year - min_year} anos)\n"
+            text += f"- **Ano com mais publicações**: {int(years.mode().iloc[0]) if len(years.mode()) > 0 else 'N/A'}\n"
+            
+            # Tendência
+            if len(years) > 5:
+                recent_years = years[years >= (max_year - 5)]
+                older_years = years[years < (max_year - 5)]
+                if len(recent_years) > len(older_years):
+                    text += "- **Tendência**: Produção acadêmica em crescimento\n"
+                else:
+                    text += "- **Tendência**: Produção acadêmica estável\n"
+            
+            text += "\n"
+        
+        return text
+    
+    def _thematic_analysis(self):
+        """Análise temática dos dados"""
+        text = "### 🔍 Análise Temática\n\n"
+        
+        # Combinar texto de todas as colunas relevantes
+        texto_completo = ""
+        text_cols = [col for col in self.df.columns if self.df[col].dtype == 'object']
+        for col in text_cols[:3]:
+            texto_completo += " " + self.df[col].fillna('').astype(str).str.cat(sep=' ')
+        
+        # Extrair temas
+        palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
+        stop_words = set([
+            'de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'una', 
+            'os', 'no', 'se', 'na', 'por', 'mais', 'as', 'dos', 'como', 'mas', 'foi', 'ao', 'ele'
+        ])
+        palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
+        
+        if palavras_filtradas:
+            temas = pd.Series(palavras_filtradas).value_counts().head(10)
+            text += "**Temas mais frequentes:**\n"
+            for tema, count in temas.items():
+                text += f"- {tema}: {count} ocorrências\n"
+            text += "\n"
+        
+        return text
+    
+    def _collaboration_analysis(self):
+        """Análise de colaborações e redes"""
+        text = "### 🤝 Análise de Colaborações\n\n"
+        
+        if 'autor' in self.df.columns:
+            coautorias = 0
+            for authors_str in self.df['autor'].dropna():
+                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b', authors_str)) > 1:
+                    coautorias += 1
+            
+            text += f"- **Trabalhos em colaboração**: {coautorias}\n"
+            text += f"- **Taxa de colaboração**: {(coautorias/len(self.df))*100:.1f}%\n"
+            
+            if coautorias > 0:
+                text += "- **Padrão**: Colaboração acadêmica ativa\n"
+            else:
+                text += "- **Padrão**: Produção individual predominante\n"
+            
+            text += "\n"
+        
+        return text
+    
+    def _geographic_analysis(self):
+        """Análise geográfica dos dados"""
+        country_col = None
+        for col in ['país', 'pais', 'country', 'local']:
+            if col in self.df.columns:
+                country_col = col
+                break
+        
+        if not country_col:
+            return ""
+            
+        text = "### 🌎 Análise Geográfica\n\n"
+        countries = self.df[country_col].dropna()
+        
+        if not countries.empty:
+            country_counts = countries.value_counts()
+            text += "**Países mais frequentes:**\n"
+            for country, count in country_counts.head(5).items():
+                text += f"- {country}: {count} publicação(ões)\n"
+            
+            # Diversidade geográfica
+            diversity_index = len(country_counts) / len(countries) * 100
+            text += f"\n- **Diversidade geográfica**: {diversity_index:.1f}%\n"
+            
+            text += "\n"
+        
+        return text
+    
+    def _trend_analysis(self):
+        """Análise de tendências e insights"""
+        text = "### 🎯 Insights e Recomendações\n\n"
+        
+        insights = []
+        
+        # Insight 1: Base de dados
+        if len(self.df) < 50:
+            insights.append("Sua base de dados é pequena. Considere expandir com mais referências para análises mais robustas.")
+        else:
+            insights.append("Sua base de dados tem bom tamanho para análises consistentes.")
+        
+        # Insight 2: Colaboração
+        if 'autor' in self.df.columns:
+            collaborations = sum(1 for authors_str in self.df['autor'].dropna() 
+                               if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b', authors_str)) > 1)
+            if collaborations / len(self.df) > 0.3:
+                insights.append("Excelente nível de colaboração entre pesquisadores.")
+            else:
+                insights.append("Há espaço para aumentar as colaborações em sua área de pesquisa.")
+        
+        # Insight 3: Temporal
+        year_col = next((col for col in ['ano', 'year'] if col in self.df.columns), None)
+        if year_col:
+            years = self.df[year_col].dropna()
+            if not years.empty and (years.max() - years.min()) > 10:
+                insights.append("Seu conjunto de dados cobre um período extenso, permitindo análise de tendências temporais.")
+        
+        for i, insight in enumerate(insights, 1):
+            text += f"{i}. {insight}\n"
+        
+        text += "\n"
+        return text
+
+def get_ai_assistant_response(question, context):
+    """Simula um assistente de IA para responder perguntas sobre os dados"""
+    
+    responses = {
+        "autores": "Analisando os autores mais produtivos em sua base de dados...",
+        "temas": "Identificando os temas mais frequentes em suas publicações...",
+        "tendências": "Analisando tendências temporais em sua pesquisa...",
+        "colaboração": "Examinando padrões de colaboração entre pesquisadores...",
+        "geografia": "Mapeando a distribuição geográfica das publicações...",
+        "recomendações": "Gerando recomendações personalizadas para sua pesquisa..."
+    }
+    
+    # Encontrar a melhor correspondência
+    question_lower = question.lower()
+    best_match = "recomendações"
+    for key in responses:
+        if key in question_lower:
+            best_match = key
+            break
+    
+    base_response = responses[best_match]
+    
+    # Resposta personalizada baseada no contexto
+    if "autores" in best_match and 'autor' in context.df.columns:
+        authors = []
+        for authors_str in context.df['autor'].dropna():
+            if isinstance(authors_str, str):
+                auths = re.split(r'[;,]|\be\b', authors_str)
+                authors.extend([a.strip() for a in auths if a.strip() and a.strip() not in ['', 'e', 'and']])
+        
+        if authors:
+            top_authors = pd.Series(authors).value_counts().head(3)
+            author_names = ", ".join([f"{author} ({count})" for author, count in top_authors.items()])
+            return f"**Autores mais produtivos**: {author_names}\n\nEstes pesquisadores são referências em sua área de estudo."
+    
+    elif "temas" in best_match:
+        # Extrair temas
+        texto_completo = ""
+        for col in context.df.select_dtypes(include=['object']).columns[:2]:
+            texto_completo += " " + context.df[col].fillna('').astype(str).str.cat(sep=' ')
+        
+        palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
+        stop_words = set(['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para'])
+        palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
+        
+        if palavras_filtradas:
+            temas = pd.Series(palavras_filtradas).value_counts().head(5)
+            temas_str = ", ".join([f"'{tema}'" for tema in temas.index])
+            return f"**Temas principais identificados**: {temas_str}\n\nEstes são os conceitos centrais em sua pesquisa."
+    
+    return f"{base_response}\n\nBaseado na análise dos seus dados, recomendo explorar essas dimensões para insights mais profundos."
+
+# -------------------------
+# Miro-like Mind Map Components
+# -------------------------
+class MiroStyleMindMap:
+    def __init__(self):
+        self.node_types = {
+            "idea": {"color": "#4ECDC4", "icon": "💡", "shape": "dot"},
+            "task": {"color": "#45B7D1", "icon": "✅", "shape": "square"},
+            "question": {"color": "#96CEB4", "icon": "❓", "shape": "diamond"},
+            "resource": {"color": "#FECA57", "icon": "📚", "shape": "triangle"},
+            "goal": {"color": "#FF6B6B", "icon": "🎯", "shape": "star"},
+            "note": {"color": "#A29BFE", "icon": "📝", "shape": "circle"}
+        }
+    
+    def create_node(self, node_id, label, node_type="idea", description="", x=0, y=0):
+        """Cria um nó no estilo Miro"""
+        node_data = self.node_types.get(node_type, self.node_types["idea"])
+        return {
+            "id": node_id,
+            "label": f"{node_data['icon']} {label}",
+            "type": node_type,
+            "description": description,
+            "color": node_data["color"],
+            "shape": node_data["shape"],
+            "x": x,
+            "y": y,
+            "font": {"color": "#FFFFFF", "size": 14, "face": "Arial"},
+            "size": 20
+        }
+    
+    def generate_layout(self, nodes, edges, layout_type="hierarchical"):
+        """Gera layout automático para os nós"""
+        if layout_type == "hierarchical":
+            return self._hierarchical_layout(nodes, edges)
+        elif layout_type == "radial":
+            return self._radial_layout(nodes, edges)
+        else:
+            return self._force_directed_layout(nodes, edges)
+    
+    def _hierarchical_layout(self, nodes, edges):
+        """Layout hierárquico (árvore)"""
+        G = nx.DiGraph()
+        for node in nodes:
+            G.add_node(node["id"])
+        for edge in edges:
+            G.add_edge(edge["source"], edge["target"])
+        
+        try:
+            pos = nx.spring_layout(G, k=2, iterations=50)
+            for node in nodes:
+                if node["id"] in pos:
+                    node["x"] = pos[node["id"]][0] * 1000
+                    node["y"] = pos[node["id"]][1] * 1000
+        except:
+            # Fallback layout
+            for i, node in enumerate(nodes):
+                node["x"] = (i % 3) * 300
+                node["y"] = (i // 3) * 200
+        
+        return nodes
 
 # -------------------------
 # Utilities: CPF / hashing / formatting
@@ -1236,304 +1586,368 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa mental - NOVO DESIGN EDITÁVEL
+# Page: mapa mental - ESTILO MIRO SUPER DINÂMICO
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🗺️ Mapa Mental & Fluxograma Interativo")
-    st.info("Crie e edite mapas mentais interativos. Clique nos nós para editar diretamente na visualização.")
-
-    # Inicializar grafo se não existir
-    if 'mapa_G' not in st.session_state:
-        st.session_state.mapa_G = nx.DiGraph()
-        # Adicionar nó raiz inicial
-        st.session_state.mapa_G.add_node("raiz", label="Ideia Principal", tipo="Raiz", descricao="Descreva sua ideia principal aqui")
-
-    G = st.session_state.mapa_G
-
-    # Sidebar para operações principais
+    st.subheader("🗺️ Mapa Mental Estilo Miro")
+    st.info("💡 **Mapa mental interativo**: Arraste os nós, edite diretamente, conecte ideias visualmente!")
+    
+    # Inicializar sistema Miro
+    if 'miro_map' not in st.session_state:
+        st.session_state.miro_map = MiroStyleMindMap()
+        st.session_state.miro_nodes = []
+        st.session_state.miro_edges = []
+        st.session_state.miro_selected_node = None
+        st.session_state.miro_layout = "hierarchical"
+    
+    # Sidebar principal
     with st.sidebar:
-        st.subheader("🎯 Operações do Mapa")
+        st.header("🎨 Controles do Mapa")
         
-        with st.expander("➕ Adicionar Nó", expanded=True):
-            with st.form("add_node_form"):
-                st.write("Criar novo nó:")
-                parent_node = st.selectbox("Conectar ao nó:", options=list(G.nodes()), key="parent_node_select")
-                new_node_label = st.text_input("Título do nó:", placeholder="Ex: Pesquisa Qualitativa")
-                new_node_desc = st.text_area("Descrição:", placeholder="Detalhes sobre este nó...", height=100)
-                node_type = st.selectbox("Tipo:", options=["Ideia", "Tarefa", "Pergunta", "Recurso", "Resultado"])
+        # Criar novo nó
+        with st.expander("➕ Criar Novo Nó", expanded=True):
+            with st.form("create_miro_node"):
+                node_label = st.text_input("Título do nó:", placeholder="Ex: Pesquisa Qualitativa")
+                node_type = st.selectbox("Tipo:", options=list(st.session_state.miro_map.node_types.keys()))
+                node_desc = st.text_area("Descrição:", placeholder="Detalhes sobre este nó...", height=100)
+                
                 col1, col2 = st.columns(2)
                 with col1:
-                    if st.form_submit_button("✅ Adicionar"):
-                        if new_node_label:
-                            node_id = f"node_{int(time.time())}_{random.randint(1000,9999)}"
-                            G.add_node(node_id, label=new_node_label, tipo=node_type, descricao=new_node_desc)
-                            if parent_node:
-                                G.add_edge(parent_node, node_id)
-                            st.session_state.mapa_G = G
-                            st.session_state.selected_node = node_id
-                            st.success("Nó adicionado!")
+                    if st.form_submit_button("🎯 Adicionar Nó", use_container_width=True):
+                        if node_label:
+                            node_id = f"miro_{int(time.time())}_{random.randint(1000,9999)}"
+                            new_node = st.session_state.miro_map.create_node(
+                                node_id, node_label, node_type, node_desc
+                            )
+                            st.session_state.miro_nodes.append(new_node)
+                            st.session_state.miro_selected_node = node_id
+                            st.success("Nó criado!")
                             safe_rerun()
                 with col2:
-                    if st.form_submit_button("❌ Cancelar"):
-                        pass
-
-        with st.expander("🔗 Conectar Nós", expanded=False):
-            with st.form("connect_nodes_form"):
-                st.write("Conectar nós existentes:")
-                available_nodes = list(G.nodes())
-                source_node = st.selectbox("De:", options=available_nodes, key="source_node")
-                target_node = st.selectbox("Para:", options=[n for n in available_nodes if n != source_node], key="target_node")
-                if st.form_submit_button("🔗 Conectar"):
-                    if not G.has_edge(source_node, target_node):
-                        G.add_edge(source_node, target_node)
-                        st.session_state.mapa_G = G
-                        st.success("Nós conectados!")
-                        safe_rerun()
-                    else:
-                        st.info("Esses nós já estão conectados.")
-
-        with st.expander("🎨 Configurações", expanded=False):
-            layout_type = st.selectbox("Layout:", options=["Hierárquico", "Circular", "Spring"])
-            show_labels = st.checkbox("Mostrar labels", value=True)
+                    if st.form_submit_button("💫 Adicionar & Conectar", use_container_width=True):
+                        if node_label and st.session_state.miro_selected_node:
+                            node_id = f"miro_{int(time.time())}_{random.randint(1000,9999)}"
+                            new_node = st.session_state.miro_map.create_node(
+                                node_id, node_label, node_type, node_desc
+                            )
+                            st.session_state.miro_nodes.append(new_node)
+                            # Conectar ao nó selecionado
+                            st.session_state.miro_edges.append({
+                                "source": st.session_state.miro_selected_node,
+                                "target": node_id,
+                                "label": "conecta"
+                            })
+                            st.session_state.miro_selected_node = node_id
+                            st.success("Nó criado e conectado!")
+                            safe_rerun()
+        
+        # Gerenciar conexões
+        with st.expander("🔗 Gerenciar Conexões", expanded=False):
+            if st.session_state.miro_nodes:
+                nodes_list = [node["id"] for node in st.session_state.miro_nodes]
+                with st.form("connect_nodes"):
+                    source_id = st.selectbox("De:", options=nodes_list, key="connect_source")
+                    target_id = st.selectbox("Para:", options=[n for n in nodes_list if n != source_id], key="connect_target")
+                    connection_label = st.text_input("Label da conexão:", value="relacionado")
+                    
+                    if st.form_submit_button("🔗 Criar Conexão", use_container_width=True):
+                        # Verificar se conexão já existe
+                        existing = any(e["source"] == source_id and e["target"] == target_id 
+                                     for e in st.session_state.miro_edges)
+                        if not existing:
+                            st.session_state.miro_edges.append({
+                                "source": source_id,
+                                "target": target_id,
+                                "label": connection_label
+                            })
+                            st.success("Conexão criada!")
+                            safe_rerun()
+                        else:
+                            st.warning("Esses nós já estão conectados.")
+            
+            # Lista de conexões existentes
+            if st.session_state.miro_edges:
+                st.write("**Conexões atuais:**")
+                for i, edge in enumerate(st.session_state.miro_edges[:5]):
+                    source_label = next((n["label"] for n in st.session_state.miro_nodes if n["id"] == edge["source"]), edge["source"])
+                    target_label = next((n["label"] for n in st.session_state.miro_nodes if n["id"] == edge["target"]), edge["target"])
+                    col1, col2 = st.columns([3, 1])
+                    with col1:
+                        st.write(f"• {source_label} → {target_label}")
+                    with col2:
+                        if st.button("🗑️", key=f"del_edge_{i}"):
+                            st.session_state.miro_edges.pop(i)
+                            safe_rerun()
+        
+        # Configurações do mapa
+        with st.expander("⚙️ Configurações", expanded=False):
+            st.session_state.miro_layout = st.selectbox(
+                "Layout:",
+                options=["hierarchical", "radial", "force"],
+                help="Escolha como organizar os nós automaticamente"
+            )
+            
+            if st.button("🔄 Reorganizar Mapa", use_container_width=True):
+                st.session_state.miro_nodes = st.session_state.miro_map.generate_layout(
+                    st.session_state.miro_nodes, 
+                    st.session_state.miro_edges,
+                    st.session_state.miro_layout
+                )
+                st.success("Mapa reorganizado!")
+                safe_rerun()
+            
             st.markdown("---")
-            if st.button("🗑️ Limpar Mapa", type="secondary"):
-                if st.checkbox("Confirmar limpeza do mapa?"):
-                    st.session_state.mapa_G = nx.DiGraph()
-                    st.session_state.mapa_G.add_node("raiz", label="Ideia Principal", tipo="Raiz", descricao="Descreva sua ideia principal aqui")
-                    st.session_state.selected_node = "raiz"
+            if st.button("🗑️ Limpar Mapa", type="secondary", use_container_width=True):
+                if st.checkbox("Confirmar limpeza total do mapa?"):
+                    st.session_state.miro_nodes = []
+                    st.session_state.miro_edges = []
+                    st.session_state.miro_selected_node = None
                     st.success("Mapa limpo!")
                     safe_rerun()
-
+    
     # Área principal do mapa
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader("📊 Visualização do Mapa")
+        st.subheader("🎨 Visualização do Mapa")
         
-        if G.nodes():
+        if st.session_state.miro_nodes:
             # Preparar nós para visualização
-            nodes = []
-            for node_id, data in G.nodes(data=True):
-                # Definir cores por tipo
-                color_map = {
-                    "Raiz": "#FF6B6B",
-                    "Ideia": "#4ECDC4", 
-                    "Tarefa": "#45B7D1",
-                    "Pergunta": "#96CEB4",
-                    "Recurso": "#FECA57",
-                    "Resultado": "#FF9FF3"
-                }
-                
-                node_color = color_map.get(data.get('tipo', 'Ideia'), "#4ECDC4")
-                
-                node_args = {
-                    'id': node_id,
-                    'label': data.get('label', node_id),
-                    'color': node_color,
-                    'font': {'color': '#FFFFFF', 'size': 14, 'face': 'Arial'},
-                    'size': 25,
-                    'shape': 'dot'
-                }
-                nodes.append(Node(**node_args))
-
-            edges = [Edge(source=u, target=v, color='#B0B0B0', width=2) for u, v in G.edges()]
+            nodes_for_viz = []
+            for node in st.session_state.miro_nodes:
+                is_selected = node["id"] == st.session_state.miro_selected_node
+                nodes_for_viz.append(Node(
+                    id=node["id"],
+                    label=node["label"],
+                    color=node["color"],
+                    size=25 if is_selected else 20,
+                    shape=node["shape"],
+                    font={"color": "#FFFFFF", "size": 14, "face": "Arial"},
+                    x=node.get("x", 0),
+                    y=node.get("y", 0)
+                ))
             
+            # Preparar arestas
+            edges_for_viz = []
+            for edge in st.session_state.miro_edges:
+                edges_for_viz.append(Edge(
+                    source=edge["source"],
+                    target=edge["target"],
+                    label=edge.get("label", ""),
+                    color="#B0B0B0",
+                    width=2,
+                    font={"size": 10, "color": "#bfc6cc"}
+                ))
+            
+            # Configuração do gráfico
             config = Config(
-                width="100%", 
-                height=600, 
-                directed=True, 
+                width="100%",
+                height=700,
+                directed=True,
                 physics=True,
-                hierarchical=False if layout_type == "Spring" else True,
-                node_highlight_behavior=True,
-                highlight_color="#F8F8F8",
+                hierarchical=st.session_state.miro_layout == "hierarchical",
+                nodeHighlightBehavior=True,
+                highlightColor="#F8F8F8",
                 collapsible=True,
-                node={'labelProperty': 'label'},
-                link={'labelProperty': 'label', 'renderLabel': True}
+                node={"labelProperty": "label"},
+                link={"labelProperty": "label", "renderLabel": True}
             )
-
+            
             try:
-                clicked_node_id = agraph(nodes=nodes, edges=edges, config=config)
-                if clicked_node_id: 
-                    st.session_state.selected_node = clicked_node_id
+                # Renderizar mapa interativo
+                clicked_node = agraph(nodes=nodes_for_viz, edges=edges_for_viz, config=config)
+                if clicked_node:
+                    st.session_state.miro_selected_node = clicked_node
                     safe_rerun()
             except Exception as e:
-                st.warning(f"Erro na visualização interativa: {e}")
+                st.error(f"Erro na visualização: {e}")
+                st.info("Tente reorganizar o mapa nas configurações.")
         else:
-            st.info("O mapa está vazio. Adicione alguns nós para começar.")
-
+            # Tela inicial vazia
+            st.markdown("""
+            <div style='text-align: center; padding: 50px; background: rgba(255,255,255,0.02); border-radius: 10px;'>
+                <h3 style='color: #bfc6cc;'>🎯 Seu Mapa Mental Vazio</h3>
+                <p style='color: #8b9bab;'>Comece adicionando seu primeiro nó usando o painel lateral!</p>
+                <div style='margin-top: 20px;'>
+                    <div style='display: inline-block; margin: 10px; padding: 15px; background: rgba(78, 205, 196, 0.1); border-radius: 8px;'>
+                        💡 Ideias
+                    </div>
+                    <div style='display: inline-block; margin: 10px; padding: 15px; background: rgba(69, 183, 209, 0.1); border-radius: 8px;'>
+                        ✅ Tarefas
+                    </div>
+                    <div style='display: inline-block; margin: 10px; padding: 15px; background: rgba(150, 206, 180, 0.1); border-radius: 8px;'>
+                        ❓ Perguntas
+                    </div>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+    
     with col2:
         st.subheader("✏️ Editor de Nó")
         
-        selected_node = st.session_state.get("selected_node")
-        if selected_node and selected_node in G:
-            node_data = G.nodes[selected_node]
+        selected_node_id = st.session_state.miro_selected_node
+        if selected_node_id and st.session_state.miro_nodes:
+            selected_node = next((n for n in st.session_state.miro_nodes if n["id"] == selected_node_id), None)
             
-            with st.form(f"edit_node_{selected_node}"):
-                st.write(f"**Editando:** {node_data.get('label', selected_node)}")
-                
-                new_label = st.text_input("Título:", value=node_data.get('label', ''), key=f"label_{selected_node}")
-                new_type = st.selectbox("Tipo:", options=["Raiz", "Ideia", "Tarefa", "Pergunta", "Recurso", "Resultado"], 
-                                      index=["Raiz", "Ideia", "Tarefa", "Pergunta", "Recurso", "Resultado"].index(node_data.get('tipo', 'Ideia')),
-                                      key=f"type_{selected_node}")
-                new_desc = st.text_area("Descrição:", value=node_data.get('descricao', ''), height=150, key=f"desc_{selected_node}")
-                
-                col_edit1, col_edit2 = st.columns(2)
-                with col_edit1:
-                    if st.form_submit_button("💾 Salvar Alterações", use_container_width=True):
-                        if new_label.strip():
-                            G.nodes[selected_node]['label'] = new_label.strip()
-                            G.nodes[selected_node]['tipo'] = new_type
-                            G.nodes[selected_node]['descricao'] = new_desc
-                            st.session_state.mapa_G = G
-                            st.success("Nó atualizado!")
-                            safe_rerun()
-                        else:
-                            st.warning("O título não pode ser vazio.")
-                
-                with col_edit2:
-                    if st.form_submit_button("🗑️ Excluir Nó", type="secondary", use_container_width=True):
-                        if len(G.nodes()) > 1:
-                            G.remove_node(selected_node)
-                            remaining_nodes = list(G.nodes())
-                            st.session_state.selected_node = remaining_nodes[0] if remaining_nodes else None
-                            st.session_state.mapa_G = G
+            if selected_node:
+                with st.form(f"edit_miro_node_{selected_node_id}"):
+                    st.write(f"**Editando:** {selected_node['label']}")
+                    
+                    # Extrair label sem emoji
+                    current_label = selected_node['label']
+                    if ' ' in current_label:
+                        current_label = current_label.split(' ', 1)[1]
+                    
+                    new_label = st.text_input("Título:", value=current_label, key=f"label_{selected_node_id}")
+                    new_type = st.selectbox("Tipo:", 
+                                          options=list(st.session_state.miro_map.node_types.keys()),
+                                          index=list(st.session_state.miro_map.node_types.keys()).index(selected_node["type"]),
+                                          key=f"type_{selected_node_id}")
+                    new_desc = st.text_area("Descrição:", 
+                                          value=selected_node.get("description", ""), 
+                                          height=120,
+                                          key=f"desc_{selected_node_id}")
+                    
+                    col_edit1, col_edit2 = st.columns(2)
+                    with col_edit1:
+                        if st.form_submit_button("💾 Salvar", use_container_width=True):
+                            if new_label.strip():
+                                node_type_data = st.session_state.miro_map.node_types[new_type]
+                                selected_node["label"] = f"{node_type_data['icon']} {new_label.strip()}"
+                                selected_node["type"] = new_type
+                                selected_node["description"] = new_desc
+                                selected_node["color"] = node_type_data["color"]
+                                selected_node["shape"] = node_type_data["shape"]
+                                st.success("Nó atualizado!")
+                                safe_rerun()
+                            else:
+                                st.warning("O título não pode ser vazio.")
+                    
+                    with col_edit2:
+                        if st.form_submit_button("🗑️ Excluir", type="secondary", use_container_width=True):
+                            # Remover nó e suas conexões
+                            st.session_state.miro_nodes = [n for n in st.session_state.miro_nodes if n["id"] != selected_node_id]
+                            st.session_state.miro_edges = [e for e in st.session_state.miro_edges 
+                                                         if e["source"] != selected_node_id and e["target"] != selected_node_id]
+                            st.session_state.miro_selected_node = None
                             st.success("Nó excluído!")
                             safe_rerun()
-                        else:
-                            st.warning("Não é possível excluir o último nó.")
-
-            # Mostrar conexões
-            st.markdown("---")
-            st.write("**🔗 Conexões:**")
-            
-            in_connections = list(G.predecessors(selected_node))
-            out_connections = list(G.successors(selected_node))
-            
-            if in_connections:
-                st.write("**Recebe de:**")
-                for conn in in_connections:
-                    conn_label = G.nodes[conn].get('label', conn)
-                    col_conn1, col_conn2 = st.columns([3, 1])
-                    with col_conn1:
-                        st.write(f"• {conn_label}")
-                    with col_conn2:
-                        if st.button("🗑️", key=f"rm_in_{conn}_{selected_node}"):
-                            G.remove_edge(conn, selected_node)
-                            st.session_state.mapa_G = G
-                            safe_rerun()
-            
-            if out_connections:
-                st.write("**Conecta para:**")
-                for conn in out_connections:
-                    conn_label = G.nodes[conn].get('label', conn)
-                    col_conn1, col_conn2 = st.columns([3, 1])
-                    with col_conn1:
-                        st.write(f"• {conn_label}")
-                    with col_conn2:
-                        if st.button("🗑️", key=f"rm_out_{selected_node}_{conn}"):
-                            G.remove_edge(selected_node, conn)
-                            st.session_state.mapa_G = G
-                            safe_rerun()
-            
-            if not in_connections and not out_connections:
-                st.info("Este nó não possui conexões.")
+                
+                # Visualização da descrição
+                if selected_node.get("description"):
+                    st.markdown("---")
+                    st.write("**Descrição atual:**")
+                    st.markdown(f'<div class="node-preview">{selected_node["description"]}</div>', unsafe_allow_html=True)
+                
+                # Conexões deste nó
+                st.markdown("---")
+                st.write("**🔗 Conexões:**")
+                
+                incoming = [e for e in st.session_state.miro_edges if e["target"] == selected_node_id]
+                outgoing = [e for e in st.session_state.miro_edges if e["source"] == selected_node_id]
+                
+                if incoming:
+                    st.write("**Recebe de:**")
+                    for edge in incoming:
+                        source_node = next((n for n in st.session_state.miro_nodes if n["id"] == edge["source"]), None)
+                        if source_node:
+                            st.write(f"• {source_node['label']}")
+                
+                if outgoing:
+                    st.write("**Conecta para:**")
+                    for edge in outgoing:
+                        target_node = next((n for n in st.session_state.miro_nodes if n["id"] == edge["target"]), None)
+                        if target_node:
+                            st.write(f"• {target_node['label']}")
+                
+                if not incoming and not outgoing:
+                    st.info("Este nó não possui conexões.")
         else:
-            st.info("Selecione um nó no mapa para editar.")
-
-    # Exportação do mapa
+            st.info("👆 Selecione um nó no mapa para editar.")
+    
+    # Ferramentas de exportação
     st.markdown("---")
     st.subheader("📤 Exportar Mapa")
     
-    col_exp1, col_exp2 = st.columns(2)
-    with col_exp1:
-        # Exportar como JSON
-        if st.button("💾 Exportar como JSON", use_container_width=True):
-            graph_data = {
-                "nodes": {node: dict(data) for node, data in G.nodes(data=True)},
-                "edges": list(G.edges())
+    exp_col1, exp_col2, exp_col3 = st.columns(3)
+    
+    with exp_col1:
+        if st.button("💾 Salvar como JSON", use_container_width=True):
+            map_data = {
+                "nodes": st.session_state.miro_nodes,
+                "edges": st.session_state.miro_edges,
+                "metadata": {
+                    "created": datetime.now().isoformat(),
+                    "user": USERNAME,
+                    "version": "miro_style_1.0"
+                }
             }
-            json_str = json.dumps(graph_data, ensure_ascii=False, indent=2)
+            json_str = json.dumps(map_data, ensure_ascii=False, indent=2)
             st.download_button(
                 "⬇️ Baixar JSON",
                 data=json_str,
-                file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.json",
+                file_name=f"mapa_miro_{USERNAME}_{int(time.time())}.json",
                 mime="application/json"
             )
     
-    with col_exp2:
-        # Exportar como PNG
+    with exp_col2:
         if st.button("🖼️ Exportar como PNG", use_container_width=True):
-            def export_map_to_png_bytes(G):
-                fig = plt.figure(figsize=(16, 12), dpi=200)
-                try:
-                    pos = nx.spring_layout(G, k=2, iterations=100)
-                except Exception:
-                    pos = nx.spring_layout(G)
-
-                # Cores por tipo
-                color_map = {
-                    "Raiz": "#FF6B6B",
-                    "Ideia": "#4ECDC4", 
-                    "Tarefa": "#45B7D1",
-                    "Pergunta": "#96CEB4",
-                    "Recurso": "#FECA57",
-                    "Resultado": "#FF9FF3"
-                }
-                
-                node_colors = [color_map.get(G.nodes[node].get('tipo', 'Ideia'), "#4ECDC4") for node in G.nodes()]
-                node_sizes = [3000 if G.nodes[node].get('tipo') == 'Raiz' else 2000 for node in G.nodes()]
-
-                nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=node_sizes, 
-                                     alpha=0.95, edgecolors='white', linewidths=2)
-                
-                nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, 
-                                     arrowsize=25, width=2, connectionstyle='arc3,rad=0.1')
-
-                # Labels com quebra de linha
-                labels = {}
-                for node in G.nodes():
-                    label = G.nodes[node].get('label', node)
-                    if len(label) > 20:
-                        words = label.split()
-                        lines = []
-                        current_line = []
-                        for word in words:
-                            if len(' '.join(current_line + [word])) <= 20:
-                                current_line.append(word)
-                            else:
-                                if current_line:
-                                    lines.append(' '.join(current_line))
-                                current_line = [word]
-                        if current_line:
-                            lines.append(' '.join(current_line))
-                        label = '\n'.join(lines)
-                    labels[node] = label
-
-                nx.draw_networkx_labels(G, pos, labels=labels, font_size=8, 
-                                      font_color='white', font_weight='bold')
-
-                plt.title("Mapa Mental", color='white', fontsize=16, pad=20)
-                plt.axis('off')
-                plt.tight_layout()
-                buf = io.BytesIO()
-                fig.patch.set_facecolor('#0E192A')
-                plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
-                           facecolor=fig.get_facecolor(), transparent=False)
-                plt.close(fig)
-                buf.seek(0)
-                return buf.getvalue()
-
+            # Gerar visualização estática
             try:
-                png_bytes = export_map_to_png_bytes(G)
+                plt.figure(figsize=(16, 12))
+                plt.title("Mapa Mental", fontsize=16, color='white', pad=20)
+                plt.axis('off')
+                
+                # Salvar imagem temporária
+                buf = io.BytesIO()
+                plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', 
+                           facecolor='#0E192A', edgecolor='none')
+                plt.close()
+                buf.seek(0)
+                
                 st.download_button(
                     "⬇️ Baixar PNG",
-                    data=png_bytes,
-                    file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.png",
+                    data=buf.getvalue(),
+                    file_name=f"mapa_miro_{USERNAME}_{int(time.time())}.png",
                     mime="image/png"
                 )
             except Exception as e:
                 st.error(f"Erro ao gerar imagem: {e}")
+    
+    with exp_col3:
+        if st.button("📊 Relatório do Mapa", use_container_width=True):
+            total_nodes = len(st.session_state.miro_nodes)
+            total_edges = len(st.session_state.miro_edges)
+            node_types = {}
+            
+            for node in st.session_state.miro_nodes:
+                node_type = node["type"]
+                node_types[node_type] = node_types.get(node_type, 0) + 1
+            
+            report = f"""
+# 📊 Relatório do Mapa Mental
+
+## Estatísticas Gerais
+- **Total de nós**: {total_nodes}
+- **Total de conexões**: {total_edges}
+- **Densidade da rede**: {(total_edges / max(1, total_nodes * (total_nodes - 1)) * 100):.1f}%
+
+## Distribuição por Tipo
+"""
+            for node_type, count in node_types.items():
+                type_info = st.session_state.miro_map.node_types.get(node_type, {})
+                icon = type_info.get("icon", "●")
+                report += f"- {icon} {node_type.title()}: {count} nós\n"
+            
+            report += f"\n**Gerado em**: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
+            
+            st.download_button(
+                "⬇️ Baixar Relatório",
+                data=report,
+                file_name=f"relatorio_mapa_{USERNAME}_{int(time.time())}.md",
+                mime="text/markdown"
+            )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1551,256 +1965,288 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos - ANÁLISE INTELIGENTE MELHORADA
+# Page: graficos - ANÁLISE SUPER INTELIGENTE COM IA
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("📊 Análise Inteligente dos Dados")
+    st.subheader("📊 Análise Inteligente com IA")
     
     if st.session_state.df is None:
         st.warning("Carregue uma planilha na página 'Planilha' para gerar análises.")
     else:
         df = st.session_state.df.copy()
         
-        # ANÁLISE INTELIGENTE MELHORADA
+        # Inicializar analisador de IA
+        analyzer = DataAnalyzer(df)
+        
+        # Análise completa automática
         st.write("### 🧠 Resumo Inteligente da Sua Pesquisa")
         
-        # Estatísticas básicas
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Total de Registros", len(df))
-        with col2:
-            st.metric("Colunas", len(df.columns))
-        with col3:
-            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-            st.metric("Colunas Numéricas", len(numeric_cols))
-        with col4:
-            categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
-            st.metric("Colunas Texto", len(categorical_cols))
+        # Gerar análise completa
+        analysis = analyzer.generate_comprehensive_analysis()
+        st.markdown(analysis)
         
-        # Análise de autores (se existir coluna de autores)
-        autores_col = None
-        for col in ['autor', 'autores', 'author', 'authors']:
-            if col in df.columns:
-                autores_col = col
-                break
-        
-        if autores_col:
-            st.markdown("---")
-            st.write("### 👥 Análise de Autores")
-            
-            # Extrair e contar autores
-            todos_autores = []
-            for autores_str in df[autores_col].dropna():
-                if isinstance(autores_str, str):
-                    # Separar autores por ponto e vírgula, vírgula ou " e "
-                    autores = re.split(r'[;,]|\be\b', autores_str)
-                    for autor in autores:
-                        autor_limpo = autor.strip()
-                        if autor_limpo and autor_limpo not in ['', 'e', 'and']:
-                            todos_autores.append(autor_limpo)
-            
-            if todos_autores:
-                contagem_autores = pd.Series(todos_autores).value_counts()
-                
-                col_aut1, col_aut2 = st.columns(2)
-                with col_aut1:
-                    st.write("**Autores Mais Frequentes:**")
-                    top_autores = contagem_autores.head(10)
-                    for autor, count in top_autores.items():
-                        st.write(f"• **{autor}**: {count} publicação(ões)")
-                
-                with col_aut2:
-                    if len(contagem_autores) > 1:
-                        st.write("**Colaborações em Potencial:**")
-                        # Encontrar autores que aparecem juntos
-                        colaboracoes = []
-                        for autores_str in df[autores_col].dropna():
-                            if isinstance(autores_str, str) and len(re.split(r'[;,]|\be\b', autores_str)) > 1:
-                                colaboracoes.append(autores_str)
-                        
-                        if colaboracoes:
-                            st.write(f"**{len(colaboracoes)}** trabalhos com coautoria")
-                            st.write("Principais colaborações:")
-                            for colab in colaboracoes[:3]:
-                                st.write(f"• {colab}")
-        
-        # Análise de temas e palavras-chave
+        # Assistente de IA
         st.markdown("---")
-        st.write("### 🔍 Temas e Palavras-Chave")
+        st.write("### 🤖 Assistente de IA para Análise")
         
-        # Encontrar colunas de texto para análise
-        texto_cols = []
-        for col in df.columns:
-            if df[col].dtype == 'object' and col not in [autores_col] and autores_col:
-                # Verificar se a coluna tem texto significativo
-                unique_ratio = df[col].nunique() / len(df)
-                if 0.1 < unique_ratio < 0.9:  # Nem muito repetitivo, nem muito único
-                    texto_cols.append(col)
+        col_ai1, col_ai2 = st.columns([3, 1])
+        with col_ai1:
+            ai_question = st.text_input(
+                "Pergunte sobre seus dados:",
+                placeholder="Ex: Quais são os autores mais relevantes? Quais temas aparecem juntos?",
+                key="ai_question"
+            )
+        with col_ai2:
+            ai_ask = st.button("🔍 Analisar com IA", use_container_width=True, use_container_width=True)
         
-        if texto_cols:
-            # Combinar texto de todas as colunas relevantes
+        if ai_ask and ai_question:
+            with st.spinner("🤔 Analisando seus dados..."):
+                time.sleep(1)  # Simular processamento
+                response = get_ai_assistant_response(ai_question, analyzer)
+                st.success("Análise concluída!")
+                st.markdown(f"**Resposta da IA:** {response}")
+        
+        # Análises especializadas
+        st.markdown("---")
+        st.write("### 🔍 Análises Especializadas")
+        
+        tab_basic, tab_authors, tab_themes, tab_geo, tab_temp = st.tabs([
+            "📈 Básica", "👥 Autores", "🔤 Temas", "🌎 Geográfica", "📅 Temporal"
+        ])
+        
+        with tab_basic:
+            st.write("#### Estatísticas Descritivas")
+            col1, col2, col3, col4 = st.columns(4)
+            with col1:
+                st.metric("Total de Registros", len(df))
+            with col2:
+                st.metric("Colunas", len(df.columns))
+            with col3:
+                numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+                st.metric("Colunas Numéricas", len(numeric_cols))
+            with col4:
+                text_cols = df.select_dtypes(include=['object']).columns.tolist()
+                st.metric("Colunas Texto", len(text_cols))
+            
+            # Visualização rápida
+            st.write("#### Visualização Rápida dos Dados")
+            st.dataframe(df.head(10), use_container_width=True)
+        
+        with tab_authors:
+            if 'autor' in df.columns:
+                st.write("#### Análise de Autores e Colaborações")
+                
+                # Extrair todos os autores
+                all_authors = []
+                for authors_str in df['autor'].dropna():
+                    if isinstance(authors_str, str):
+                        authors = re.split(r'[;,]|\be\b', authors_str)
+                        for author in authors:
+                            author_clean = author.strip()
+                            if author_clean and author_clean not in ['', 'e', 'and']:
+                                all_authors.append(author_clean)
+                
+                if all_authors:
+                    author_counts = pd.Series(all_authors).value_counts()
+                    
+                    col_a1, col_a2 = st.columns(2)
+                    with col_a1:
+                        # Top autores
+                        st.write("**Autores Mais Produtivos:**")
+                        top_authors = author_counts.head(10)
+                        for author, count in top_authors.items():
+                            st.write(f"• **{author}**: {count} publicação(ões)")
+                    
+                    with col_a2:
+                        # Colaborações
+                        collaborations = []
+                        for authors_str in df['autor'].dropna():
+                            if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b', authors_str)) > 1:
+                                collaborations.append(authors_str)
+                        
+                        st.write(f"**Colaborações**: {len(collaborations)} trabalhos em coautoria")
+                        if collaborations:
+                            st.write("**Exemplos de colaborações:**")
+                            for colab in collaborations[:3]:
+                                st.write(f"• {colab}")
+                else:
+                    st.info("Não foi possível extrair autores dos dados.")
+            else:
+                st.warning("Não há coluna 'autor' para análise.")
+        
+        with tab_themes:
+            st.write("#### Análise Temática Avançada")
+            
+            # Combinar texto para análise
             texto_completo = ""
-            for col in texto_cols[:3]:  # Limitar a 3 colunas para performance
+            text_cols = [col for col in df.columns if df[col].dtype == 'object']
+            for col in text_cols[:3]:
                 texto_completo += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
             
-            # Extrair palavras-chave mais frequentes
-            palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
-            stop_words_pt = set(PORTUGUESE_STOP_WORDS)
-            palavras_filtradas = [p for p in palavras if p not in stop_words_pt and len(p) > 3]
-            
-            if palavras_filtradas:
-                contagem_palavras = pd.Series(palavras_filtradas).value_counts().head(15)
+            if texto_completo.strip():
+                # Extrair temas
+                palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
+                stop_words = set(PORTUGUESE_STOP_WORDS)
+                palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
                 
-                col_tema1, col_tema2 = st.columns(2)
-                with col_tema1:
-                    st.write("**Temas Mais Frequentes:**")
-                    for palavra, count in contagem_palavras.head(8).items():
-                        st.write(f"• **{palavra}**: {count} ocorrências")
-                
-                with col_tema2:
-                    st.write("**Recomendações de Busca:**")
-                    temas_sugeridos = contagem_palavras.head(5).index.tolist()
-                    st.write("Baseado nos seus dados, você pode pesquisar por:")
-                    for tema in temas_sugeridos:
-                        st.write(f"• `{tema}`")
-        
-        # Análise temporal (se existir coluna de data/ano)
-        ano_col = None
-        for col in ['ano', 'year', 'data', 'date']:
-            if col in df.columns:
-                # Tentar converter para numérico
-                try:
-                    df[col] = pd.to_numeric(df[col], errors='coerce')
-                    if not df[col].isna().all():
-                        ano_col = col
-                        break
-                except:
-                    pass
-        
-        if ano_col:
-            st.markdown("---")
-            st.write("### 📈 Evolução Temporal")
-            
-            anos_validos = df[ano_col].dropna()
-            if not anos_validos.empty:
-                col_temp1, col_temp2, col_temp3 = st.columns(3)
-                with col_temp1:
-                    st.metric("Ano Mais Antigo", int(anos_validos.min()))
-                with col_temp2:
-                    st.metric("Ano Mais Recente", int(anos_validos.max()))
-                with col_temp3:
-                    st.metric("Período Abrangido", f"{int(anos_validos.max() - anos_validos.min())} anos")
-                
-                # Distribuição por ano
-                dist_ano = anos_validos.value_counts().sort_index()
-                if len(dist_ano) > 1:
-                    fig_temp = px.bar(x=dist_ano.index, y=dist_ano.values, 
-                                    title="Publicações por Ano",
-                                    labels={'x': 'Ano', 'y': 'Número de Publicações'})
-                    fig_temp.update_layout(
-                        plot_bgcolor="rgba(0,0,0,0)", 
-                        paper_bgcolor="rgba(0,0,0,0)", 
-                        font=dict(color="#d6d9dc")
-                    )
-                    st.plotly_chart(fig_temp, use_container_width=True)
-        
-        # Gráficos interativos
-        st.markdown("---")
-        st.write("### 📊 Visualizações Interativas")
-        
-        chart_type = st.selectbox(
-            "Tipo de gráfico:",
-            ["Barra", "Linha", "Pizza"],
-            key=f"chart_type_{USERNAME}"
-        )
-        
-        cols = df.columns.tolist()
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
-        
-        if chart_type == "Barra":
-            col1, col2 = st.columns(2)
-            with col1:
-                eixo_x = st.selectbox("Eixo X", options=categorical_cols + numeric_cols, key=f"x_{USERNAME}")
-            with col2:
-                if numeric_cols:
-                    eixo_y = st.selectbox("Eixo Y", options=[None] + numeric_cols, key=f"y_{USERNAME}")
-                else:
-                    eixo_y = None
-            
-            if chart_type == "Barra" and eixo_y is None:
-                group_by = st.selectbox("Agrupar por (opcional)", options=[None] + categorical_cols, key=f"group_{USERNAME}")
-            else:
-                group_by = None
-                
-        elif chart_type == "Linha":
-            col1, col2 = st.columns(2)
-            with col1:
-                eixo_x = st.selectbox("Eixo X", options=categorical_cols + numeric_cols, key=f"line_x_{USERNAME}")
-            with col2:
-                if numeric_cols:
-                    eixo_y = st.selectbox("Eixo Y", options=numeric_cols, key=f"line_y_{USERNAME}")
-                else:
-                    st.error("É necessária uma coluna numérica para o eixo Y")
+                if palavras_filtradas:
+                    temas = pd.Series(palavras_filtradas).value_counts().head(15)
                     
-        elif chart_type == "Pizza":
-            eixo_x = st.selectbox("Categorias", options=categorical_cols, key=f"pie_x_{USERNAME}")
-            if numeric_cols:
-                eixo_y = st.selectbox("Valores", options=[None] + numeric_cols, key=f"pie_y_{USERNAME}")
-            else:
-                eixo_y = None
-
-        if st.button("Gerar Visualização", key=f"gen_chart_{USERNAME}", use_container_width=True):
-            try:
-                fig = None
-                
-                if chart_type == "Barra":
-                    if eixo_y is None:
-                        if group_by:
-                            fig = px.histogram(df, x=eixo_x, color=group_by, 
-                                             title=f"Distribuição de {eixo_x} por {group_by}",
-                                             barmode='group')
-                        else:
-                            fig = px.histogram(df, x=eixo_x, 
-                                             title=f"Distribuição de {eixo_x}")
-                    else:
-                        if group_by:
-                            fig = px.bar(df, x=eixo_x, y=eixo_y, color=group_by, 
-                                       title=f"{eixo_y} por {eixo_x}",
-                                       barmode='group')
-                        else:
-                            fig = px.bar(df, x=eixo_x, y=eixo_y, 
-                                       title=f"{eixo_y} por {eixo_x}")
-                            
-                elif chart_type == "Linha":
-                    if eixo_y:
-                        fig = px.line(df, x=eixo_x, y=eixo_y, 
-                                    title=f"Evolução de {eixo_y} por {eixo_x}")
-                    else:
-                        st.error("Selecione uma coluna numérica para o eixo Y")
+                    col_t1, col_t2 = st.columns(2)
+                    with col_t1:
+                        st.write("**Temas Mais Frequentes:**")
+                        for tema, count in temas.head(8).items():
+                            st.write(f"• **{tema}**: {count} ocorrências")
+                    
+                    with col_t2:
+                        st.write("**Rede de Temas:**")
+                        st.info("Temas que frequentemente aparecem juntos:")
                         
-                elif chart_type == "Pizza":
-                    if eixo_y:
-                        fig = px.pie(df, names=eixo_x, values=eixo_y, 
-                                   title=f"Proporção de {eixo_x}")
-                    else:
-                        contagem = df[eixo_x].value_counts()
-                        fig = px.pie(values=contagem.values, names=contagem.index,
-                                   title=f"Distribuição de {eixo_x}")
-
-                if fig:
-                    fig.update_layout(
-                        plot_bgcolor="rgba(0,0,0,0)", 
-                        paper_bgcolor="rgba(0,0,0,0)", 
-                        font=dict(color="#d6d9dc"),
-                        title_font=dict(size=20, color="#ffffff"),
-                        legend=dict(bgcolor="rgba(0,0,0,0)", font=dict(color="#d6d9dc"))
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                        # Análise de co-ocorrência simples
+                        theme_pairs = []
+                        for i, tema1 in enumerate(temas.index[:5]):
+                            for j, tema2 in enumerate(temas.index[:5]):
+                                if i < j and tema1 in texto_completo and tema2 in texto_completo:
+                                    theme_pairs.append(f"{tema1} + {tema2}")
+                        
+                        for pair in theme_pairs[:5]:
+                            st.write(f"• {pair}")
+                else:
+                    st.info("Não foram identificados temas significativos.")
+            else:
+                st.warning("Não há texto suficiente para análise temática.")
+        
+        with tab_geo:
+            country_col = None
+            for col in ['país', 'pais', 'country', 'local']:
+                if col in df.columns:
+                    country_col = col
+                    break
+            
+            if country_col:
+                st.write("#### Análise Geográfica")
+                countries = df[country_col].dropna()
+                
+                if not countries.empty:
+                    country_counts = countries.value_counts()
                     
-            except Exception as e:
-                st.error(f"Erro ao gerar visualização: {e}")
+                    col_g1, col_g2 = st.columns(2)
+                    with col_g1:
+                        st.write("**Distribuição por País:**")
+                        for country, count in country_counts.head(8).items():
+                            st.write(f"• **{country}**: {count} publicação(ões)")
+                    
+                    with col_g2:
+                        # Mapa de calor geográfico
+                        if len(country_counts) > 1:
+                            fig_geo = px.pie(values=country_counts.values, names=country_counts.index,
+                                           title="Distribuição Geográfica das Publicações")
+                            fig_geo.update_layout(
+                                plot_bgcolor="rgba(0,0,0,0)", 
+                                paper_bgcolor="rgba(0,0,0,0)", 
+                                font=dict(color="#d6d9dc")
+                            )
+                            st.plotly_chart(fig_geo, use_container_width=True)
+                else:
+                    st.info("Não há dados geográficos para análise.")
+            else:
+                st.warning("Não há coluna de país/região para análise geográfica.")
+        
+        with tab_temp:
+            year_col = None
+            for col in ['ano', 'year', 'data', 'date']:
+                if col in df.columns:
+                    try:
+                        df[col] = pd.to_numeric(df[col], errors='coerce')
+                        if not df[col].isna().all():
+                            year_col = col
+                            break
+                    except:
+                        pass
+            
+            if year_col:
+                st.write("#### Análise Temporal")
+                years = df[year_col].dropna()
+                
+                if not years.empty:
+                    year_counts = years.value_counts().sort_index()
+                    
+                    col_y1, col_y2 = st.columns(2)
+                    with col_y1:
+                        st.write("**Evolução Temporal:**")
+                        if len(year_counts) > 1:
+                            fig_temp = px.line(x=year_counts.index, y=year_counts.values,
+                                             title="Publicações por Ano",
+                                             labels={'x': 'Ano', 'y': 'Número de Publicações'})
+                            fig_temp.update_layout(
+                                plot_bgcolor="rgba(0,0,0,0)", 
+                                paper_bgcolor="rgba(0,0,0,0)", 
+                                font=dict(color="#d6d9dc")
+                            )
+                            st.plotly_chart(fig_temp, use_container_width=True)
+                        else:
+                            st.write(f"**Ano principal**: {int(years.iloc[0])}")
+                    
+                    with col_y2:
+                        st.write("**Estatísticas Temporais:**")
+                        st.write(f"- **Período**: {int(years.min())} - {int(years.max())}")
+                        st.write(f"- **Variação**: {int(years.max() - years.min())} anos")
+                        st.write(f"- **Ano mais produtivo**: {int(year_counts.idxmax())}")
+                else:
+                    st.info("Não há dados temporais suficientes.")
+            else:
+                st.warning("Não há coluna de ano/data para análise temporal.")
+        
+        # Visualizações interativas
+        st.markdown("---")
+        st.write("### 📈 Visualizações Interativas")
+        
+        # Gráficos dinâmicos baseados nos dados disponíveis
+        available_viz = []
+        if 'autor' in df.columns:
+            available_viz.append("Autores")
+        if any(col in df.columns for col in ['país', 'pais', 'country']):
+            available_viz.append("Geografia")
+        if any(col in df.columns for col in ['ano', 'year']):
+            available_viz.append("Temporal")
+        
+        if available_viz:
+            viz_type = st.selectbox("Tipo de visualização:", available_viz)
+            
+            if viz_type == "Autores" and 'autor' in df.columns:
+                # Gráfico de autores
+                all_authors = []
+                for authors_str in df['autor'].dropna():
+                    if isinstance(authors_str, str):
+                        authors = re.split(r'[;,]|\be\b', authors_str)
+                        all_authors.extend([a.strip() for a in authors if a.strip() and a.strip() not in ['', 'e', 'and']])
+                
+                if all_authors:
+                    author_counts = pd.Series(all_authors).value_counts().head(10)
+                    fig_auth = px.bar(x=author_counts.index, y=author_counts.values,
+                                    title="Top 10 Autores Mais Produtivos",
+                                    labels={'x': 'Autor', 'y': 'Número de Publicações'})
+                    fig_auth.update_layout(xaxis_tickangle=-45)
+                    st.plotly_chart(fig_auth, use_container_width=True)
+            
+            elif viz_type == "Geografia":
+                country_col = next((col for col in ['país', 'pais', 'country'] if col in df.columns), None)
+                if country_col:
+                    country_counts = df[country_col].value_counts().head(10)
+                    fig_geo = px.bar(x=country_counts.index, y=country_counts.values,
+                                   title="Top 10 Países/Regiões",
+                                   labels={'x': 'País', 'y': 'Número de Publicações'})
+                    st.plotly_chart(fig_geo, use_container_width=True)
+            
+            elif viz_type == "Temporal":
+                year_col = next((col for col in ['ano', 'year'] if col in df.columns), None)
+                if year_col:
+                    year_counts = df[year_col].value_counts().sort_index()
+                    fig_temp = px.area(x=year_counts.index, y=year_counts.values,
+                                     title="Evolução Temporal das Publicações",
+                                     labels={'x': 'Ano', 'y': 'Número de Publicações'})
+                    st.plotly_chart(fig_temp, use_container_width=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
 
