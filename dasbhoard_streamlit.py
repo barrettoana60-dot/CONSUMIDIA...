@@ -919,8 +919,8 @@ with top2:
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
-nav_buttons = {"planilha": "📄 Planilha", "recomendacoes": "💡 Recomendações", "mapa": "🞠 Mapa",
-               "anotacoes": "📝 Anotações", "graficos": "📊 Gráficos", "busca": "🔍 Busca",
+nav_buttons = {"planilha": "📄 Planilha", "recomendacoes": "💡 Recomendações", "mapa": "🗺️ Mapa Mental",
+               "anotacoes": "📝 Anotações", "graficos": "📊 Análise", "busca": "🔍 Busca",
                "mensagens": mens_label, "config": "⚙️ Configurações"}
 nav_cols = st.columns(len(nav_buttons))
 for i, (page_key, page_label) in enumerate(nav_buttons.items()):
@@ -937,9 +937,9 @@ if not st.session_state.get("tutorial_completed"):
         **O que cada botão faz?**
         * **📄 Planilha**: Carregue sua planilha (.csv ou .xlsx). Os dados dela alimentarão os gráficos e as buscas.
         * **💡 Recomendações**: Explore artigos e trabalhos de outros usuários com base em temas de interesse.
-        * **🞠 Mapa**: Visualize e edite um mapa de ideias no formato hierárquico. Você pode adicionar, conectar e remover nós.
+        * **🗺️ Mapa Mental**: Visualize e edite mapas mentais e fluxogramas interativos para organizar ideias.
         * **📝 Anotações**: Um bloco de notas para destacar texto com `==sinais de igual==` e exportar como PDF.
-        * **📊 Gráficos**: Gere gráficos personalizados a partir da sua planilha.
+        * **📊 Análise**: Gere gráficos e análises inteligentes a partir da sua planilha.
         * **🔍 Busca**: Pesquise em todas as planilhas carregadas na plataforma.
         * **✉️ Mensagens**: Comunique-se com outros pesquisadores.
         * **⚙️ Configurações**: Personalize a aparência do aplicativo.
@@ -1236,7 +1236,8 @@ elif st.session_state.page == "recomendacoes":
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🞠 Mapa de Ideias Editável")
+    st.subheader("🗺️ Mapa Mental & Fluxograma")
+    st.info("Crie e edite mapas mentais interativos. Use para organizar ideias, planejar projetos e visualizar relações entre conceitos.")
 
     if 'mapa_G' not in st.session_state:
         st.session_state.mapa_G = nx.DiGraph()
@@ -1552,20 +1553,22 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos (MELHORIA: Gráficos mais inteligentes)
+# Page: graficos (MELHORIA: Análise Inteligente)
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("📊 Gráficos Inteligentes")
+    st.subheader("📊 Análise Inteligente dos Dados")
     
     if st.session_state.df is None:
-        st.warning("Carregue uma planilha na página 'Planilha' para gerar gráficos.")
+        st.warning("Carregue uma planilha na página 'Planilha' para gerar análises.")
     else:
         df = st.session_state.df.copy()
         
-        # Análise automática dos dados
-        st.write("### 📈 Análise dos Dados")
-        col1, col2, col3 = st.columns(3)
+        # Análise Inteligente Automática
+        st.write("### 📈 Análise Automática dos Dados")
+        
+        # Estatísticas básicas
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Total de Registros", len(df))
         with col2:
@@ -1573,12 +1576,78 @@ elif st.session_state.page == "graficos":
         with col3:
             numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
             st.metric("Colunas Numéricas", len(numeric_cols))
+        with col4:
+            categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+            st.metric("Colunas Texto", len(categorical_cols))
         
-        # Seleção de tipo de gráfico
-        st.write("### 🎨 Tipo de Gráfico")
+        # Insights automáticos
+        st.write("### 💡 Insights dos Dados")
+        
+        # Análise de colunas numéricas
+        if numeric_cols:
+            insights = []
+            
+            for col in numeric_cols[:5]:  # Analisar até 5 colunas numéricas
+                col_data = df[col].dropna()
+                if len(col_data) > 0:
+                    mean_val = col_data.mean()
+                    std_val = col_data.std()
+                    missing = df[col].isna().sum()
+                    
+                    insight_text = f"**{col}**: Média {mean_val:.2f} ± {std_val:.2f}"
+                    if missing > 0:
+                        insight_text += f" ({missing} valores faltantes)"
+                    
+                    # Detectar outliers
+                    Q1 = col_data.quantile(0.25)
+                    Q3 = col_data.quantile(0.75)
+                    IQR = Q3 - Q1
+                    outliers = col_data[(col_data < (Q1 - 1.5 * IQR)) | (col_data > (Q3 + 1.5 * IQR))]
+                    
+                    if len(outliers) > 0:
+                        insight_text += f" - ⚠️ {len(outliers)} possíveis outliers"
+                    
+                    insights.append(insight_text)
+            
+            for insight in insights:
+                st.write(insight)
+        
+        # Análise de colunas categóricas
+        if categorical_cols:
+            st.write("#### 📝 Análise de Texto")
+            for col in categorical_cols[:3]:  # Analisar até 3 colunas categóricas
+                unique_vals = df[col].nunique()
+                most_common = df[col].value_counts().head(3)
+                st.write(f"**{col}**: {unique_vals} valores únicos")
+                st.write(f"Mais frequentes: {', '.join([f'{k} ({v})' for k, v in most_common.items()])}")
+        
+        # Correlações (se houver colunas numéricas suficientes)
+        if len(numeric_cols) >= 2:
+            st.write("#### 🔗 Correlações")
+            corr_matrix = df[numeric_cols].corr()
+            
+            # Encontrar correlações fortes
+            strong_corrs = []
+            for i in range(len(corr_matrix.columns)):
+                for j in range(i+1, len(corr_matrix.columns)):
+                    corr_val = corr_matrix.iloc[i, j]
+                    if abs(corr_val) > 0.7:  # Correlação forte
+                        strong_corrs.append(
+                            f"**{corr_matrix.columns[i]}** ↔ **{corr_matrix.columns[j]}**: {corr_val:.2f}"
+                        )
+            
+            if strong_corrs:
+                st.write("Correlações fortes encontradas:")
+                for corr in strong_corrs[:5]:  # Mostrar até 5 correlações
+                    st.write(f"• {corr}")
+            else:
+                st.write("Nenhuma correlação forte (> 0.7) encontrada.")
+        
+        # Seleção de Gráficos (apenas os 3 tipos solicitados)
+        st.write("### 📊 Criar Visualização")
         chart_type = st.selectbox(
-            "Selecione o tipo de gráfico:",
-            ["Barra", "Linha", "Dispersão", "Histograma", "Pizza", "Boxplot", "Heatmap", "Treemap"],
+            "Tipo de gráfico:",
+            ["Barra", "Linha", "Pizza"],
             key=f"chart_type_{USERNAME}"
         )
         
@@ -1586,7 +1655,7 @@ elif st.session_state.page == "graficos":
         numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
         categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
         
-        if chart_type in ["Barra", "Linha"]:
+        if chart_type == "Barra":
             col1, col2 = st.columns(2)
             with col1:
                 eixo_x = st.selectbox("Eixo X", options=categorical_cols + numeric_cols, key=f"x_{USERNAME}")
@@ -1603,51 +1672,24 @@ elif st.session_state.page == "graficos":
             else:
                 group_by = None
                 
-        elif chart_type == "Dispersão":
-            col1, col2, col3 = st.columns(3)
+        elif chart_type == "Linha":
+            col1, col2 = st.columns(2)
             with col1:
-                eixo_x = st.selectbox("Eixo X", options=numeric_cols if numeric_cols else cols, key=f"scatter_x_{USERNAME}")
+                eixo_x = st.selectbox("Eixo X", options=categorical_cols + numeric_cols, key=f"line_x_{USERNAME}")
             with col2:
-                eixo_y = st.selectbox("Eixo Y", options=numeric_cols if numeric_cols else cols, key=f"scatter_y_{USERNAME}")
-            with col3:
-                color_by = st.selectbox("Cor por (opcional)", options=[None] + categorical_cols, key=f"scatter_color_{USERNAME}")
-                
-        elif chart_type == "Histograma":
-            eixo_x = st.selectbox("Selecione a coluna:", options=numeric_cols if numeric_cols else cols, key=f"hist_x_{USERNAME}")
-            bins = st.slider("Número de bins", 5, 100, 20, key=f"bins_{USERNAME}")
-            
+                if numeric_cols:
+                    eixo_y = st.selectbox("Eixo Y", options=numeric_cols, key=f"line_y_{USERNAME}")
+                else:
+                    st.error("É necessária uma coluna numérica para o eixo Y")
+                    
         elif chart_type == "Pizza":
             eixo_x = st.selectbox("Categorias", options=categorical_cols, key=f"pie_x_{USERNAME}")
             if numeric_cols:
-                eixo_y = st.selectbox("Valores", options=numeric_cols, key=f"pie_y_{USERNAME}")
+                eixo_y = st.selectbox("Valores", options=[None] + numeric_cols, key=f"pie_y_{USERNAME}")
             else:
                 eixo_y = None
-                st.info("Nenhuma coluna numérica para valores")
-                
-        elif chart_type == "Boxplot":
-            eixo_x = st.selectbox("Categorias (opcional)", options=[None] + categorical_cols, key=f"box_x_{USERNAME}")
-            eixo_y = st.selectbox("Valores", options=numeric_cols if numeric_cols else cols, key=f"box_y_{USERNAME}")
-            
-        elif chart_type == "Heatmap":
-            st.info("Heatmap mostra correlação entre variáveis numéricas")
-            if len(numeric_cols) >= 2:
-                selected_cols = st.multiselect("Selecione colunas para heatmap", 
-                                             options=numeric_cols, default=numeric_cols[:5],
-                                             key=f"heatmap_cols_{USERNAME}")
-            else:
-                selected_cols = numeric_cols
-                st.warning("Heatmap requer pelo menos 2 colunas numéricas")
-                
-        elif chart_type == "Treemap":
-            path_cols = st.multiselect("Hierarquia (caminho)", options=categorical_cols, 
-                                     key=f"treemap_path_{USERNAME}", max_selections=3)
-            if numeric_cols:
-                value_col = st.selectbox("Valor", options=numeric_cols, key=f"treemap_value_{USERNAME}")
-            else:
-                value_col = None
-                st.info("Nenhuma coluna numérica para valores")
 
-        if st.button("Gerar Gráfico", key=f"gen_chart_{USERNAME}", use_container_width=True):
+        if st.button("Gerar Visualização", key=f"gen_chart_{USERNAME}", use_container_width=True):
             try:
                 fig = None
                 
@@ -1655,33 +1697,28 @@ elif st.session_state.page == "graficos":
                     if eixo_y is None:
                         # Gráfico de contagem
                         if group_by:
-                            fig = px.histogram(df, x=eixo_x, color=group_by, title=f"Contagem de {eixo_x} por {group_by}")
+                            fig = px.histogram(df, x=eixo_x, color=group_by, 
+                                             title=f"Distribuição de {eixo_x} por {group_by}",
+                                             barmode='group')
                         else:
-                            fig = px.histogram(df, x=eixo_x, title=f"Contagem de {eixo_x}")
+                            fig = px.histogram(df, x=eixo_x, 
+                                             title=f"Distribuição de {eixo_x}")
                     else:
                         if group_by:
-                            fig = px.bar(df, x=eixo_x, y=eixo_y, color=group_by, title=f"{eixo_y} por {eixo_x}")
+                            fig = px.bar(df, x=eixo_x, y=eixo_y, color=group_by, 
+                                       title=f"{eixo_y} por {eixo_x}",
+                                       barmode='group')
                         else:
-                            fig = px.bar(df, x=eixo_x, y=eixo_y, title=f"{eixo_y} por {eixo_x}")
+                            fig = px.bar(df, x=eixo_x, y=eixo_y, 
+                                       title=f"{eixo_y} por {eixo_x}")
                             
                 elif chart_type == "Linha":
                     if eixo_y:
-                        fig = px.line(df, x=eixo_x, y=eixo_y, title=f"{eixo_y} por {eixo_x}")
+                        fig = px.line(df, x=eixo_x, y=eixo_y, 
+                                    title=f"Evolução de {eixo_y} por {eixo_x}")
                     else:
                         st.error("Selecione uma coluna numérica para o eixo Y")
                         
-                elif chart_type == "Dispersão":
-                    if color_by:
-                        fig = px.scatter(df, x=eixo_x, y=eixo_y, color=color_by, 
-                                       title=f"{eixo_y} vs {eixo_x}")
-                    else:
-                        fig = px.scatter(df, x=eixo_x, y=eixo_y, 
-                                       title=f"{eixo_y} vs {eixo_x}")
-                                       
-                elif chart_type == "Histograma":
-                    fig = px.histogram(df, x=eixo_x, nbins=bins, 
-                                     title=f"Distribuição de {eixo_x}")
-                                     
                 elif chart_type == "Pizza":
                     if eixo_y:
                         fig = px.pie(df, names=eixo_x, values=eixo_y, 
@@ -1691,26 +1728,6 @@ elif st.session_state.page == "graficos":
                         contagem = df[eixo_x].value_counts()
                         fig = px.pie(values=contagem.values, names=contagem.index,
                                    title=f"Distribuição de {eixo_x}")
-                                   
-                elif chart_type == "Boxplot":
-                    if eixo_x:
-                        fig = px.box(df, x=eixo_x, y=eixo_y, 
-                                   title=f"Distribuição de {eixo_y} por {eixo_x}")
-                    else:
-                        fig = px.box(df, y=eixo_y, title=f"Distribuição de {eixo_y}")
-                        
-                elif chart_type == "Heatmap" and len(selected_cols) >= 2:
-                    corr_matrix = df[selected_cols].corr()
-                    fig = px.imshow(corr_matrix, 
-                                  title="Matriz de Correlação",
-                                  color_continuous_scale='RdBu_r',
-                                  aspect="auto")
-                    fig.update_layout(height=600)
-                    
-                elif chart_type == "Treemap" and path_cols and value_col:
-                    fig = px.treemap(df, path=path_cols, values=value_col,
-                                   title=f"Treemap de {value_col}")
-                    fig.update_layout(height=600)
 
                 if fig:
                     fig.update_layout(
@@ -1722,10 +1739,10 @@ elif st.session_state.page == "graficos":
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Estatísticas descritivas
-                    if chart_type in ["Barra", "Linha", "Dispersão", "Histograma", "Boxplot"] and eixo_y in numeric_cols:
-                        with st.expander("📊 Estatísticas Descritivas"):
-                            st.write(f"**Estatísticas para {eixo_y}:**")
+                    # Estatísticas descritivas adicionais
+                    if chart_type in ["Barra", "Linha"] and eixo_y in numeric_cols:
+                        with st.expander("📈 Estatísticas Detalhadas"):
+                            st.write(f"**Análise de {eixo_y}:**")
                             stats = df[eixo_y].describe()
                             st.dataframe(stats)
                             
@@ -1733,32 +1750,7 @@ elif st.session_state.page == "graficos":
                     st.warning("Não foi possível gerar o gráfico com os parâmetros selecionados.")
 
             except Exception as e:
-                st.error(f"Erro ao gerar gráfico: {e}")
-                
-        # Gráficos automáticos sugeridos
-        if len(numeric_cols) > 0:
-            with st.expander("🚀 Gráficos Automáticos Sugeridos"):
-                st.write("Gráficos gerados automaticamente com base nos dados:")
-                
-                # Gráfico de correlação
-                if len(numeric_cols) >= 2:
-                    if st.button("📈 Matriz de Correlação", key=f"auto_corr_{USERNAME}"):
-                        corr_matrix = df[numeric_cols].corr()
-                        fig = px.imshow(corr_matrix, 
-                                      title="Matriz de Correlação (Automática)",
-                                      color_continuous_scale='RdBu_r',
-                                      aspect="auto")
-                        fig.update_layout(height=600)
-                        st.plotly_chart(fig, use_container_width=True)
-                
-                # Distribuição das principais colunas numéricas
-                if numeric_cols:
-                    col_numeric = st.selectbox("Selecione coluna para distribuição:", 
-                                             options=numeric_cols, key=f"auto_dist_{USERNAME}")
-                    if st.button("📊 Distribuição", key=f"auto_hist_{USERNAME}"):
-                        fig = px.histogram(df, x=col_numeric, 
-                                         title=f"Distribuição de {col_numeric}")
-                        st.plotly_chart(fig, use_container_width=True)
+                st.error(f"Erro ao gerar visualização: {e}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1823,7 +1815,7 @@ elif st.session_state.page == "busca":
                 user_display_name = "Fonte: Web"
             else:
                 user_obj = users_map.get(str(origin_uid), {})
-                user_display_name = user_obj.get("name") if user_obj and user_obj.get("name") else str(origin_uid)
+                user_display_name = user_obj.get("name", "Usuário") + f" ({format_cpf_display(origin_uid)})"
 
             initials = "".join([p[0] for p in str(user_display_name).split()[:2]]).upper() or "U"
             title_raw = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
@@ -1875,7 +1867,7 @@ elif st.session_state.page == "busca":
                     origin_display = "Fonte: Web"
                 else:
                     ou = users_map.get(str(origin_user), {})
-                    origin_display = ou.get("name") if ou and ou.get("name") else str(origin_user)
+                    origin_display = ou.get("name", "Usuário") + f" ({format_cpf_display(origin_user)})"
                 st.markdown("## Detalhes do Registro")
                 
                 col1, col2 = st.columns([3, 1])
@@ -1918,13 +1910,13 @@ elif st.session_state.page == "busca":
                 if origin_user != "N/A" and origin_user != "web":
                     with st.form(key=f"inline_compose_{vi}_{USERNAME}"):
                         subj_fill = st.text_input("Assunto:", value=f"Sobre: {det.get('título', '')[:50]}...")
-                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_display},\n\nVi seu registro '{det.get('título', '')}' na plataforma e gostaria de conversar.\n\n")
+                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_display.split('(')[0].strip()},\n\nVi seu registro '{det.get('título', '')}' na plataforma e gostaria de conversar.\n\n")
                         c1, c2 = st.columns(2)
                         with c1:
                             if st.form_submit_button("✉️ Enviar"):
                                 # aqui enviamos para o CPF (origin_user) internamente
                                 send_message(USERNAME, str(origin_user), subj_fill, body_fill)
-                                st.success(f"Mensagem enviada para {origin_display}.")
+                                st.success(f"Mensagem enviada para {origin_display.split('(')[0].strip()}.")
                                 time.sleep(2); safe_rerun()
                         with c2:
                             if st.form_submit_button("❌ Cancelar"):
@@ -1941,7 +1933,7 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mensagens (CORREÇÃO do erro de attachment)
+# Page: mensagens (CORREÇÃO do erro de attachment e mostrar nomes)
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1954,7 +1946,13 @@ elif st.session_state.page == "mensagens":
             msg = next((m for m in all_msgs if m['id'] == st.session_state.view_message_id), None)
             if msg:
                 mark_message_read(msg['id'], USERNAME)
-                st.markdown(f"**De:** {escape_html(msg.get('from'))}")
+                
+                # Mostrar nome em vez de CPF
+                users_map = load_users()
+                from_user = msg.get('from')
+                from_display = users_map.get(from_user, {}).get('name', from_user) + f" ({format_cpf_display(from_user)})"
+                
+                st.markdown(f"**De:** {escape_html(from_display)}")
                 st.markdown(f"**Assunto:** {escape_html(msg.get('subject'))}")
                 st.markdown(f"**Data:** {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}")
                 st.markdown("---")
@@ -1994,8 +1992,14 @@ elif st.session_state.page == "mensagens":
                 col1, col2 = st.columns([3, 1])
                 with col1:
                     read_marker = "" if msg.get('read', False) else "🔵 "
+                    
+                    # Mostrar nome em vez de CPF
+                    users_map = load_users()
+                    from_user = msg.get('from')
+                    from_display = users_map.get(from_user, {}).get('name', from_user) + f" ({format_cpf_display(from_user)})"
+                    
                     st.markdown(f"**{read_marker}{escape_html(msg.get('subject', '(sem assunto)'))}**")
-                    st.markdown(f"<span class='small-muted'>De: {escape_html(msg.get('from', '...'))} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
+                    st.markdown(f"<span class='small-muted'>De: {escape_html(from_display)} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
                 with col2:
                     if st.button("Ler", key=f"read_{msg['id']}_{USERNAME}", use_container_width=True):
                         st.session_state.view_message_id = msg['id']; safe_rerun()
@@ -2008,8 +2012,13 @@ elif st.session_state.page == "mensagens":
         for msg in sent_msgs:
             col1, col2 = st.columns([3, 1])
             with col1:
+                # Mostrar nome em vez de CPF
+                users_map = load_users()
+                to_user = msg.get('to')
+                to_display = users_map.get(to_user, {}).get('name', to_user) + f" ({format_cpf_display(to_user)})"
+                
                 st.markdown(f"**{escape_html(msg.get('subject', '(sem assunto)'))}**")
-                st.markdown(f"<span class='small-muted'>Para: {escape_html(msg.get('to', '...'))} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
+                st.markdown(f"<span class='small-muted'>Para: {escape_html(to_display)} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
             with col2:
                 if st.button("🗑️ Excluir", key=f"del_sent_{msg['id']}_{USERNAME}", use_container_width=True):
                     if delete_message(msg['id'], USERNAME): 
@@ -2021,7 +2030,11 @@ elif st.session_state.page == "mensagens":
         if st.session_state.get("reply_message_id"):
             original_msg = next((m for m in all_msgs if m['id'] == st.session_state.reply_message_id), None)
             if original_msg:
-                st.info(f"Respondendo a: {original_msg['from']}")
+                users_map = load_users()
+                from_user = original_msg.get('from')
+                from_display = users_map.get(from_user, {}).get('name', from_user) + f" ({format_cpf_display(from_user)})"
+                
+                st.info(f"Respondendo a: {from_display}")
                 default_to, default_subj, default_body = original_msg['from'], f"Re: {original_msg['subject']}", f"\n\n---\nEm resposta a:\n{original_msg['body']}"
             else:
                 st.session_state.reply_message_id = None; default_to, default_subj, default_body = "", "", ""
@@ -2034,11 +2047,30 @@ elif st.session_state.page == "mensagens":
             default_to, default_subj, default_body = "", "", ""
 
         with st.form("compose_form", clear_on_submit=True):
-            all_users = [u for u in load_users().keys() if u != USERNAME]
-            if not all_users:
+            users = load_users()
+            # Criar lista de usuários com formato "Nome (CPF)" para display, mas usar CPF internamente
+            user_options = []
+            user_mapping = {}
+            
+            for username, user_data in users.items():
+                if username != USERNAME:
+                    display_name = f"{user_data.get('name', 'Usuário')} ({format_cpf_display(username)})"
+                    user_options.append(display_name)
+                    user_mapping[display_name] = username
+            
+            if not user_options:
                 st.warning("Nenhum outro usuário cadastrado — não é possível enviar mensagens.")
             else:
-                to_user = st.selectbox("Para:", options=all_users, index=all_users.index(default_to) if default_to in all_users else 0)
+                # Selecionar pelo nome de exibição
+                selected_display = st.selectbox(
+                    "Para:", 
+                    options=user_options,
+                    index=user_options.index(default_to) if default_to in user_options else 0
+                )
+                
+                # Obter o CPF real do usuário selecionado
+                to_user = user_mapping.get(selected_display, "")
+                
                 subject = st.text_input("Assunto:", value=default_subj)
                 body = st.text_area("Mensagem:", height=200, value=default_body)
                 attachment = st.file_uploader("Anexo (opcional)", type=['pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx'])
@@ -2048,7 +2080,7 @@ elif st.session_state.page == "mensagens":
                     if st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True):
                         if to_user:
                             send_message(USERNAME, to_user, subject, body, attachment)
-                            st.success(f"Mensagem enviada para {to_user}!")
+                            st.success(f"Mensagem enviada para {selected_display.split('(')[0].strip()}!")
                             st.session_state.reply_message_id = None
                             time.sleep(1); safe_rerun()
                         else:
