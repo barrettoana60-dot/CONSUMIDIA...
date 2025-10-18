@@ -1998,7 +1998,7 @@ elif st.session_state.page == "graficos":
                 key="ai_question"
             )
         with col_ai2:
-            ai_ask = st.button("🔍 Analisar com IA", use_container_width=True, use_container_width=True)
+           ai_ask = st.button("🔍 Analisar com IA", use_container_width=True)
         
         if ai_ask and ai_question:
             with st.spinner("🤔 Analisando seus dados..."):
