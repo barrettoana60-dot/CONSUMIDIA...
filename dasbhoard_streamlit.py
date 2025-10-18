@@ -130,6 +130,14 @@ body { transition: background-color .25s ease, color .25s ease; }
     border: 2px solid #FECA57;
     box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
+/* Configurações de fonte */
+.font-config {
+    background: rgba(255,255,255,0.05);
+    border-radius: 10px;
+    padding: 15px;
+    margin: 10px 0;
+    border: 1px solid rgba(255,255,255,0.1);
+}
 """
 
 DEFAULT_CSS = r"""
@@ -765,7 +773,7 @@ class MiroStyleMindMap:
         return nodes
 
     def _force_directed_layout(self, nodes, edges):
-        """Layout de força direcionada"""
+        """Layout de força direcionada - CORRIGIDO: estabilidade melhorada"""
         G = nx.Graph()
         for node in nodes:
             G.add_node(node["id"])
@@ -773,11 +781,12 @@ class MiroStyleMindMap:
             G.add_edge(edge["source"], edge["target"])
         
         try:
-            pos = nx.spring_layout(G, k=1, iterations=100)
+            # Forças otimizadas para estabilidade
+            pos = nx.spring_layout(G, k=1.5, iterations=100, scale=2)
             for node in nodes:
                 if node["id"] in pos:
-                    node["x"] = pos[node["id"]][0] * 800
-                    node["y"] = pos[node["id"]][1] * 600
+                    node["x"] = pos[node["id"]][0] * 600 + 200
+                    node["y"] = pos[node["id"]][1] * 400 + 200
         except:
             # Fallback random
             for node in nodes:
@@ -1336,6 +1345,8 @@ _defaults = {
     "recommendation_onboarding_complete": False,
     "settings": {
         "plot_height": 720, "font_scale": 1.0, "node_opacity": 1.0,
+        "font_size": 14,  # NOVO: Tamanho da fonte
+        "node_font_size": 14,  # NOVO: Tamanho da fonte dos nós
     }
 }
 for k, v in _defaults.items():
@@ -1970,8 +1981,8 @@ elif st.session_state.page == "mapa":
             # Modos de visualização
             visualization_mode = st.selectbox(
                 "Modo de Visualização:",
-                options=["Mapa 3D", "Mapa 2D", "Fluxograma"],
-                index=1,
+                options=["Mapa 2D", "Mapa 3D", "Fluxograma"],
+                index=0,
                 help="Escolha como visualizar seu mapa"
             )
             
@@ -2013,7 +2024,7 @@ elif st.session_state.page == "mapa":
                 st.info("🌐 **Modo 3D Ativo**: Efeito visual tridimensional com gradiente!")
                 
                 node_size = 30
-                font_size = 16
+                font_size = st.session_state.settings.get("node_font_size", 16)
                 physics_enabled = True
                 hierarchical_enabled = False
                 
@@ -2035,13 +2046,13 @@ elif st.session_state.page == "mapa":
                 for node in st.session_state.miro_nodes:
                     node["shape"] = "square"  # Forçar formato quadrado
                 node_size = 25
-                font_size = 14
+                font_size = st.session_state.settings.get("node_font_size", 14)
                 physics_enabled = False
                 hierarchical_enabled = True
                 
             else:  # Mapa 2D
                 node_size = 20
-                font_size = 14
+                font_size = st.session_state.settings.get("node_font_size", 14)
                 physics_enabled = True
                 hierarchical_enabled = True
             
@@ -2076,7 +2087,7 @@ elif st.session_state.page == "mapa":
                     font={"size": 10, "color": "#bfc6cc"}
                 ))
             
-            # Configuração do gráfico
+            # Configuração do gráfico - CORRIGIDA: estabilidade melhorada
             config = Config(
                 width="100%",
                 height=700,
@@ -2087,7 +2098,19 @@ elif st.session_state.page == "mapa":
                 highlightColor="#F8F8F8",
                 collapsible=True,
                 node={"labelProperty": "label"},
-                link={"labelProperty": "label", "renderLabel": True}
+                link={"labelProperty": "label", "renderLabel": True},
+                # Configurações de física otimizadas para estabilidade
+                physics_config={
+                    "barnesHut": {
+                        "gravitationalConstant": -2000,  # Reduzida repulsão
+                        "centralGravity": 0.3,
+                        "springLength": 100,
+                        "springConstant": 0.05,
+                        "damping": 0.09,
+                        "avoidOverlap": 0.5
+                    },
+                    "minVelocity": 0.75
+                } if physics_enabled else None
             )
             
             try:
@@ -2285,18 +2308,16 @@ elif st.session_state.page == "graficos":
         # Inicializar analisador de IA
         analyzer = DataAnalyzer(df)
         
-        # Organização com abas
-        tab_overview, tab_authors, tab_themes, tab_geo, tab_temp, tab_collab, tab_ai = st.tabs([
-            "📊 Visão Geral", "👥 Autores", "🔤 Temas", "🌎 Geográfica", "📅 Temporal", "🤝 Colaboração", "🤖 IA"
+        # Organização com abas - SIMPLIFICADA
+        tab_overview, tab_analysis, tab_ai = st.tabs([
+            "📊 Visão Geral", "🧠 Análise Inteligente", "🤖 IA"
         ])
         
         with tab_overview:
-            # Análise completa automática
-            analysis = analyzer.generate_comprehensive_analysis()
-            st.markdown(analysis)
+            # Análise simplificada - APENAS O ESSENCIAL
+            st.write("### 📊 Resumo da Base de Dados")
             
             # Estatísticas rápidas
-            st.write("#### 📈 Estatísticas da Base")
             col1, col2, col3, col4 = st.columns(4)
             with col1:
                 st.metric("Total de Registros", len(df))
@@ -2308,131 +2329,74 @@ elif st.session_state.page == "graficos":
             with col4:
                 text_cols = df.select_dtypes(include=['object']).columns.tolist()
                 st.metric("Colunas Texto", len(text_cols))
-        
-        with tab_authors:
-            author_analysis = analyzer._author_analysis()
-            st.markdown(author_analysis)
             
-            # Gráfico de autores se disponível
-            author_col = next((col for col in df.columns if any(keyword in col.lower() for keyword in ['autor', 'author'])), None)
-            if author_col:
-                all_authors = []
-                for authors_str in df[author_col].dropna():
-                    if isinstance(authors_str, str):
-                        authors = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
-                        for author in authors:
-                            author_clean = author.strip()
-                            if author_clean and len(author_clean) > 2:
-                                all_authors.append(author_clean)
-                
-                if all_authors:
-                    author_counts = pd.Series(all_authors).value_counts().head(10)
-                    if len(author_counts) > 0:
-                        fig_auth = px.bar(
-                            x=author_counts.values, 
-                            y=author_counts.index,
-                            orientation='h',
-                            title="Principais Autores",
-                            labels={'x': 'Número de Publicações', 'y': 'Autor'}
-                        )
-                        fig_auth.update_layout(
-                            plot_bgcolor="rgba(0,0,0,0)", 
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            font=dict(color="#d6d9dc"),
-                            xaxis=dict(color="#d6d9dc"),
-                            yaxis=dict(color="#d6d9dc")
-                        )
-                        st.plotly_chart(fig_auth, use_container_width=True)
+            # Informações básicas da planilha
+            st.write("#### 📋 Estrutura da Planilha")
+            st.write(f"**Colunas disponíveis:** {', '.join(df.columns.tolist())}")
+            
+            # Verificação de dados essenciais
+            st.write("#### ✅ Verificação de Dados")
+            
+            has_authors = any(col.lower() in ['autor', 'author'] for col in df.columns)
+            has_years = any(col.lower() in ['ano', 'year'] for col in df.columns)
+            has_countries = any(col.lower() in ['país', 'pais', 'country'] for col in df.columns)
+            
+            col_check1, col_check2, col_check3 = st.columns(3)
+            with col_check1:
+                st.write("👥 Autores:", "✅ Disponível" if has_authors else "❌ Faltando")
+            with col_check2:
+                st.write("📅 Anos:", "✅ Disponível" if has_years else "❌ Faltando")
+            with col_check3:
+                st.write("🌎 Países:", "✅ Disponível" if has_countries else "❌ Faltando")
         
-        with tab_themes:
+        with tab_analysis:
+            # Análise inteligente simplificada - REMOVIDAS REDUNDÂNCIAS
+            st.write("### 🧠 Análise Inteligente")
+            
+            # Apenas as análises mais importantes
+            analysis_parts = []
+            
+            # Análise de autores (se disponível)
+            if any(col.lower() in ['autor', 'author'] for col in df.columns):
+                author_analysis = analyzer._author_analysis()
+                # Extrair apenas a parte principal
+                lines = author_analysis.split('\n')
+                main_content = [line for line in lines if not line.startswith('❌') and not line.startswith('⚠️')]
+                analysis_parts.append("### 👥 Autores\n" + '\n'.join(main_content[:10]))  # Limitar conteúdo
+            
+            # Análise temporal (se disponível)
+            if any(col.lower() in ['ano', 'year'] for col in df.columns):
+                temporal_analysis = analyzer._temporal_analysis()
+                lines = temporal_analysis.split('\n')
+                main_content = [line for line in lines if not line.startswith('❌') and not line.startswith('⚠️')]
+                analysis_parts.append("### 📅 Timeline\n" + '\n'.join(main_content[:8]))
+            
+            # Análise geográfica (se disponível)
+            if any(col.lower() in ['país', 'pais', 'country'] for col in df.columns):
+                geo_analysis = analyzer._geographic_analysis()
+                lines = geo_analysis.split('\n')
+                main_content = [line for line in lines if not line.startswith('❌') and not line.startswith('⚠️')]
+                analysis_parts.append("### 🌎 Geografia\n" + '\n'.join(main_content[:8]))
+            
+            # Análise de temas (sempre disponível)
             thematic_analysis = analyzer._thematic_analysis()
-            st.markdown(thematic_analysis)
+            lines = thematic_analysis.split('\n')
+            main_content = [line for line in lines if not line.startswith('❌') and not line.startswith('⚠️')]
+            analysis_parts.append("### 🔤 Temas\n" + '\n'.join(main_content[:8]))
             
-            # Gráfico de temas
-            texto_completo = ""
-            text_cols = [col for col in df.columns if df[col].dtype == 'object']
-            for col in text_cols[:3]:
-                texto_completo += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
+            # Exibir análises
+            for analysis_part in analysis_parts:
+                st.markdown(analysis_part)
+                st.markdown("---")
             
-            if texto_completo.strip():
-                palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
-                stop_words = set(PORTUGUESE_STOP_WORDS)
-                palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
-                
-                if palavras_filtradas:
-                    temas = pd.Series(palavras_filtradas).value_counts().head(15)
-                    if len(temas) > 0:
-                        fig_temas = px.bar(
-                            x=temas.values,
-                            y=temas.index,
-                            orientation='h',
-                            title="Palavras-chave Mais Frequentes",
-                            labels={'x': 'Frequência', 'y': 'Palavra'}
-                        )
-                        fig_temas.update_layout(
-                            plot_bgcolor="rgba(0,0,0,0)", 
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            font=dict(color="#d6d9dc"),
-                            xaxis=dict(color="#d6d9dc"),
-                            yaxis=dict(color="#d6d9dc")
-                        )
-                        st.plotly_chart(fig_temas, use_container_width=True)
-        
-        with tab_geo:
-            geographic_analysis = analyzer._geographic_analysis()
-            st.markdown(geographic_analysis)
-            
-            # Gráfico geográfico
-            country_col = next((col for col in df.columns if any(keyword in col.lower() for keyword in ['país', 'pais', 'country'])), None)
-            if country_col:
-                countries = df[country_col].dropna()
-                if not countries.empty:
-                    country_counts = countries.value_counts()
-                    if len(country_counts) > 0:
-                        fig_geo = px.pie(
-                            values=country_counts.values, 
-                            names=country_counts.index,
-                            title="Distribuição Geográfica"
-                        )
-                        fig_geo.update_layout(
-                            plot_bgcolor="rgba(0,0,0,0)", 
-                            paper_bgcolor="rgba(0,0,0,0)",
-                            font=dict(color="#d6d9dc")
-                        )
-                        st.plotly_chart(fig_geo, use_container_width=True)
-        
-        with tab_temp:
-            temporal_analysis = analyzer._temporal_analysis()
-            st.markdown(temporal_analysis)
-            
-            # Gráfico temporal
-            year_col = next((col for col in df.columns if any(keyword in col.lower() for keyword in ['ano', 'year'])), None)
-            if year_col:
-                try:
-                    years = pd.to_numeric(df[year_col], errors='coerce').dropna()
-                except:
-                    years = pd.Series(dtype=float)
-                    
-                if not years.empty and len(years.unique()) > 1:
-                    year_counts = years.value_counts().sort_index()
-                    fig_temp = px.line(
-                        x=year_counts.index, 
-                        y=year_counts.values,
-                        title="Publicações por Ano",
-                        labels={'x': 'Ano', 'y': 'Número de Publicações'}
-                    )
-                    fig_temp.update_layout(
-                        plot_bgcolor="rgba(0,0,0,0)", 
-                        paper_bgcolor="rgba(0,0,0,0)",
-                        font=dict(color="#d6d9dc"),
-                        xaxis=dict(color="#d6d9dc"),
-                        yaxis=dict(color="#d6d9dc")
-                    )
-                    st.plotly_chart(fig_temp, use_container_width=True)
-        
-        with tab_collab:
-            collaboration_analysis = analyzer._collaboration_analysis()
-            st.markdown(collaboration_analysis)
+            # Sugestões finais
+            st.write("### 💡 Próximos Passos")
+            if len(df) < 20:
+                st.info("**Expanda sua base**: Adicione mais registros para análises mais confiáveis.")
+            elif len(df) < 50:
+                st.success("**Boa base em desenvolvimento**: Continue expandindo e complete os metadados.")
+            else:
+                st.success("**Base sólida**: Excelente para análises detalhadas e estudos avançados.")
         
         with tab_ai:
             # Assistente de IA MELHORADO
@@ -2777,3 +2741,176 @@ elif st.session_state.page == "mensagens":
                 body = st.text_area("Mensagem:", height=200, value=default_body)
                 attachment = st.file_uploader("Anexo (opcional)", type=['pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx'])
             
+            col_send, col_cancel = st.columns(2)
+            with col_send:
+                if st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True):
+                    if not to_user:
+                        st.error("Selecione um destinatário.")
+                    elif not subject.strip():
+                        st.error("Digite um assunto.")
+                    elif not body.strip():
+                        st.error("Digite uma mensagem.")
+                    else:
+                        send_message(USERNAME, to_user, subject.strip(), body.strip(), attachment)
+                        st.session_state.reply_message_id = None
+                        st.session_state.compose_open = False
+                        st.success("Mensagem enviada!")
+                        time.sleep(1); safe_rerun()
+            with col_cancel:
+                if st.form_submit_button("❌ Cancelar", type="secondary", use_container_width=True):
+                    st.session_state.reply_message_id = None
+                    st.session_state.compose_open = False
+                    safe_rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# -------------------------
+# Page: configurações - ADICIONADO CONTROLE DE FONTE
+# -------------------------
+elif st.session_state.page == "config":
+    st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.subheader("⚙️ Configurações")
+    
+    # Configurações de fonte - NOVO
+    st.markdown('<div class="font-config">', unsafe_allow_html=True)
+    st.write("### 👁️ Configurações de Visualização")
+    
+    col_font1, col_font2 = st.columns(2)
+    
+    with col_font1:
+        # Tamanho da fonte geral
+        font_size = st.slider(
+            "Tamanho da Fonte Geral",
+            min_value=8,
+            max_value=32,
+            value=st.session_state.settings.get("font_size", 14),
+            key="config_font_size",
+            help="Ajusta o tamanho do texto em toda a aplicação"
+        )
+        
+        # Tamanho da fonte dos nós do mapa mental
+        node_font_size = st.slider(
+            "Tamanho da Fonte dos Nós",
+            min_value=8,
+            max_value=24,
+            value=st.session_state.settings.get("node_font_size", 14),
+            key="config_node_font_size",
+            help="Ajusta o tamanho do texto nos nós do mapa mental"
+        )
+    
+    with col_font2:
+        # Escala geral da fonte
+        font_scale = st.slider(
+            "Escala Geral da Fonte (%)",
+            min_value=50,
+            max_value=150,
+            value=int(st.session_state.settings.get("font_scale", 1.0) * 100),
+            key="config_font_scale",
+            help="Ajusta a escala geral de todos os textos"
+        )
+        
+        # Altura dos gráficos
+        plot_height = st.slider(
+            "Altura dos Gráficos",
+            min_value=400,
+            max_value=1200,
+            value=st.session_state.settings.get("plot_height", 720),
+            key="config_plot_height",
+            help="Altura dos gráficos e visualizações"
+        )
+    
+    # Aplicar configurações
+    if st.button("💾 Aplicar Configurações", use_container_width=True):
+        st.session_state.settings.update({
+            "font_size": font_size,
+            "node_font_size": node_font_size,
+            "font_scale": font_scale / 100.0,
+            "plot_height": plot_height
+        })
+        
+        # Aplicar CSS imediatamente
+        apply_global_styles(font_scale / 100.0)
+        
+        st.success("Configurações aplicadas com sucesso!")
+        if save_user_state_minimal(USER_STATE):
+            st.toast("Configurações salvas permanentemente.")
+        safe_rerun()
+    
+    st.markdown('</div>', unsafe_allow_html=True)
+    
+    # Visualização de prévia
+    st.markdown("---")
+    st.write("### 👀 Prévia do Texto")
+    
+    col_preview1, col_preview2 = st.columns(2)
+    
+    with col_preview1:
+        st.markdown(f"""
+        <div style='font-size: {font_size}px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px;'>
+            <h3 style='font-size: {font_size + 4}px;'>Texto de Exemplo</h3>
+            <p>Este é um exemplo de texto com o tamanho de fonte selecionado.</p>
+            <p style='font-size: {font_size - 2}px;'>Texto menor para referência.</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    with col_preview2:
+        st.markdown(f"""
+        <div style='font-size: {node_font_size}px; padding: 15px; background: rgba(78, 205, 196, 0.1); border-radius: 8px; border-left: 4px solid #4ECDC4;'>
+            <strong>💡 Nó do Mapa Mental</strong>
+            <p style='margin: 5px 0 0 0;'>Texto do nó com tamanho selecionado</p>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    # Configurações de backup
+    st.markdown("---")
+    st.write("### 💾 Backup e Dados")
+    
+    col_data1, col_data2 = st.columns(2)
+    
+    with col_data1:
+        if st.button("🗑️ Limpar Todos os Dados", type="secondary", use_container_width=True):
+            if st.checkbox("Confirmar limpeza completa de TODOS os dados?"):
+                try:
+                    # Limpar dados da sessão
+                    for key in list(st.session_state.keys()):
+                        if key not in ['authenticated', 'username', 'user_obj']:
+                            del st.session_state[key]
+                    
+                    # Limpar arquivos de estado
+                    if USER_STATE.exists():
+                        USER_STATE.unlink()
+                    
+                    st.success("Dados locais limpos com sucesso!")
+                    safe_rerun()
+                except Exception as e:
+                    st.error(f"Erro ao limpar dados: {e}")
+    
+    with col_data2:
+        if st.button("📥 Exportar Configurações", use_container_width=True):
+            settings_data = {
+                "user": USERNAME,
+                "exported_at": datetime.now().isoformat(),
+                "settings": st.session_state.settings,
+                "favorites_count": len(get_session_favorites()),
+                "tutorial_completed": st.session_state.get("tutorial_completed", False)
+            }
+            
+            settings_json = json.dumps(settings_data, ensure_ascii=False, indent=2)
+            st.download_button(
+                "⬇️ Baixar Configurações",
+                data=settings_json,
+                file_name=f"nugep_config_{USERNAME}_{int(time.time())}.json",
+                mime="application/json"
+            )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# -------------------------
+# Auto-save final
+# -------------------------
+if st.session_state.autosave and st.session_state.authenticated:
+    try:
+        save_user_state_minimal(USER_STATE)
+    except Exception:
+        pass
+        
