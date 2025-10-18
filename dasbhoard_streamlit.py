@@ -34,10 +34,14 @@ try:
     import joblib
     from sklearn.feature_extraction.text import TfidfVectorizer
     from sklearn.metrics.pairwise import cosine_similarity
+    from sklearn.cluster import KMeans
+    from sklearn.decomposition import LatentDirichletAllocation
 except Exception:
     joblib = None
     TfidfVectorizer = None
     cosine_similarity = None
+    KMeans = None
+    LatentDirichletAllocation = None
 
 # bcrypt for password hashing (optional)
 try:
@@ -397,7 +401,7 @@ def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
         for part in parts:
             if not part: continue
             if part.startswith("==") and part.endswith("=="):
-                inner = part[2:-2].replace("—", "-").replace("–", "-").encode("latin-1", "replace").decode("latin-1")
+                inner = part[2:-2].replace("—", "-").replace("—", "-").encode("latin-1", "replace").decode("latin-1")
                 hexv = (highlight_hex or "#ffd600").lstrip("#")
                 if len(hexv) == 3: hexv = ''.join([c*2 for c in hexv])
                 try: r, g, b = int(hexv[0:2], 16), int(hexv[2:4], 16), int(hexv[4:6], 16)
@@ -406,7 +410,7 @@ def generate_pdf_with_highlights(texto, highlight_hex="#ffd600"):
                 pdf.set_text_color(0, 0, 0)
                 pdf.multi_cell(0, 6, txt=inner, border=0, fill=True)
             else:
-                safe_part = part.replace("—", "-").replace("–", "-").encode("latin-1", "replace").decode("latin-1")
+                safe_part = part.replace("—", "-").replace("—", "-").encode("latin-1", "replace").decode("latin-1")
                 pdf.set_text_color(0, 0, 0)
                 pdf.multi_cell(0, 6, txt=safe_part, border=0)
     return pdf.output(dest="S").encode("latin-1")
@@ -1232,310 +1236,304 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa (força texto branco) - COM EDIÇÃO DE NÓS RENOMEAR/EXCLUIR NO PAINEL
+# Page: mapa mental - NOVO DESIGN EDITÁVEL
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🗺️ Mapa Mental & Fluxograma")
-    st.info("Crie e edite mapas mentais interativos. Use para organizar ideias, planejar projetos e visualizar relações entre conceitos.")
+    st.subheader("🗺️ Mapa Mental & Fluxograma Interativo")
+    st.info("Crie e edite mapas mentais interativos. Clique nos nós para editar diretamente na visualização.")
 
+    # Inicializar grafo se não existir
     if 'mapa_G' not in st.session_state:
         st.session_state.mapa_G = nx.DiGraph()
+        # Adicionar nó raiz inicial
+        st.session_state.mapa_G.add_node("raiz", label="Ideia Principal", tipo="Raiz", descricao="Descreva sua ideia principal aqui")
 
     G = st.session_state.mapa_G
 
-    if not G.nodes():
-        default_nodes = {
-            "ALTO": {"label": "🟢 ALTO", "tipo": "Categoria"},
-            "MÉDIO-ALTO": {"label": "🟡 MÉDIO-ALTO", "tipo": "Categoria"},
-            "MÉDIO": {"label": "🟠 MÉDIO", "tipo": "Categoria"},
-            "Open Access": {"label": "Open Access Massivo", "tipo": "Item"},
-            "IA Curadoria": {"label": "IA para curadoria", "tipo": "Item"},
-            "Ferramentas Interativas": {"label": "Ferramentas interativas", "tipo": "Item"},
-            "Foco Educacional": {"label": "Foco educacional", "tipo": "Item"},
-            "Digitalização Técnica": {"label": "Digitalização técnica", "tipo": "Item"},
-            "Projetos VR": {"label": "Projetos de VR", "tipo": "Item"},
-            "Falta Transparência": {"label": "Falta de transparência", "tipo": "Item"},
-        }
-        for node_id, attrs in default_nodes.items():
-            G.add_node(node_id, **attrs)
+    # Sidebar para operações principais
+    with st.sidebar:
+        st.subheader("🎯 Operações do Mapa")
         
-        default_edges = [
-            ("ALTO", "Open Access"), ("ALTO", "IA Curadoria"), ("ALTO", "Ferramentas Interativas"),
-            ("MÉDIO-ALTO", "Foco Educacional"), ("MÉDIO-ALTO", "Digitalização Técnica"),
-            ("MÉDIO", "Projetos VR"), ("MÉDIO", "Falta Transparência")
-        ]
-        G.add_edges_from(default_edges)
-        st.session_state.mapa_G = G  
-
-    with st.expander("Opções e Edição do Mapa", expanded=True):
-        edit_c1, edit_c2 = st.columns(2)
-        with edit_c1:
-            with st.form("create_node_form", clear_on_submit=True):
-                st.write("**1. Criar Novo Nó**")
-                new_node_label = st.text_input("Rótulo do nó")
-                new_node_id = st.text_input("ID único (sem espaços)")
-                new_node_type = st.selectbox("Tipo do nó", options=["Categoria", "Item"])
-                if st.form_submit_button("➕ Criar Nó"):
-                    if new_node_label and new_node_id and new_node_type:
-                        if new_node_id not in G:
-                            G.add_node(new_node_id, label=new_node_label, tipo=new_node_type)
-                            st.success(f"Nó '{new_node_label}' criado!")
+        with st.expander("➕ Adicionar Nó", expanded=True):
+            with st.form("add_node_form"):
+                st.write("Criar novo nó:")
+                parent_node = st.selectbox("Conectar ao nó:", options=list(G.nodes()), key="parent_node_select")
+                new_node_label = st.text_input("Título do nó:", placeholder="Ex: Pesquisa Qualitativa")
+                new_node_desc = st.text_area("Descrição:", placeholder="Detalhes sobre este nó...", height=100)
+                node_type = st.selectbox("Tipo:", options=["Ideia", "Tarefa", "Pergunta", "Recurso", "Resultado"])
+                col1, col2 = st.columns(2)
+                with col1:
+                    if st.form_submit_button("✅ Adicionar"):
+                        if new_node_label:
+                            node_id = f"node_{int(time.time())}_{random.randint(1000,9999)}"
+                            G.add_node(node_id, label=new_node_label, tipo=node_type, descricao=new_node_desc)
+                            if parent_node:
+                                G.add_edge(parent_node, node_id)
                             st.session_state.mapa_G = G
-                            time.sleep(0.5); safe_rerun()
-                        else: st.warning("Este ID de nó já existe.")
-                    else: st.warning("Preencha todos os campos.")
-        with edit_c2:
-            with st.form("connect_nodes_form", clear_on_submit=True):
-                st.write("**2. Conectar Nós**")
-                nodes_list = list(G.nodes())
-                node1 = st.selectbox("De:", options=[""] + nodes_list, key=f"connect1_{USERNAME}")
-                node2 = st.selectbox("Para:", options=[""] + nodes_list, key=f"connect2_{USERNAME}")
+                            st.session_state.selected_node = node_id
+                            st.success("Nó adicionado!")
+                            safe_rerun()
+                with col2:
+                    if st.form_submit_button("❌ Cancelar"):
+                        pass
+
+        with st.expander("🔗 Conectar Nós", expanded=False):
+            with st.form("connect_nodes_form"):
+                st.write("Conectar nós existentes:")
+                available_nodes = list(G.nodes())
+                source_node = st.selectbox("De:", options=available_nodes, key="source_node")
+                target_node = st.selectbox("Para:", options=[n for n in available_nodes if n != source_node], key="target_node")
                 if st.form_submit_button("🔗 Conectar"):
-                    if node1 and node2 and node1 != node2:
-                        if not G.has_edge(node1, node2):
-                           G.add_edge(node1, node2)
-                           st.success("Nós conectados.")
-                           st.session_state.mapa_G = G
-                           time.sleep(0.5); safe_rerun()
-                        else: st.info("Esses nós já estão conectados.")
-                    else: st.warning("Selecione dois nós diferentes.")
-
-        st.markdown("---")
-        st.write("**Edição Rápida dos Nós**")
-        
-        # Mostrar lista de nós com controle de renomear/excluir direto
-        nodes_list = list(G.nodes())
-        if nodes_list:
-            st.write(f"Total de {len(nodes_list)} nós no mapa:")
-            for nid in nodes_list:
-                nlabel = G.nodes[nid].get('label', nid)
-                ntipo = G.nodes[nid].get('tipo', 'Item')
-                
-                col_a, col_b, col_c = st.columns([4, 2, 1])
-                with col_a:
-                    new_label = st.text_input(f"Rótulo ({nid})", value=nlabel, key=f"edit_label_{nid}")
-                with col_b:
-                    # Atualizar tipo
-                    new_tipo = st.selectbox(f"Tipo", options=["Categoria", "Item"], 
-                                          index=0 if ntipo == "Categoria" else 1, 
-                                          key=f"edit_tipo_{nid}")
-                    if new_tipo != ntipo:
-                        G.nodes[nid]['tipo'] = new_tipo
+                    if not G.has_edge(source_node, target_node):
+                        G.add_edge(source_node, target_node)
                         st.session_state.mapa_G = G
-                        st.toast(f"Tipo do nó '{nid}' atualizado.")
-                with col_c:
-                    if st.button("🗑️", key=f"btn_del_{nid}", help=f"Excluir nó {nid}"):
-                        try:
-                            G.remove_node(nid)
-                            st.session_state.mapa_G = G
-                            if st.session_state.get("selected_node") == nid:
-                                st.session_state.selected_node = None
-                            st.toast(f"Nó '{nid}' excluído.")
-                            time.sleep(0.5); safe_rerun()
-                        except Exception as e:
-                            st.error(f"Erro ao excluir nó: {e}")
-                
-                # Botão de renomear separado
-                if st.button("✏️ Renomear", key=f"btn_rename_{nid}", use_container_width=True):
-                    if new_label.strip():
-                        G.nodes[nid]['label'] = new_label.strip()
-                        st.session_state.mapa_G = G
-                        st.toast(f"Nó renomeado para '{new_label}'.")
-                        time.sleep(0.5); safe_rerun()
+                        st.success("Nós conectados!")
+                        safe_rerun()
                     else:
-                        st.warning("O rótulo não pode ser vazio.")
+                        st.info("Esses nós já estão conectados.")
+
+        with st.expander("🎨 Configurações", expanded=False):
+            layout_type = st.selectbox("Layout:", options=["Hierárquico", "Circular", "Spring"])
+            show_labels = st.checkbox("Mostrar labels", value=True)
+            st.markdown("---")
+            if st.button("🗑️ Limpar Mapa", type="secondary"):
+                if st.checkbox("Confirmar limpeza do mapa?"):
+                    st.session_state.mapa_G = nx.DiGraph()
+                    st.session_state.mapa_G.add_node("raiz", label="Ideia Principal", tipo="Raiz", descricao="Descreva sua ideia principal aqui")
+                    st.session_state.selected_node = "raiz"
+                    st.success("Mapa limpo!")
+                    safe_rerun()
+
+    # Área principal do mapa
+    col1, col2 = st.columns([2, 1])
+    
+    with col1:
+        st.subheader("📊 Visualização do Mapa")
+        
+        if G.nodes():
+            # Preparar nós para visualização
+            nodes = []
+            for node_id, data in G.nodes(data=True):
+                # Definir cores por tipo
+                color_map = {
+                    "Raiz": "#FF6B6B",
+                    "Ideia": "#4ECDC4", 
+                    "Tarefa": "#45B7D1",
+                    "Pergunta": "#96CEB4",
+                    "Recurso": "#FECA57",
+                    "Resultado": "#FF9FF3"
+                }
                 
-                st.markdown("---")
-        else:
-            st.info("Nenhum nó para editar.")
+                node_color = color_map.get(data.get('tipo', 'Ideia'), "#4ECDC4")
+                
+                node_args = {
+                    'id': node_id,
+                    'label': data.get('label', node_id),
+                    'color': node_color,
+                    'font': {'color': '#FFFFFF', 'size': 14, 'face': 'Arial'},
+                    'size': 25,
+                    'shape': 'dot'
+                }
+                nodes.append(Node(**node_args))
 
-        st.markdown("---")
-        st.write("**3. Baixar Mapa (PNG)**")
+            edges = [Edge(source=u, target=v, color='#B0B0B0', width=2) for u, v in G.edges()]
+            
+            config = Config(
+                width="100%", 
+                height=600, 
+                directed=True, 
+                physics=True,
+                hierarchical=False if layout_type == "Spring" else True,
+                node_highlight_behavior=True,
+                highlight_color="#F8F8F8",
+                collapsible=True,
+                node={'labelProperty': 'label'},
+                link={'labelProperty': 'label', 'renderLabel': True}
+            )
 
-        # Função para exportar o mapa como PNG (em memória)
-        def export_map_to_png_bytes(G):
-            fig = plt.figure(figsize=(14, 10), dpi=200)
             try:
-                pos = nx.spring_layout(G, k=1.5, iterations=100)
-            except Exception:
-                pos = nx.spring_layout(G)
-
-            # Cores diferentes para categorias e itens
-            node_colors = []
-            node_sizes = []
-            for node in G.nodes():
-                if G.nodes[node].get('tipo') == 'Categoria':
-                    node_colors.append('#FF6B6B')  # Vermelho para categorias
-                    node_sizes.append(3000)
-                else:
-                    node_colors.append('#4ECDC4')  # Verde para itens
-                    node_sizes.append(2000)
-
-            nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=node_sizes, 
-                                 alpha=0.95, edgecolors='white', linewidths=2)
-            
-            nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, 
-                                 arrowsize=25, width=2, connectionstyle='arc3,rad=0.1')
-
-            # Labels com quebra de linha
-            labels = {}
-            for node in G.nodes():
-                label = G.nodes[node].get('label', node)
-                # Quebra de linha automática para labels longos
-                if len(label) > 15:
-                    words = label.split()
-                    lines = []
-                    current_line = []
-                    for word in words:
-                        if len(' '.join(current_line + [word])) <= 15:
-                            current_line.append(word)
-                        else:
-                            if current_line:
-                                lines.append(' '.join(current_line))
-                            current_line = [word]
-                    if current_line:
-                        lines.append(' '.join(current_line))
-                    label = '\n'.join(lines)
-                labels[node] = label
-
-            nx.draw_networkx_labels(G, pos, labels=labels, font_size=8, 
-                                  font_color='white', font_weight='bold')
-
-            plt.title("Mapa Mental", color='white', fontsize=16, pad=20)
-            plt.axis('off')
-            plt.tight_layout()
-            buf = io.BytesIO()
-            fig.patch.set_facecolor('#0E192A')
-            plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
-                       facecolor=fig.get_facecolor(), transparent=False)
-            plt.close(fig)
-            buf.seek(0)
-            return buf.getvalue()
-
-        try:
-            png_bytes = export_map_to_png_bytes(G)
-            st.download_button(
-                label="⬇️ Baixar Mapa como PNG",
-                data=png_bytes,
-                file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.png",
-                mime="image/png",
-                use_container_width=True,
-                help="Salva uma imagem PNG do mapa mental."
-            )
-        except Exception as e:
-            st.error(f"Não foi possível gerar a imagem PNG: {e}")
-
-    # Visualização interativa
-    if G.nodes():
-        nodes = []
-        for node_id, data in G.nodes(data=True):
-            node_args = {
-                'id': node_id,
-                'label': data.get('label', node_id),
-                'color': '#FF6B6B' if data.get('tipo') == 'Categoria' else '#4ECDC4',
-                'font': {'color': '#FFFFFF', 'size': 16, 'face': 'Arial'},
-                'size': 25 if data.get('tipo') == 'Categoria' else 20
-            }
-            nodes.append(Node(**node_args))
-
-        edges = [Edge(source=u, target=v, color='#B0B0B0', width=2) for u, v in G.edges()]
-        
-        config = Config(
-            width="100%", 
-            height=780, 
-            directed=True, 
-            physics=True,
-            hierarchical=False,
-            node_highlight_behavior=True,
-            highlight_color="#F8F8F8",
-            collapsible=True,
-            node={'labelProperty': 'label'},
-            link={'labelProperty': 'label', 'renderLabel': True}
-        )
-
-        try:
-            clicked_node_id = agraph(nodes=nodes, edges=edges, config=config)
-            if clicked_node_id: 
-                st.session_state.selected_node = clicked_node_id
-        except Exception as e:
-            st.warning(f"Erro na visualização interativa: {e}")
-            # Fallback para visualização estática
-            st.info("Visualização interativa temporariamente indisponível. Use o download PNG.")
-    else:
-        st.warning("O mapa está vazio. Adicione alguns nós para começar.")
-
-    selected_node_name = st.session_state.get("selected_node")
-    if selected_node_name and selected_node_name in G:
-        node_data = G.nodes[selected_node_name]
-        st.markdown("---")
-        st.subheader(f"🔍 Nó Selecionado: {node_data.get('label', selected_node_name)}")
-        
-        # Painel de informações do nó
-        col1, col2 = st.columns(2)
-        with col1:
-            st.markdown(f"**ID:** `{selected_node_name}`")
-            st.markdown(f"**Tipo:** {escape_html(node_data.get('tipo', 'N/A'))}")
-        with col2:
-            # Conexões
-            in_connections = list(G.predecessors(selected_node_name))
-            out_connections = list(G.successors(selected_node_name))
-            st.markdown(f"**Conexões de entrada:** {len(in_connections)}")
-            st.markdown(f"**Conexões de saída:** {len(out_connections)}")
-
-        st.markdown("---")
-        
-        # Formulário para edição avançada
-        with st.form(f"edit_node_{selected_node_name}"):
-            st.write("**Editar Nó**")
-            new_label = st.text_input(
-                "Novo Rótulo:", 
-                value=node_data.get('label', selected_node_name), 
-                key=f"rename_{selected_node_name}"
-            )
-            new_tipo = st.selectbox(
-                "Novo Tipo:",
-                options=["Categoria", "Item"],
-                index=0 if node_data.get('tipo') == "Categoria" else 1,
-                key=f"tipo_{selected_node_name}"
-            )
-            
-            col_edit1, col_edit2 = st.columns(2)
-            with col_edit1:
-                if st.form_submit_button("💾 Atualizar Nó", use_container_width=True):
-                    if new_label.strip():
-                        G.nodes[selected_node_name]['label'] = new_label.strip()
-                        G.nodes[selected_node_name]['tipo'] = new_tipo
-                        st.session_state.mapa_G = G
-                        st.toast("Nó atualizado com sucesso!")
-                        time.sleep(1); safe_rerun()
-                    else:
-                        st.warning("O rótulo não pode ser vazio.")
-            
-            with col_edit2:
-                if st.form_submit_button("🗑️ Excluir Nó", use_container_width=True):
-                    G.remove_node(selected_node_name)
-                    st.session_state.selected_node = None
-                    st.session_state.mapa_G = G
-                    st.toast(f"Nó '{selected_node_name}' removido.")
-                    time.sleep(1); safe_rerun()
-
-        # Mostrar conexões
-        if in_connections or out_connections:
-            st.write("**Conexões:**")
-            col_conn1, col_conn2 = st.columns(2)
-            with col_conn1:
-                if in_connections:
-                    st.write("**Entrada de:**")
-                    for neighbor in sorted(in_connections):
-                        st.markdown(f"- {G.nodes[neighbor].get('label', neighbor)}")
-            with col_conn2:
-                if out_connections:
-                    st.write("**Saída para:**")
-                    for neighbor in sorted(out_connections):
-                        st.markdown(f"- {G.nodes[neighbor].get('label', neighbor)}")
+                clicked_node_id = agraph(nodes=nodes, edges=edges, config=config)
+                if clicked_node_id: 
+                    st.session_state.selected_node = clicked_node_id
+                    safe_rerun()
+            except Exception as e:
+                st.warning(f"Erro na visualização interativa: {e}")
         else:
-            st.write("Este nó não possui conexões.")
+            st.info("O mapa está vazio. Adicione alguns nós para começar.")
+
+    with col2:
+        st.subheader("✏️ Editor de Nó")
+        
+        selected_node = st.session_state.get("selected_node")
+        if selected_node and selected_node in G:
+            node_data = G.nodes[selected_node]
+            
+            with st.form(f"edit_node_{selected_node}"):
+                st.write(f"**Editando:** {node_data.get('label', selected_node)}")
+                
+                new_label = st.text_input("Título:", value=node_data.get('label', ''), key=f"label_{selected_node}")
+                new_type = st.selectbox("Tipo:", options=["Raiz", "Ideia", "Tarefa", "Pergunta", "Recurso", "Resultado"], 
+                                      index=["Raiz", "Ideia", "Tarefa", "Pergunta", "Recurso", "Resultado"].index(node_data.get('tipo', 'Ideia')),
+                                      key=f"type_{selected_node}")
+                new_desc = st.text_area("Descrição:", value=node_data.get('descricao', ''), height=150, key=f"desc_{selected_node}")
+                
+                col_edit1, col_edit2 = st.columns(2)
+                with col_edit1:
+                    if st.form_submit_button("💾 Salvar Alterações", use_container_width=True):
+                        if new_label.strip():
+                            G.nodes[selected_node]['label'] = new_label.strip()
+                            G.nodes[selected_node]['tipo'] = new_type
+                            G.nodes[selected_node]['descricao'] = new_desc
+                            st.session_state.mapa_G = G
+                            st.success("Nó atualizado!")
+                            safe_rerun()
+                        else:
+                            st.warning("O título não pode ser vazio.")
+                
+                with col_edit2:
+                    if st.form_submit_button("🗑️ Excluir Nó", type="secondary", use_container_width=True):
+                        if len(G.nodes()) > 1:
+                            G.remove_node(selected_node)
+                            remaining_nodes = list(G.nodes())
+                            st.session_state.selected_node = remaining_nodes[0] if remaining_nodes else None
+                            st.session_state.mapa_G = G
+                            st.success("Nó excluído!")
+                            safe_rerun()
+                        else:
+                            st.warning("Não é possível excluir o último nó.")
+
+            # Mostrar conexões
+            st.markdown("---")
+            st.write("**🔗 Conexões:**")
+            
+            in_connections = list(G.predecessors(selected_node))
+            out_connections = list(G.successors(selected_node))
+            
+            if in_connections:
+                st.write("**Recebe de:**")
+                for conn in in_connections:
+                    conn_label = G.nodes[conn].get('label', conn)
+                    col_conn1, col_conn2 = st.columns([3, 1])
+                    with col_conn1:
+                        st.write(f"• {conn_label}")
+                    with col_conn2:
+                        if st.button("🗑️", key=f"rm_in_{conn}_{selected_node}"):
+                            G.remove_edge(conn, selected_node)
+                            st.session_state.mapa_G = G
+                            safe_rerun()
+            
+            if out_connections:
+                st.write("**Conecta para:**")
+                for conn in out_connections:
+                    conn_label = G.nodes[conn].get('label', conn)
+                    col_conn1, col_conn2 = st.columns([3, 1])
+                    with col_conn1:
+                        st.write(f"• {conn_label}")
+                    with col_conn2:
+                        if st.button("🗑️", key=f"rm_out_{selected_node}_{conn}"):
+                            G.remove_edge(selected_node, conn)
+                            st.session_state.mapa_G = G
+                            safe_rerun()
+            
+            if not in_connections and not out_connections:
+                st.info("Este nó não possui conexões.")
+        else:
+            st.info("Selecione um nó no mapa para editar.")
+
+    # Exportação do mapa
+    st.markdown("---")
+    st.subheader("📤 Exportar Mapa")
+    
+    col_exp1, col_exp2 = st.columns(2)
+    with col_exp1:
+        # Exportar como JSON
+        if st.button("💾 Exportar como JSON", use_container_width=True):
+            graph_data = {
+                "nodes": {node: dict(data) for node, data in G.nodes(data=True)},
+                "edges": list(G.edges())
+            }
+            json_str = json.dumps(graph_data, ensure_ascii=False, indent=2)
+            st.download_button(
+                "⬇️ Baixar JSON",
+                data=json_str,
+                file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.json",
+                mime="application/json"
+            )
+    
+    with col_exp2:
+        # Exportar como PNG
+        if st.button("🖼️ Exportar como PNG", use_container_width=True):
+            def export_map_to_png_bytes(G):
+                fig = plt.figure(figsize=(16, 12), dpi=200)
+                try:
+                    pos = nx.spring_layout(G, k=2, iterations=100)
+                except Exception:
+                    pos = nx.spring_layout(G)
+
+                # Cores por tipo
+                color_map = {
+                    "Raiz": "#FF6B6B",
+                    "Ideia": "#4ECDC4", 
+                    "Tarefa": "#45B7D1",
+                    "Pergunta": "#96CEB4",
+                    "Recurso": "#FECA57",
+                    "Resultado": "#FF9FF3"
+                }
+                
+                node_colors = [color_map.get(G.nodes[node].get('tipo', 'Ideia'), "#4ECDC4") for node in G.nodes()]
+                node_sizes = [3000 if G.nodes[node].get('tipo') == 'Raiz' else 2000 for node in G.nodes()]
+
+                nx.draw_networkx_nodes(G, pos, node_color=node_colors, node_size=node_sizes, 
+                                     alpha=0.95, edgecolors='white', linewidths=2)
+                
+                nx.draw_networkx_edges(G, pos, edge_color='gray', arrows=True, 
+                                     arrowsize=25, width=2, connectionstyle='arc3,rad=0.1')
+
+                # Labels com quebra de linha
+                labels = {}
+                for node in G.nodes():
+                    label = G.nodes[node].get('label', node)
+                    if len(label) > 20:
+                        words = label.split()
+                        lines = []
+                        current_line = []
+                        for word in words:
+                            if len(' '.join(current_line + [word])) <= 20:
+                                current_line.append(word)
+                            else:
+                                if current_line:
+                                    lines.append(' '.join(current_line))
+                                current_line = [word]
+                        if current_line:
+                            lines.append(' '.join(current_line))
+                        label = '\n'.join(lines)
+                    labels[node] = label
+
+                nx.draw_networkx_labels(G, pos, labels=labels, font_size=8, 
+                                      font_color='white', font_weight='bold')
+
+                plt.title("Mapa Mental", color='white', fontsize=16, pad=20)
+                plt.axis('off')
+                plt.tight_layout()
+                buf = io.BytesIO()
+                fig.patch.set_facecolor('#0E192A')
+                plt.savefig(buf, format='png', dpi=300, bbox_inches='tight', 
+                           facecolor=fig.get_facecolor(), transparent=False)
+                plt.close(fig)
+                buf.seek(0)
+                return buf.getvalue()
+
+            try:
+                png_bytes = export_map_to_png_bytes(G)
+                st.download_button(
+                    "⬇️ Baixar PNG",
+                    data=png_bytes,
+                    file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.png",
+                    mime="image/png"
+                )
+            except Exception as e:
+                st.error(f"Erro ao gerar imagem: {e}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1553,7 +1551,7 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos (MELHORIA: Análise Inteligente)
+# Page: graficos - ANÁLISE INTELIGENTE MELHORADA
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1564,8 +1562,8 @@ elif st.session_state.page == "graficos":
     else:
         df = st.session_state.df.copy()
         
-        # Análise Inteligente Automática
-        st.write("### 📈 Análise Automática dos Dados")
+        # ANÁLISE INTELIGENTE MELHORADA
+        st.write("### 🧠 Resumo Inteligente da Sua Pesquisa")
         
         # Estatísticas básicas
         col1, col2, col3, col4 = st.columns(4)
@@ -1580,71 +1578,137 @@ elif st.session_state.page == "graficos":
             categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
             st.metric("Colunas Texto", len(categorical_cols))
         
-        # Insights automáticos
-        st.write("### 💡 Insights dos Dados")
+        # Análise de autores (se existir coluna de autores)
+        autores_col = None
+        for col in ['autor', 'autores', 'author', 'authors']:
+            if col in df.columns:
+                autores_col = col
+                break
         
-        # Análise de colunas numéricas
-        if numeric_cols:
-            insights = []
+        if autores_col:
+            st.markdown("---")
+            st.write("### 👥 Análise de Autores")
             
-            for col in numeric_cols[:5]:  # Analisar até 5 colunas numéricas
-                col_data = df[col].dropna()
-                if len(col_data) > 0:
-                    mean_val = col_data.mean()
-                    std_val = col_data.std()
-                    missing = df[col].isna().sum()
-                    
-                    insight_text = f"**{col}**: Média {mean_val:.2f} ± {std_val:.2f}"
-                    if missing > 0:
-                        insight_text += f" ({missing} valores faltantes)"
-                    
-                    # Detectar outliers
-                    Q1 = col_data.quantile(0.25)
-                    Q3 = col_data.quantile(0.75)
-                    IQR = Q3 - Q1
-                    outliers = col_data[(col_data < (Q1 - 1.5 * IQR)) | (col_data > (Q3 + 1.5 * IQR))]
-                    
-                    if len(outliers) > 0:
-                        insight_text += f" - ⚠️ {len(outliers)} possíveis outliers"
-                    
-                    insights.append(insight_text)
+            # Extrair e contar autores
+            todos_autores = []
+            for autores_str in df[autores_col].dropna():
+                if isinstance(autores_str, str):
+                    # Separar autores por ponto e vírgula, vírgula ou " e "
+                    autores = re.split(r'[;,]|\be\b', autores_str)
+                    for autor in autores:
+                        autor_limpo = autor.strip()
+                        if autor_limpo and autor_limpo not in ['', 'e', 'and']:
+                            todos_autores.append(autor_limpo)
             
-            for insight in insights:
-                st.write(insight)
+            if todos_autores:
+                contagem_autores = pd.Series(todos_autores).value_counts()
+                
+                col_aut1, col_aut2 = st.columns(2)
+                with col_aut1:
+                    st.write("**Autores Mais Frequentes:**")
+                    top_autores = contagem_autores.head(10)
+                    for autor, count in top_autores.items():
+                        st.write(f"• **{autor}**: {count} publicação(ões)")
+                
+                with col_aut2:
+                    if len(contagem_autores) > 1:
+                        st.write("**Colaborações em Potencial:**")
+                        # Encontrar autores que aparecem juntos
+                        colaboracoes = []
+                        for autores_str in df[autores_col].dropna():
+                            if isinstance(autores_str, str) and len(re.split(r'[;,]|\be\b', autores_str)) > 1:
+                                colaboracoes.append(autores_str)
+                        
+                        if colaboracoes:
+                            st.write(f"**{len(colaboracoes)}** trabalhos com coautoria")
+                            st.write("Principais colaborações:")
+                            for colab in colaboracoes[:3]:
+                                st.write(f"• {colab}")
         
-        # Análise de colunas categóricas
-        if categorical_cols:
-            st.write("#### 📝 Análise de Texto")
-            for col in categorical_cols[:3]:  # Analisar até 3 colunas categóricas
-                unique_vals = df[col].nunique()
-                most_common = df[col].value_counts().head(3)
-                st.write(f"**{col}**: {unique_vals} valores únicos")
-                st.write(f"Mais frequentes: {', '.join([f'{k} ({v})' for k, v in most_common.items()])}")
+        # Análise de temas e palavras-chave
+        st.markdown("---")
+        st.write("### 🔍 Temas e Palavras-Chave")
         
-        # Correlações (se houver colunas numéricas suficientes)
-        if len(numeric_cols) >= 2:
-            st.write("#### 🔗 Correlações")
-            corr_matrix = df[numeric_cols].corr()
-            
-            # Encontrar correlações fortes
-            strong_corrs = []
-            for i in range(len(corr_matrix.columns)):
-                for j in range(i+1, len(corr_matrix.columns)):
-                    corr_val = corr_matrix.iloc[i, j]
-                    if abs(corr_val) > 0.7:  # Correlação forte
-                        strong_corrs.append(
-                            f"**{corr_matrix.columns[i]}** ↔ **{corr_matrix.columns[j]}**: {corr_val:.2f}"
-                        )
-            
-            if strong_corrs:
-                st.write("Correlações fortes encontradas:")
-                for corr in strong_corrs[:5]:  # Mostrar até 5 correlações
-                    st.write(f"• {corr}")
-            else:
-                st.write("Nenhuma correlação forte (> 0.7) encontrada.")
+        # Encontrar colunas de texto para análise
+        texto_cols = []
+        for col in df.columns:
+            if df[col].dtype == 'object' and col not in [autores_col] and autores_col:
+                # Verificar se a coluna tem texto significativo
+                unique_ratio = df[col].nunique() / len(df)
+                if 0.1 < unique_ratio < 0.9:  # Nem muito repetitivo, nem muito único
+                    texto_cols.append(col)
         
-        # Seleção de Gráficos (apenas os 3 tipos solicitados)
-        st.write("### 📊 Criar Visualização")
+        if texto_cols:
+            # Combinar texto de todas as colunas relevantes
+            texto_completo = ""
+            for col in texto_cols[:3]:  # Limitar a 3 colunas para performance
+                texto_completo += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
+            
+            # Extrair palavras-chave mais frequentes
+            palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
+            stop_words_pt = set(PORTUGUESE_STOP_WORDS)
+            palavras_filtradas = [p for p in palavras if p not in stop_words_pt and len(p) > 3]
+            
+            if palavras_filtradas:
+                contagem_palavras = pd.Series(palavras_filtradas).value_counts().head(15)
+                
+                col_tema1, col_tema2 = st.columns(2)
+                with col_tema1:
+                    st.write("**Temas Mais Frequentes:**")
+                    for palavra, count in contagem_palavras.head(8).items():
+                        st.write(f"• **{palavra}**: {count} ocorrências")
+                
+                with col_tema2:
+                    st.write("**Recomendações de Busca:**")
+                    temas_sugeridos = contagem_palavras.head(5).index.tolist()
+                    st.write("Baseado nos seus dados, você pode pesquisar por:")
+                    for tema in temas_sugeridos:
+                        st.write(f"• `{tema}`")
+        
+        # Análise temporal (se existir coluna de data/ano)
+        ano_col = None
+        for col in ['ano', 'year', 'data', 'date']:
+            if col in df.columns:
+                # Tentar converter para numérico
+                try:
+                    df[col] = pd.to_numeric(df[col], errors='coerce')
+                    if not df[col].isna().all():
+                        ano_col = col
+                        break
+                except:
+                    pass
+        
+        if ano_col:
+            st.markdown("---")
+            st.write("### 📈 Evolução Temporal")
+            
+            anos_validos = df[ano_col].dropna()
+            if not anos_validos.empty:
+                col_temp1, col_temp2, col_temp3 = st.columns(3)
+                with col_temp1:
+                    st.metric("Ano Mais Antigo", int(anos_validos.min()))
+                with col_temp2:
+                    st.metric("Ano Mais Recente", int(anos_validos.max()))
+                with col_temp3:
+                    st.metric("Período Abrangido", f"{int(anos_validos.max() - anos_validos.min())} anos")
+                
+                # Distribuição por ano
+                dist_ano = anos_validos.value_counts().sort_index()
+                if len(dist_ano) > 1:
+                    fig_temp = px.bar(x=dist_ano.index, y=dist_ano.values, 
+                                    title="Publicações por Ano",
+                                    labels={'x': 'Ano', 'y': 'Número de Publicações'})
+                    fig_temp.update_layout(
+                        plot_bgcolor="rgba(0,0,0,0)", 
+                        paper_bgcolor="rgba(0,0,0,0)", 
+                        font=dict(color="#d6d9dc")
+                    )
+                    st.plotly_chart(fig_temp, use_container_width=True)
+        
+        # Gráficos interativos
+        st.markdown("---")
+        st.write("### 📊 Visualizações Interativas")
+        
         chart_type = st.selectbox(
             "Tipo de gráfico:",
             ["Barra", "Linha", "Pizza"],
@@ -1664,9 +1728,7 @@ elif st.session_state.page == "graficos":
                     eixo_y = st.selectbox("Eixo Y", options=[None] + numeric_cols, key=f"y_{USERNAME}")
                 else:
                     eixo_y = None
-                    st.info("Nenhuma coluna numérica encontrada")
             
-            # Agrupamento para gráficos de barra
             if chart_type == "Barra" and eixo_y is None:
                 group_by = st.selectbox("Agrupar por (opcional)", options=[None] + categorical_cols, key=f"group_{USERNAME}")
             else:
@@ -1695,7 +1757,6 @@ elif st.session_state.page == "graficos":
                 
                 if chart_type == "Barra":
                     if eixo_y is None:
-                        # Gráfico de contagem
                         if group_by:
                             fig = px.histogram(df, x=eixo_x, color=group_by, 
                                              title=f"Distribuição de {eixo_x} por {group_by}",
@@ -1724,7 +1785,6 @@ elif st.session_state.page == "graficos":
                         fig = px.pie(df, names=eixo_x, values=eixo_y, 
                                    title=f"Proporção de {eixo_x}")
                     else:
-                        # Contagem simples
                         contagem = df[eixo_x].value_counts()
                         fig = px.pie(values=contagem.values, names=contagem.index,
                                    title=f"Distribuição de {eixo_x}")
@@ -1739,23 +1799,13 @@ elif st.session_state.page == "graficos":
                     )
                     st.plotly_chart(fig, use_container_width=True)
                     
-                    # Estatísticas descritivas adicionais
-                    if chart_type in ["Barra", "Linha"] and eixo_y in numeric_cols:
-                        with st.expander("📈 Estatísticas Detalhadas"):
-                            st.write(f"**Análise de {eixo_y}:**")
-                            stats = df[eixo_y].describe()
-                            st.dataframe(stats)
-                            
-                else:
-                    st.warning("Não foi possível gerar o gráfico com os parâmetros selecionados.")
-
             except Exception as e:
                 st.error(f"Erro ao gerar visualização: {e}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: busca (AQUI foi a alteração principal)
+# Page: busca
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1797,7 +1847,7 @@ elif st.session_state.page == "busca":
                 st.session_state.search_page = 1
 
     results_df = st.session_state.get('search_results', pd.DataFrame())
-    users_map = load_users()  # carregamos os usuários para mapear CPF -> nome
+    users_map = load_users()
 
     if not results_df.empty:
         total = len(results_df)
@@ -1810,12 +1860,13 @@ elif st.session_state.page == "busca":
         for orig_i in page_df.index:
             result_data = results_df.loc[orig_i].to_dict()
             origin_uid = result_data.get("_artemis_username", "N/A")
-            # Aqui: mostrar o NOME do usuário (se existir), senão uma indicação ("Usuário desconhecido" / "Web")
+            
+            # CORREÇÃO: Mostrar apenas o nome, sem CPF
             if origin_uid == "web":
                 user_display_name = "Fonte: Web"
             else:
                 user_obj = users_map.get(str(origin_uid), {})
-                user_display_name = user_obj.get("name", "Usuário") + f" ({format_cpf_display(origin_uid)})"
+                user_display_name = user_obj.get("name", "Usuário")  # Removido o CPF
 
             initials = "".join([p[0] for p in str(user_display_name).split()[:2]]).upper() or "U"
             title_raw = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
@@ -1862,12 +1913,14 @@ elif st.session_state.page == "busca":
                 det = results_df.loc[vi].to_dict()
                 det = enrich_article_metadata(det)
                 origin_user = det.get("_artemis_username", "N/A")
-                # display-friendly name
+                
+                # CORREÇÃO: Mostrar apenas o nome, sem CPF
                 if origin_user == "web":
                     origin_display = "Fonte: Web"
                 else:
                     ou = users_map.get(str(origin_user), {})
-                    origin_display = ou.get("name", "Usuário") + f" ({format_cpf_display(origin_user)})"
+                    origin_display = ou.get("name", "Usuário")  # Removido o CPF
+                    
                 st.markdown("## Detalhes do Registro")
                 
                 col1, col2 = st.columns([3, 1])
@@ -1889,12 +1942,9 @@ elif st.session_state.page == "busca":
                     st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
                 
                 with col2:
-                    # Informações adicionais
-                    st.markdown("**Informações**")
                     if det.get('similarity'):
                         st.metric("Similaridade", f"{det['similarity']:.2f}")
                     
-                    # Botões de ação
                     if st.button("⭐ Adicionar aos Favoritos", key=f"fav_search_detail_{vi}", use_container_width=True):
                         if add_to_favorites(det): 
                             st.toast("Adicionado aos favoritos!", icon="⭐")
@@ -1910,13 +1960,12 @@ elif st.session_state.page == "busca":
                 if origin_user != "N/A" and origin_user != "web":
                     with st.form(key=f"inline_compose_{vi}_{USERNAME}"):
                         subj_fill = st.text_input("Assunto:", value=f"Sobre: {det.get('título', '')[:50]}...")
-                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_display.split('(')[0].strip()},\n\nVi seu registro '{det.get('título', '')}' na plataforma e gostaria de conversar.\n\n")
+                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_display},\n\nVi seu registro '{det.get('título', '')}' na plataforma e gostaria de conversar.\n\n")
                         c1, c2 = st.columns(2)
                         with c1:
                             if st.form_submit_button("✉️ Enviar"):
-                                # aqui enviamos para o CPF (origin_user) internamente
                                 send_message(USERNAME, str(origin_user), subj_fill, body_fill)
-                                st.success(f"Mensagem enviada para {origin_display.split('(')[0].strip()}.")
+                                st.success(f"Mensagem enviada para {origin_display}.")
                                 time.sleep(2); safe_rerun()
                         with c2:
                             if st.form_submit_button("❌ Cancelar"):
@@ -1933,7 +1982,7 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mensagens (CORREÇÃO do erro de attachment e mostrar nomes)
+# Page: mensagens - CORREÇÃO: REMOVER CPF DA EXIBIÇÃO
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1947,10 +1996,10 @@ elif st.session_state.page == "mensagens":
             if msg:
                 mark_message_read(msg['id'], USERNAME)
                 
-                # Mostrar nome em vez de CPF
+                # CORREÇÃO: Mostrar apenas o nome, sem CPF
                 users_map = load_users()
                 from_user = msg.get('from')
-                from_display = users_map.get(from_user, {}).get('name', from_user) + f" ({format_cpf_display(from_user)})"
+                from_display = users_map.get(from_user, {}).get('name', from_user)  # Removido CPF
                 
                 st.markdown(f"**De:** {escape_html(from_display)}")
                 st.markdown(f"**Assunto:** {escape_html(msg.get('subject'))}")
@@ -1958,7 +2007,6 @@ elif st.session_state.page == "mensagens":
                 st.markdown("---")
                 st.markdown(f"<div style='white-space:pre-wrap; padding:10px; border-radius:8px; background:rgba(0,0,0,0.2);'>{escape_html(msg.get('body'))}</div>", unsafe_allow_html=True)
                 
-                # CORREÇÃO: Verificação segura do anexo
                 if msg.get('attachment') and isinstance(msg['attachment'], dict) and msg['attachment'].get('path') and Path(msg['attachment']['path']).exists():
                     with open(msg['attachment']['path'], "rb") as fp:
                         st.download_button(
@@ -1993,10 +2041,10 @@ elif st.session_state.page == "mensagens":
                 with col1:
                     read_marker = "" if msg.get('read', False) else "🔵 "
                     
-                    # Mostrar nome em vez de CPF
+                    # CORREÇÃO: Mostrar apenas o nome, sem CPF
                     users_map = load_users()
                     from_user = msg.get('from')
-                    from_display = users_map.get(from_user, {}).get('name', from_user) + f" ({format_cpf_display(from_user)})"
+                    from_display = users_map.get(from_user, {}).get('name', from_user)  # Removido CPF
                     
                     st.markdown(f"**{read_marker}{escape_html(msg.get('subject', '(sem assunto)'))}**")
                     st.markdown(f"<span class='small-muted'>De: {escape_html(from_display)} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
@@ -2012,10 +2060,10 @@ elif st.session_state.page == "mensagens":
         for msg in sent_msgs:
             col1, col2 = st.columns([3, 1])
             with col1:
-                # Mostrar nome em vez de CPF
+                # CORREÇÃO: Mostrar apenas o nome, sem CPF
                 users_map = load_users()
                 to_user = msg.get('to')
-                to_display = users_map.get(to_user, {}).get('name', to_user) + f" ({format_cpf_display(to_user)})"
+                to_display = users_map.get(to_user, {}).get('name', to_user)  # Removido CPF
                 
                 st.markdown(f"**{escape_html(msg.get('subject', '(sem assunto)'))}**")
                 st.markdown(f"<span class='small-muted'>Para: {escape_html(to_display)} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
@@ -2032,7 +2080,7 @@ elif st.session_state.page == "mensagens":
             if original_msg:
                 users_map = load_users()
                 from_user = original_msg.get('from')
-                from_display = users_map.get(from_user, {}).get('name', from_user) + f" ({format_cpf_display(from_user)})"
+                from_display = users_map.get(from_user, {}).get('name', from_user)  # Removido CPF
                 
                 st.info(f"Respondendo a: {from_display}")
                 default_to, default_subj, default_body = original_msg['from'], f"Re: {original_msg['subject']}", f"\n\n---\nEm resposta a:\n{original_msg['body']}"
@@ -2048,13 +2096,13 @@ elif st.session_state.page == "mensagens":
 
         with st.form("compose_form", clear_on_submit=True):
             users = load_users()
-            # Criar lista de usuários com formato "Nome (CPF)" para display, mas usar CPF internamente
+            # CORREÇÃO: Mostrar apenas nomes na lista de destinatários
             user_options = []
             user_mapping = {}
             
             for username, user_data in users.items():
                 if username != USERNAME:
-                    display_name = f"{user_data.get('name', 'Usuário')} ({format_cpf_display(username)})"
+                    display_name = user_data.get('name', 'Usuário')  # Removido CPF
                     user_options.append(display_name)
                     user_mapping[display_name] = username
             
@@ -2080,7 +2128,7 @@ elif st.session_state.page == "mensagens":
                     if st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True):
                         if to_user:
                             send_message(USERNAME, to_user, subject, body, attachment)
-                            st.success(f"Mensagem enviada para {selected_display.split('(')[0].strip()}!")
+                            st.success(f"Mensagem enviada para {selected_display}!")
                             st.session_state.reply_message_id = None
                             time.sleep(1); safe_rerun()
                         else:
