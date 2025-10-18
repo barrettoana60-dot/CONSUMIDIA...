@@ -142,7 +142,7 @@ BACKUPS_DIR.mkdir(exist_ok=True)
 ATTACHMENTS_DIR.mkdir(exist_ok=True)
 
 # -------------------------
-# AI Helper Functions
+# AI Helper Functions - MELHORADA
 # -------------------------
 class DataAnalyzer:
     def __init__(self, df):
@@ -179,20 +179,27 @@ class DataAnalyzer:
         return text
     
     def _author_analysis(self):
-        """Análise de autores e colaborações"""
-        if 'autor' not in self.df.columns:
-            return ""
-            
+        """Análise de autores e colaborações - CORRIGIDA"""
         text = "### 👥 Análise de Autores\n\n"
         
-        # Autores mais produtivos
+        # Buscar coluna de autores
+        author_col = None
+        for col in ['autor', 'autores', 'author', 'authors']:
+            if col in self.df.columns:
+                author_col = col
+                break
+        
+        if not author_col:
+            return "⚠️ **Autores**: Coluna não encontrada na planilha\n\n"
+            
         all_authors = []
-        for authors_str in self.df['autor'].dropna():
+        for authors_str in self.df[author_col].dropna():
             if isinstance(authors_str, str):
-                authors = re.split(r'[;,]|\be\b', authors_str)
+                # Múltiplas estratégias de parsing
+                authors = re.split(r'[;,]|\be\b|\band\b', authors_str)
                 for author in authors:
                     author_clean = author.strip()
-                    if author_clean and author_clean not in ['', 'e', 'and']:
+                    if author_clean and len(author_clean) > 2 and author_clean.lower() not in ['', 'e', 'and', 'et']:
                         all_authors.append(author_clean)
         
         if all_authors:
@@ -203,21 +210,28 @@ class DataAnalyzer:
             
             # Colaborações
             collaborations = []
-            for authors_str in self.df['autor'].dropna():
-                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b', authors_str)) > 1:
+            for authors_str in self.df[author_col].dropna():
+                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b', authors_str)) > 1:
                     collaborations.append(authors_str)
             
             if collaborations:
                 text += f"\n**Colaborações identificadas**: {len(collaborations)} trabalhos com coautoria\n"
+            else:
+                text += "\n**Colaborações**: Nenhuma colaboração identificada\n"
             
             text += "\n"
+        else:
+            text += "⚠️ **Autores**: Dados encontrados na coluna mas não foi possível extrair autores válidos\n\n"
         
         return text
     
     def _temporal_analysis(self):
-        """Análise temporal dos dados"""
+        """Análise temporal dos dados - CORRIGIDA"""
+        text = "### 📈 Análise Temporal\n\n"
+        
+        # Buscar coluna de ano
         year_col = None
-        for col in ['ano', 'year', 'data', 'date']:
+        for col in ['ano', 'year', 'data', 'date', 'publication_year']:
             if col in self.df.columns:
                 try:
                     self.df[col] = pd.to_numeric(self.df[col], errors='coerce')
@@ -225,30 +239,41 @@ class DataAnalyzer:
                         year_col = col
                         break
                 except:
-                    pass
+                    continue
         
         if not year_col:
-            return ""
+            return "⚠️ **Anos**: Coluna não encontrada na planilha\n\n"
             
-        text = "### 📈 Análise Temporal\n\n"
         years = self.df[year_col].dropna()
         
         if not years.empty:
             min_year = int(years.min())
             max_year = int(years.max())
             text += f"- **Período analisado**: {min_year} - {max_year} ({max_year - min_year} anos)\n"
-            text += f"- **Ano com mais publicações**: {int(years.mode().iloc[0]) if len(years.mode()) > 0 else 'N/A'}\n"
+            
+            # Ano mais frequente
+            year_counts = years.value_counts()
+            if not year_counts.empty:
+                most_frequent_year = int(year_counts.index[0])
+                text += f"- **Ano com mais publicações**: {most_frequent_year}\n"
             
             # Tendência
             if len(years) > 5:
                 recent_years = years[years >= (max_year - 5)]
                 older_years = years[years < (max_year - 5)]
-                if len(recent_years) > len(older_years):
+                recent_count = len(recent_years)
+                older_count = len(older_years)
+                
+                if recent_count > older_count:
                     text += "- **Tendência**: Produção acadêmica em crescimento\n"
+                elif recent_count < older_count:
+                    text += "- **Tendência**: Produção acadêmica em declínio\n"
                 else:
                     text += "- **Tendência**: Produção acadêmica estável\n"
             
             text += "\n"
+        else:
+            text += "⚠️ **Anos**: Coluna encontrada mas sem dados válidos\n\n"
         
         return text
     
@@ -259,15 +284,12 @@ class DataAnalyzer:
         # Combinar texto de todas as colunas relevantes
         texto_completo = ""
         text_cols = [col for col in self.df.columns if self.df[col].dtype == 'object']
-        for col in text_cols[:3]:
+        for col in text_cols[:3]:  # Limitar a 3 colunas para performance
             texto_completo += " " + self.df[col].fillna('').astype(str).str.cat(sep=' ')
         
         # Extrair temas
         palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
-        stop_words = set([
-            'de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para', 'é', 'com', 'não', 'una', 
-            'os', 'no', 'se', 'na', 'por', 'mais', 'as', 'dos', 'como', 'mas', 'foi', 'ao', 'ele'
-        ])
+        stop_words = set(PORTUGUESE_STOP_WORDS)
         palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
         
         if palavras_filtradas:
@@ -276,6 +298,8 @@ class DataAnalyzer:
             for tema, count in temas.items():
                 text += f"- {tema}: {count} ocorrências\n"
             text += "\n"
+        else:
+            text += "⚠️ **Temas**: Não foi possível identificar temas frequentes\n\n"
         
         return text
     
@@ -283,36 +307,53 @@ class DataAnalyzer:
         """Análise de colaborações e redes"""
         text = "### 🤝 Análise de Colaborações\n\n"
         
-        if 'autor' in self.df.columns:
+        author_col = None
+        for col in ['autor', 'autores', 'author']:
+            if col in self.df.columns:
+                author_col = col
+                break
+        
+        if author_col:
             coautorias = 0
-            for authors_str in self.df['autor'].dropna():
-                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b', authors_str)) > 1:
+            total_trabalhos = len(self.df[author_col].dropna())
+            
+            for authors_str in self.df[author_col].dropna():
+                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b', authors_str)) > 1:
                     coautorias += 1
             
-            text += f"- **Trabalhos em colaboração**: {coautorias}\n"
-            text += f"- **Taxa de colaboração**: {(coautorias/len(self.df))*100:.1f}%\n"
-            
-            if coautorias > 0:
-                text += "- **Padrão**: Colaboração acadêmica ativa\n"
+            if total_trabalhos > 0:
+                taxa_colaboracao = (coautorias/total_trabalhos)*100
+                text += f"- **Trabalhos em colaboração**: {coautorias}\n"
+                text += f"- **Taxa de colaboração**: {taxa_colaboracao:.1f}%\n"
+                
+                if coautorias > 0:
+                    if taxa_colaboracao > 50:
+                        text += "- **Padrão**: Alta colaboração acadêmica\n"
+                    else:
+                        text += "- **Padrão**: Colaboração moderada\n"
+                else:
+                    text += "- **Padrão**: Produção individual predominante\n"
             else:
-                text += "- **Padrão**: Produção individual predominante\n"
+                text += "⚠️ **Colaboração**: Sem dados de autores para análise\n"
             
             text += "\n"
         
         return text
     
     def _geographic_analysis(self):
-        """Análise geográfica dos dados"""
+        """Análise geográfica dos dados - CORRIGIDA"""
+        text = "### 🌎 Análise Geográfica\n\n"
+        
+        # Buscar coluna de país
         country_col = None
-        for col in ['país', 'pais', 'country', 'local']:
+        for col in ['país', 'pais', 'country', 'local', 'location', 'nationality']:
             if col in self.df.columns:
                 country_col = col
                 break
         
         if not country_col:
-            return ""
+            return "⚠️ **Países**: Coluna não encontrada na planilha\n\n"
             
-        text = "### 🌎 Análise Geográfica\n\n"
         countries = self.df[country_col].dropna()
         
         if not countries.empty:
@@ -322,101 +363,334 @@ class DataAnalyzer:
                 text += f"- {country}: {count} publicação(ões)\n"
             
             # Diversidade geográfica
-            diversity_index = len(country_counts) / len(countries) * 100
+            diversity_index = (len(country_counts) / len(countries)) * 100
             text += f"\n- **Diversidade geográfica**: {diversity_index:.1f}%\n"
             
+            if len(country_counts) == 1:
+                text += "- **Foco**: Pesquisa concentrada em um único país\n"
+            elif len(country_counts) <= 3:
+                text += "- **Foco**: Pesquisa com foco regional\n"
+            else:
+                text += "- **Foco**: Pesquisa com abrangência internacional\n"
+            
             text += "\n"
+        else:
+            text += "⚠️ **Países**: Coluna encontrada mas sem dados válidos\n\n"
         
         return text
     
     def _trend_analysis(self):
-        """Análise de tendências e insights"""
-        text = "### 🎯 Insights e Recomendações\n\n"
+        """Análise de tendências e insights - MELHORADA"""
+        text = "### 🎯 Insights e Recomendações Inteligentes\n\n"
         
         insights = []
+        recomendacoes = []
         
         # Insight 1: Base de dados
-        if len(self.df) < 50:
-            insights.append("Sua base de dados é pequena. Considere expandir com mais referências para análises mais robustas.")
+        if len(self.df) < 30:
+            insights.append("Base de dados pequena - considere expandir com mais referências")
+            recomendacoes.append("Adicione pelo menos 50-100 registros para análises mais robustas")
+        elif len(self.df) < 100:
+            insights.append("Base de dados moderada - boa para análises iniciais")
+            recomendacoes.append("Continue expandindo para aumentar a confiabilidade estatística")
         else:
-            insights.append("Sua base de dados tem bom tamanho para análises consistentes.")
+            insights.append("Base de dados sólida - excelente para análises aprofundadas")
+            recomendacoes.append("Explore análises multivariadas e correlações complexas")
         
         # Insight 2: Colaboração
-        if 'autor' in self.df.columns:
-            collaborations = sum(1 for authors_str in self.df['autor'].dropna() 
-                               if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b', authors_str)) > 1)
-            if collaborations / len(self.df) > 0.3:
-                insights.append("Excelente nível de colaboração entre pesquisadores.")
-            else:
-                insights.append("Há espaço para aumentar as colaborações em sua área de pesquisa.")
+        author_col = next((col for col in ['autor', 'autores'] if col in self.df.columns), None)
+        if author_col:
+            collaborations = sum(1 for authors_str in self.df[author_col].dropna() 
+                               if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b', authors_str)) > 1)
+            total = len(self.df[author_col].dropna())
+            
+            if total > 0:
+                collab_rate = (collaborations/total)*100
+                if collab_rate > 60:
+                    insights.append("Excelente nível de colaboração entre pesquisadores")
+                    recomendacoes.append("Aproveite as redes de colaboração existentes")
+                elif collab_rate > 30:
+                    insights.append("Bom nível de colaboração acadêmica")
+                    recomendacoes.append("Fortaleça parcerias com pesquisadores-chave")
+                else:
+                    insights.append("Oportunidade para aumentar colaborações")
+                    recomendacoes.append("Busque coautoria em projetos multidisciplinares")
         
         # Insight 3: Temporal
         year_col = next((col for col in ['ano', 'year'] if col in self.df.columns), None)
         if year_col:
             years = self.df[year_col].dropna()
-            if not years.empty and (years.max() - years.min()) > 10:
-                insights.append("Seu conjunto de dados cobre um período extenso, permitindo análise de tendências temporais.")
+            if not years.empty:
+                year_range = years.max() - years.min()
+                if year_range > 15:
+                    insights.append("Dados cobrem período extenso - permite análise de tendências")
+                    recomendacoes.append("Analise a evolução temporal dos temas de pesquisa")
+                elif year_range > 5:
+                    insights.append("Dados com boa cobertura temporal")
+                    recomendacoes.append("Identifique tendências emergentes no período")
+                else:
+                    insights.append("Período temporal limitado")
+                    recomendacoes.append("Considere incluir dados históricos para contexto")
         
-        for i, insight in enumerate(insights, 1):
-            text += f"{i}. {insight}\n"
+        # Insight 4: Geográfico
+        country_col = next((col for col in ['país', 'pais', 'country'] if col in self.df.columns), None)
+        if country_col:
+            countries = self.df[country_col].dropna()
+            if not countries.empty:
+                unique_countries = len(countries.value_counts())
+                if unique_countries > 10:
+                    insights.append("Excelente diversidade geográfica")
+                    recomendacoes.append("Compare abordagens regionais diferentes")
+                elif unique_countries > 3:
+                    insights.append("Boa diversidade geográfica")
+                    recomendacoes.append("Explore perspectivas multiculturais")
         
-        text += "\n"
+        # Gerar texto formatado
+        if insights:
+            text += "**Insights Identificados:**\n"
+            for i, insight in enumerate(insights, 1):
+                text += f"{i}. {insight}\n"
+            text += "\n"
+        
+        if recomendacoes:
+            text += "**Recomendações Estratégicas:**\n"
+            for i, rec in enumerate(recomendacoes, 1):
+                text += f"{i}. {rec}\n"
+            text += "\n"
+        
+        # Recomendação final personalizada
+        if len(self.df) >= 50 and year_col and author_col:
+            text += "💡 **Sua pesquisa tem potencial para:**\n- Análises estatísticas avançadas\n- Estudos de rede de colaboração\n- Análise de tendências temporais\n- Mapeamento de temas emergentes\n"
+        elif len(self.df) >= 20:
+            text += "💡 **Próximos passos recomendados:**\n- Expanda a base de dados\n- Enriqueça metadados (autores, anos, países)\n- Defina focos temáticos específicos\n"
+        else:
+            text += "💡 **Para começar:**\n- Foque em coletar mais dados\n- Estruture bem as colunas (autor, ano, país)\n- Defina objetivos claros de pesquisa\n"
+        
         return text
 
 def get_ai_assistant_response(question, context):
-    """Simula um assistente de IA para responder perguntas sobre os dados"""
+    """Assistente de IA melhorado para responder perguntas sobre os dados"""
     
-    responses = {
-        "autores": "Analisando os autores mais produtivos em sua base de dados...",
-        "temas": "Identificando os temas mais frequentes em suas publicações...",
-        "tendências": "Analisando tendências temporais em sua pesquisa...",
-        "colaboração": "Examinando padrões de colaboração entre pesquisadores...",
-        "geografia": "Mapeando a distribuição geográfica das publicações...",
-        "recomendações": "Gerando recomendações personalizadas para sua pesquisa..."
-    }
-    
-    # Encontrar a melhor correspondência
     question_lower = question.lower()
-    best_match = "recomendações"
-    for key in responses:
-        if key in question_lower:
-            best_match = key
-            break
     
-    base_response = responses[best_match]
-    
-    # Resposta personalizada baseada no contexto
-    if "autores" in best_match and 'autor' in context.df.columns:
-        authors = []
-        for authors_str in context.df['autor'].dropna():
-            if isinstance(authors_str, str):
-                auths = re.split(r'[;,]|\be\b', authors_str)
-                authors.extend([a.strip() for a in auths if a.strip() and a.strip() not in ['', 'e', 'and']])
+    # Análise de autores - MELHORADA
+    if any(word in question_lower for word in ['autor', 'autores', 'pesquisador', 'escritor', 'quem escreveu']):
+        author_col = None
+        for col in ['autor', 'autores', 'author']:
+            if col in context.df.columns:
+                author_col = col
+                break
         
-        if authors:
-            top_authors = pd.Series(authors).value_counts().head(3)
-            author_names = ", ".join([f"{author} ({count})" for author, count in top_authors.items()])
-            return f"**Autores mais produtivos**: {author_names}\n\nEstes pesquisadores são referências em sua área de estudo."
+        if author_col:
+            all_authors = []
+            for authors_str in context.df[author_col].dropna():
+                if isinstance(authors_str, str):
+                    authors = re.split(r'[;,]|\be\b|\band\b', authors_str)
+                    for author in authors:
+                        author_clean = author.strip()
+                        if author_clean and len(author_clean) > 2:
+                            all_authors.append(author_clean)
+            
+            if all_authors:
+                author_counts = pd.Series(all_authors).value_counts().head(5)
+                response = "**📊 Autores Mais Relevantes na Sua Base:**\n\n"
+                for author, count in author_counts.items():
+                    response += f"• **{author}**: {count} publicação(ões)\n"
+                
+                # Análise de colaboração
+                collaborations = sum(1 for authors_str in context.df[author_col].dropna() 
+                                   if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b', authors_str)) > 1)
+                total = len(context.df[author_col].dropna())
+                
+                if total > 0:
+                    collab_rate = (collaborations/total)*100
+                    response += f"\n**🤝 Padrão de Colaboração:** {collab_rate:.1f}% dos trabalhos são em coautoria\n"
+                    
+                    if collab_rate > 50:
+                        response += "💡 **Insight**: Sua área tem forte cultura colaborativa\n"
+                    elif collab_rate > 20:
+                        response += "💡 **Insight**: Colaboração moderada - oportunidades de parceria\n"
+                    else:
+                        response += "💡 **Insight**: Produção mais individual - considere colaborações\n"
+                
+                return response
+            else:
+                return "**⚠️ Atenção**: Encontrei a coluna de autores mas não consegui extrair nomes válidos. Verifique o formato dos dados."
+        else:
+            return "**❌ Dados Insuficientes**: Não encontrei coluna de autores na sua planilha. Adicione uma coluna 'autor' ou 'autores'."
     
-    elif "temas" in best_match:
-        # Extrair temas
+    # Análise de países - MELHORADA
+    elif any(word in question_lower for word in ['país', 'países', 'geografia', 'região', 'local', 'nacionalidade']):
+        country_col = None
+        for col in ['país', 'pais', 'country', 'location']:
+            if col in context.df.columns:
+                country_col = col
+                break
+        
+        if country_col:
+            countries = context.df[country_col].dropna()
+            if not countries.empty:
+                country_counts = countries.value_counts()
+                response = "**🌎 Distribuição Geográfica:**\n\n"
+                
+                for country, count in country_counts.head(8).items():
+                    response += f"• **{country}**: {count} publicação(ões)\n"
+                
+                # Análise de diversidade
+                diversity = len(country_counts) / len(countries) * 100
+                response += f"\n**📈 Diversidade Geográfica**: {diversity:.1f}%\n"
+                
+                if diversity > 70:
+                    response += "💡 **Insight**: Pesquisa com excelente abrangência internacional\n"
+                elif diversity > 40:
+                    response += "💡 **Insight**: Boa diversidade geográfica\n"
+                else:
+                    response += "💡 **Insight**: Oportunidade para ampliar escopo geográfico\n"
+                
+                return response
+            else:
+                return "**⚠️ Atenção**: Coluna de países encontrada mas sem dados válidos."
+        else:
+            return "**❌ Dados Insuficientes**: Não encontrei coluna de países. Adicione 'país' ou 'country' para análise geográfica."
+    
+    # Análise temporal - MELHORADA
+    elif any(word in question_lower for word in ['ano', 'anos', 'temporal', 'evolução', 'cronologia', 'linha do tempo']):
+        year_col = None
+        for col in ['ano', 'year', 'data', 'date']:
+            if col in context.df.columns:
+                try:
+                    context.df[col] = pd.to_numeric(context.df[col], errors='coerce')
+                    if not context.df[col].isna().all():
+                        year_col = col
+                        break
+                except:
+                    continue
+        
+        if year_col:
+            years = context.df[year_col].dropna()
+            if not years.empty:
+                min_year = int(years.min())
+                max_year = int(years.max())
+                year_range = max_year - min_year
+                
+                response = f"**📅 Análise Temporal:**\n\n"
+                response += f"• **Período**: {min_year} - {max_year} ({year_range} anos)\n"
+                
+                year_counts = years.value_counts().sort_index()
+                if not year_counts.empty:
+                    most_active = int(year_counts.idxmax())
+                    response += f"• **Ano mais produtivo**: {most_active}\n"
+                
+                # Tendência
+                if year_range > 5:
+                    recent = years[years >= (max_year - 5)].count()
+                    older = years[years < (max_year - 5)].count()
+                    
+                    if recent > older:
+                        response += "• **Tendência**: 📈 Crescimento na produção recente\n"
+                        response += "💡 **Insight**: Área em expansão - boas oportunidades\n"
+                    elif recent < older:
+                        response += "• **Tendência**: 📉 Produção concentrada no passado\n"
+                        response += "💡 **Insight**: Considere focar em trabalhos recentes\n"
+                    else:
+                        response += "• **Tendência**: ➡️ Produção constante\n"
+                
+                return response
+            else:
+                return "**⚠️ Atenção**: Coluna de anos encontrada mas sem dados numéricos válidos."
+        else:
+            return "**❌ Dados Insuficientes**: Não encontrei coluna de anos. Adicione 'ano' ou 'year' para análise temporal."
+    
+    # Análise de temas - MELHORADA
+    elif any(word in question_lower for word in ['tema', 'temas', 'assunto', 'palavras-chave', 'termos', 'tópicos']):
         texto_completo = ""
-        for col in context.df.select_dtypes(include=['object']).columns[:2]:
+        text_cols = [col for col in context.df.columns if context.df[col].dtype == 'object']
+        for col in text_cols[:3]:
             texto_completo += " " + context.df[col].fillna('').astype(str).str.cat(sep=' ')
         
-        palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
-        stop_words = set(['de', 'a', 'o', 'que', 'e', 'do', 'da', 'em', 'um', 'para'])
-        palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
-        
-        if palavras_filtradas:
-            temas = pd.Series(palavras_filtradas).value_counts().head(5)
-            temas_str = ", ".join([f"'{tema}'" for tema in temas.index])
-            return f"**Temas principais identificados**: {temas_str}\n\nEstes são os conceitos centrais em sua pesquisa."
+        if texto_completo.strip():
+            palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
+            stop_words = set(PORTUGUESE_STOP_WORDS)
+            palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
+            
+            if palavras_filtradas:
+                temas = pd.Series(palavras_filtradas).value_counts().head(12)
+                response = "**🔤 Temas Mais Frequentes:**\n\n"
+                
+                for i, (tema, count) in enumerate(temas.items(), 1):
+                    response += f"{i}. **{tema}** ({count} ocorrências)\n"
+                
+                response += "\n💡 **Sugestão**: Use esses temas para:\n"
+                response += "• Refinar suas buscas\n• Identificar gaps na literatura\n• Explorar conexões entre conceitos\n"
+                
+                return response
+            else:
+                return "**🔍**: Analisei o texto mas não identifiquei temas claros. Tente adicionar mais descrições ou resumos."
+        else:
+            return "**❌ Dados Insuficientes**: Não há texto suficiente para análise temática. Adicione colunas com títulos, resumos ou descrições."
     
-    return f"{base_response}\n\nBaseado na análise dos seus dados, recomendo explorar essas dimensões para insights mais profundos."
+    # Recomendações gerais - MELHORADA
+    elif any(word in question_lower for word in ['recomendação', 'sugestão', 'ideia', 'dica', 'próximo passo', 'o que fazer']):
+        response = "**🎯 Recomendações Estratégicas Baseadas nos Seus Dados:**\n\n"
+        
+        # Análise do estado atual
+        total_records = len(context.df)
+        
+        if total_records < 30:
+            response += "📊 **Expansão de Dados**:\n"
+            response += "• Adicione mais registros (ideal: 50-100+)\n"
+            response += "• Enriqueça metadados (autores, anos, países)\n"
+            response += "• Use a busca integrada para encontrar referências\n\n"
+        else:
+            response += "📊 **Análises Avançadas**:\n"
+            response += "• Explore correlações entre variáveis\n"
+            response += "• Use o mapa mental para organizar conceitos\n"
+            response += "• Busque colaboradores com interesses similares\n\n"
+        
+        # Verificar completude dos dados
+        has_authors = any(col in context.df.columns for col in ['autor', 'autores'])
+        has_years = any(col in context.df.columns for col in ['ano', 'year'])
+        has_countries = any(col in context.df.columns for col in ['país', 'pais', 'country'])
+        
+        response += "🔧 **Otimização de Metadados**:\n"
+        if not has_authors:
+            response += "• ⚠️ Adicione coluna 'autor' para análise de colaboração\n"
+        if not has_years:
+            response += "• ⚠️ Adicione coluna 'ano' para análise temporal\n"
+        if not has_countries:
+            response += "• ⚠️ Adicione coluna 'país' para análise geográfica\n"
+        
+        if has_authors and has_years and has_countries:
+            response += "• ✅ Metadados completos - ótimo para análises!\n"
+        
+        response += "\n💡 **Próximos Passos**:\n"
+        response += "1. Use a página 'Análise' para insights visuais\n"
+        response += "2. Explore 'Recomendações' para artigos relacionados\n"
+        response += "3. Organize ideias no 'Mapa Mental'\n"
+        response += "4. Busque colaboradores na rede\n"
+        
+        return response
+    
+    # Resposta padrão inteligente
+    else:
+        return f"""**🤖 Assistente de IA - NUGEP-PQR**
+
+Analisei sua pergunta sobre *"{question}"* e posso ajudar com:
+
+🔍 **Análises Específicas:**
+• **Autores**: "Quais são os autores mais relevantes?"
+• **Países**: "Qual a distribuição geográfica?"
+• **Anos**: "Como evoluiu a pesquisa ao longo do tempo?"
+• **Temas**: "Quais são os conceitos mais frequentes?"
+
+🎯 **Recomendações:**
+• "Que próximos passos você sugere?"
+• "Como posso melhorar minha base de dados?"
+
+💡 **Dica**: Seja específico na sua pergunta para respostas mais precisas!"""
 
 # -------------------------
-# Miro-like Mind Map Components
+# Miro-like Mind Map Components - ATUALIZADO
 # -------------------------
 class MiroStyleMindMap:
     def __init__(self):
@@ -473,6 +747,40 @@ class MiroStyleMindMap:
             for i, node in enumerate(nodes):
                 node["x"] = (i % 3) * 300
                 node["y"] = (i // 3) * 200
+        
+        return nodes
+
+    def _radial_layout(self, nodes, edges):
+        """Layout radial"""
+        center_x, center_y = 500, 400
+        radius = 300
+        
+        for i, node in enumerate(nodes):
+            angle = 2 * np.pi * i / len(nodes)
+            node["x"] = center_x + radius * np.cos(angle)
+            node["y"] = center_y + radius * np.sin(angle)
+        
+        return nodes
+
+    def _force_directed_layout(self, nodes, edges):
+        """Layout de força direcionada"""
+        G = nx.Graph()
+        for node in nodes:
+            G.add_node(node["id"])
+        for edge in edges:
+            G.add_edge(edge["source"], edge["target"])
+        
+        try:
+            pos = nx.spring_layout(G, k=1, iterations=100)
+            for node in nodes:
+                if node["id"] in pos:
+                    node["x"] = pos[node["id"]][0] * 800
+                    node["y"] = pos[node["id"]][1] * 600
+        except:
+            # Fallback random
+            for node in nodes:
+                node["x"] = random.randint(100, 900)
+                node["y"] = random.randint(100, 700)
         
         return nodes
 
@@ -1586,14 +1894,14 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa mental - ESTILO MIRO SUPER DINÂMICO
+# Page: mapa mental - ATUALIZADO CONFORME SOLICITADO
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🗺️ Mapa Mental Estilo Miro")
-    st.info("💡 **Mapa mental interativo**: Arraste os nós, edite diretamente, conecte ideias visualmente!")
+    st.subheader("🗺️ Mapa Mental Interativo")
+    st.info("💡 **Crie, conecte e visualize suas ideias** - Arraste os nós e edite diretamente!")
     
-    # Inicializar sistema Miro
+    # Inicializar sistema de mapa mental
     if 'miro_map' not in st.session_state:
         st.session_state.miro_map = MiroStyleMindMap()
         st.session_state.miro_nodes = []
@@ -1601,55 +1909,35 @@ elif st.session_state.page == "mapa":
         st.session_state.miro_selected_node = None
         st.session_state.miro_layout = "hierarchical"
     
-    # Sidebar principal
+    # Sidebar principal - SIMPLIFICADA
     with st.sidebar:
         st.header("🎨 Controles do Mapa")
         
-        # Criar novo nó
+        # Criar novo nó - MANTIDO
         with st.expander("➕ Criar Novo Nó", expanded=True):
             with st.form("create_miro_node"):
                 node_label = st.text_input("Título do nó:", placeholder="Ex: Pesquisa Qualitativa")
                 node_type = st.selectbox("Tipo:", options=list(st.session_state.miro_map.node_types.keys()))
                 node_desc = st.text_area("Descrição:", placeholder="Detalhes sobre este nó...", height=100)
                 
-                col1, col2 = st.columns(2)
-                with col1:
-                    if st.form_submit_button("🎯 Adicionar Nó", use_container_width=True):
-                        if node_label:
-                            node_id = f"miro_{int(time.time())}_{random.randint(1000,9999)}"
-                            new_node = st.session_state.miro_map.create_node(
-                                node_id, node_label, node_type, node_desc
-                            )
-                            st.session_state.miro_nodes.append(new_node)
-                            st.session_state.miro_selected_node = node_id
-                            st.success("Nó criado!")
-                            safe_rerun()
-                with col2:
-                    if st.form_submit_button("💫 Adicionar & Conectar", use_container_width=True):
-                        if node_label and st.session_state.miro_selected_node:
-                            node_id = f"miro_{int(time.time())}_{random.randint(1000,9999)}"
-                            new_node = st.session_state.miro_map.create_node(
-                                node_id, node_label, node_type, node_desc
-                            )
-                            st.session_state.miro_nodes.append(new_node)
-                            # Conectar ao nó selecionado
-                            st.session_state.miro_edges.append({
-                                "source": st.session_state.miro_selected_node,
-                                "target": node_id,
-                                "label": "conecta"
-                            })
-                            st.session_state.miro_selected_node = node_id
-                            st.success("Nó criado e conectado!")
-                            safe_rerun()
+                if st.form_submit_button("🎯 Adicionar Nó", use_container_width=True):
+                    if node_label:
+                        node_id = f"miro_{int(time.time())}_{random.randint(1000,9999)}"
+                        new_node = st.session_state.miro_map.create_node(
+                            node_id, node_label, node_type, node_desc
+                        )
+                        st.session_state.miro_nodes.append(new_node)
+                        st.session_state.miro_selected_node = node_id
+                        st.success("Nó criado!")
+                        safe_rerun()
         
-        # Gerenciar conexões
-        with st.expander("🔗 Gerenciar Conexões", expanded=False):
-            if st.session_state.miro_nodes:
+        # Conectar nós - SIMPLIFICADO (sem gerenciar conexões)
+        with st.expander("🔗 Conectar Nós", expanded=False):
+            if len(st.session_state.miro_nodes) >= 2:
                 nodes_list = [node["id"] for node in st.session_state.miro_nodes]
                 with st.form("connect_nodes"):
                     source_id = st.selectbox("De:", options=nodes_list, key="connect_source")
                     target_id = st.selectbox("Para:", options=[n for n in nodes_list if n != source_id], key="connect_target")
-                    connection_label = st.text_input("Label da conexão:", value="relacionado")
                     
                     if st.form_submit_button("🔗 Criar Conexão", use_container_width=True):
                         # Verificar se conexão já existe
@@ -1659,33 +1947,30 @@ elif st.session_state.page == "mapa":
                             st.session_state.miro_edges.append({
                                 "source": source_id,
                                 "target": target_id,
-                                "label": connection_label
+                                "label": "conecta"
                             })
                             st.success("Conexão criada!")
                             safe_rerun()
                         else:
                             st.warning("Esses nós já estão conectados.")
-            
-            # Lista de conexões existentes
-            if st.session_state.miro_edges:
-                st.write("**Conexões atuais:**")
-                for i, edge in enumerate(st.session_state.miro_edges[:5]):
-                    source_label = next((n["label"] for n in st.session_state.miro_nodes if n["id"] == edge["source"]), edge["source"])
-                    target_label = next((n["label"] for n in st.session_state.miro_nodes if n["id"] == edge["target"]), edge["target"])
-                    col1, col2 = st.columns([3, 1])
-                    with col1:
-                        st.write(f"• {source_label} → {target_label}")
-                    with col2:
-                        if st.button("🗑️", key=f"del_edge_{i}"):
-                            st.session_state.miro_edges.pop(i)
-                            safe_rerun()
+            else:
+                st.info("Precisa de pelo menos 2 nós para conectar")
         
-        # Configurações do mapa
-        with st.expander("⚙️ Configurações", expanded=False):
+        # Configurações do mapa - ATUALIZADO
+        with st.expander("⚙️ Visualização", expanded=False):
+            # REMOVIDO: "Gerenciar Conexões"
+            # ADICIONADO: Modos de visualização
+            visualization_mode = st.selectbox(
+                "Modo de Visualização:",
+                options=["Mapa Mental 3D", "Mapa Normal", "Fluxograma"],
+                index=1,
+                help="Escolha como visualizar seu mapa"
+            )
+            
             st.session_state.miro_layout = st.selectbox(
-                "Layout:",
+                "Layout Automático:",
                 options=["hierarchical", "radial", "force"],
-                help="Escolha como organizar os nós automaticamente"
+                help="Organização automática dos nós"
             )
             
             if st.button("🔄 Reorganizar Mapa", use_container_width=True):
@@ -1710,7 +1995,7 @@ elif st.session_state.page == "mapa":
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader("🎨 Visualização do Mapa")
+        st.subheader(f"🎨 {visualization_mode}")
         
         if st.session_state.miro_nodes:
             # Preparar nós para visualização
@@ -1740,13 +2025,16 @@ elif st.session_state.page == "mapa":
                     font={"size": 10, "color": "#bfc6cc"}
                 ))
             
-            # Configuração do gráfico
+            # Configuração do gráfico baseada no modo
+            physics_enabled = visualization_mode != "Fluxograma"
+            hierarchical_enabled = visualization_mode == "Mapa Normal"
+            
             config = Config(
                 width="100%",
                 height=700,
                 directed=True,
-                physics=True,
-                hierarchical=st.session_state.miro_layout == "hierarchical",
+                physics=physics_enabled,
+                hierarchical=hierarchical_enabled,
                 nodeHighlightBehavior=True,
                 highlightColor="#F8F8F8",
                 collapsible=True,
@@ -1866,11 +2154,11 @@ elif st.session_state.page == "mapa":
         else:
             st.info("👆 Selecione um nó no mapa para editar.")
     
-    # Ferramentas de exportação
+    # Ferramentas de exportação - ATUALIZADO (removido relatório)
     st.markdown("---")
     st.subheader("📤 Exportar Mapa")
     
-    exp_col1, exp_col2, exp_col3 = st.columns(3)
+    exp_col1, exp_col2 = st.columns(2)
     
     with exp_col1:
         if st.button("💾 Salvar como JSON", use_container_width=True):
@@ -1887,7 +2175,7 @@ elif st.session_state.page == "mapa":
             st.download_button(
                 "⬇️ Baixar JSON",
                 data=json_str,
-                file_name=f"mapa_miro_{USERNAME}_{int(time.time())}.json",
+                file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.json",
                 mime="application/json"
             )
     
@@ -1909,45 +2197,11 @@ elif st.session_state.page == "mapa":
                 st.download_button(
                     "⬇️ Baixar PNG",
                     data=buf.getvalue(),
-                    file_name=f"mapa_miro_{USERNAME}_{int(time.time())}.png",
+                    file_name=f"mapa_mental_{USERNAME}_{int(time.time())}.png",
                     mime="image/png"
                 )
             except Exception as e:
                 st.error(f"Erro ao gerar imagem: {e}")
-    
-    with exp_col3:
-        if st.button("📊 Relatório do Mapa", use_container_width=True):
-            total_nodes = len(st.session_state.miro_nodes)
-            total_edges = len(st.session_state.miro_edges)
-            node_types = {}
-            
-            for node in st.session_state.miro_nodes:
-                node_type = node["type"]
-                node_types[node_type] = node_types.get(node_type, 0) + 1
-            
-            report = f"""
-# 📊 Relatório do Mapa Mental
-
-## Estatísticas Gerais
-- **Total de nós**: {total_nodes}
-- **Total de conexões**: {total_edges}
-- **Densidade da rede**: {(total_edges / max(1, total_nodes * (total_nodes - 1)) * 100):.1f}%
-
-## Distribuição por Tipo
-"""
-            for node_type, count in node_types.items():
-                type_info = st.session_state.miro_map.node_types.get(node_type, {})
-                icon = type_info.get("icon", "●")
-                report += f"- {icon} {node_type.title()}: {count} nós\n"
-            
-            report += f"\n**Gerado em**: {datetime.now().strftime('%d/%m/%Y %H:%M')}"
-            
-            st.download_button(
-                "⬇️ Baixar Relatório",
-                data=report,
-                file_name=f"relatorio_mapa_{USERNAME}_{int(time.time())}.md",
-                mime="text/markdown"
-            )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1965,7 +2219,7 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos - ANÁLISE SUPER INTELIGENTE COM IA
+# Page: graficos - ANÁLISE SUPER INTELIGENTE COM IA MELHORADA
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -1986,9 +2240,9 @@ elif st.session_state.page == "graficos":
         analysis = analyzer.generate_comprehensive_analysis()
         st.markdown(analysis)
         
-        # Assistente de IA
+        # Assistente de IA MELHORADO
         st.markdown("---")
-        st.write("### 🤖 Assistente de IA para Análise")
+        st.write("### 🤖 Assistente de IA - Análise Personalizada")
         
         col_ai1, col_ai2 = st.columns([3, 1])
         with col_ai1:
@@ -2005,7 +2259,8 @@ elif st.session_state.page == "graficos":
                 time.sleep(1)  # Simular processamento
                 response = get_ai_assistant_response(ai_question, analyzer)
                 st.success("Análise concluída!")
-                st.markdown(f"**Resposta da IA:** {response}")
+                st.markdown(f"**Resposta da IA:**")
+                st.markdown(response)
         
         # Análises especializadas
         st.markdown("---")
@@ -2034,218 +2289,99 @@ elif st.session_state.page == "graficos":
             st.dataframe(df.head(10), use_container_width=True)
         
         with tab_authors:
-            if 'autor' in df.columns:
-                st.write("#### Análise de Autores e Colaborações")
-                
-                # Extrair todos os autores
+            # Usar a análise de autores melhorada
+            author_analysis = analyzer._author_analysis()
+            st.markdown(author_analysis)
+            
+            # Gráfico de autores se disponível
+            author_col = next((col for col in ['autor', 'autores'] if col in df.columns), None)
+            if author_col:
                 all_authors = []
-                for authors_str in df['autor'].dropna():
+                for authors_str in df[author_col].dropna():
                     if isinstance(authors_str, str):
-                        authors = re.split(r'[;,]|\be\b', authors_str)
+                        authors = re.split(r'[;,]|\be\b|\band\b', authors_str)
                         for author in authors:
                             author_clean = author.strip()
-                            if author_clean and author_clean not in ['', 'e', 'and']:
+                            if author_clean and len(author_clean) > 2:
                                 all_authors.append(author_clean)
                 
                 if all_authors:
-                    author_counts = pd.Series(all_authors).value_counts()
-                    
-                    col_a1, col_a2 = st.columns(2)
-                    with col_a1:
-                        # Top autores
-                        st.write("**Autores Mais Produtivos:**")
-                        top_authors = author_counts.head(10)
-                        for author, count in top_authors.items():
-                            st.write(f"• **{author}**: {count} publicação(ões)")
-                    
-                    with col_a2:
-                        # Colaborações
-                        collaborations = []
-                        for authors_str in df['autor'].dropna():
-                            if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b', authors_str)) > 1:
-                                collaborations.append(authors_str)
-                        
-                        st.write(f"**Colaborações**: {len(collaborations)} trabalhos em coautoria")
-                        if collaborations:
-                            st.write("**Exemplos de colaborações:**")
-                            for colab in collaborations[:3]:
-                                st.write(f"• {colab}")
-                else:
-                    st.info("Não foi possível extrair autores dos dados.")
-            else:
-                st.warning("Não há coluna 'autor' para análise.")
+                    author_counts = pd.Series(all_authors).value_counts().head(10)
+                    if len(author_counts) > 0:
+                        fig_auth = px.bar(
+                            x=author_counts.values, 
+                            y=author_counts.index,
+                            orientation='h',
+                            title="Top 10 Autores Mais Produtivos",
+                            labels={'x': 'Número de Publicações', 'y': 'Autor'}
+                        )
+                        fig_auth.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_auth, use_container_width=True)
         
         with tab_themes:
-            st.write("#### Análise Temática Avançada")
+            thematic_analysis = analyzer._thematic_analysis()
+            st.markdown(thematic_analysis)
             
-            # Combinar texto para análise
+            # Gráfico de temas
             texto_completo = ""
             text_cols = [col for col in df.columns if df[col].dtype == 'object']
             for col in text_cols[:3]:
                 texto_completo += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
             
             if texto_completo.strip():
-                # Extrair temas
                 palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
                 stop_words = set(PORTUGUESE_STOP_WORDS)
                 palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
                 
                 if palavras_filtradas:
                     temas = pd.Series(palavras_filtradas).value_counts().head(15)
-                    
-                    col_t1, col_t2 = st.columns(2)
-                    with col_t1:
-                        st.write("**Temas Mais Frequentes:**")
-                        for tema, count in temas.head(8).items():
-                            st.write(f"• **{tema}**: {count} ocorrências")
-                    
-                    with col_t2:
-                        st.write("**Rede de Temas:**")
-                        st.info("Temas que frequentemente aparecem juntos:")
-                        
-                        # Análise de co-ocorrência simples
-                        theme_pairs = []
-                        for i, tema1 in enumerate(temas.index[:5]):
-                            for j, tema2 in enumerate(temas.index[:5]):
-                                if i < j and tema1 in texto_completo and tema2 in texto_completo:
-                                    theme_pairs.append(f"{tema1} + {tema2}")
-                        
-                        for pair in theme_pairs[:5]:
-                            st.write(f"• {pair}")
-                else:
-                    st.info("Não foram identificados temas significativos.")
-            else:
-                st.warning("Não há texto suficiente para análise temática.")
+                    if len(temas) > 0:
+                        fig_temas = px.bar(
+                            x=temas.values,
+                            y=temas.index,
+                            orientation='h',
+                            title="Temas Mais Frequentes",
+                            labels={'x': 'Frequência', 'y': 'Tema'}
+                        )
+                        fig_temas.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_temas, use_container_width=True)
         
         with tab_geo:
-            country_col = None
-            for col in ['país', 'pais', 'country', 'local']:
-                if col in df.columns:
-                    country_col = col
-                    break
+            geographic_analysis = analyzer._geographic_analysis()
+            st.markdown(geographic_analysis)
             
+            # Gráfico geográfico
+            country_col = next((col for col in ['país', 'pais', 'country'] if col in df.columns), None)
             if country_col:
-                st.write("#### Análise Geográfica")
                 countries = df[country_col].dropna()
-                
                 if not countries.empty:
                     country_counts = countries.value_counts()
-                    
-                    col_g1, col_g2 = st.columns(2)
-                    with col_g1:
-                        st.write("**Distribuição por País:**")
-                        for country, count in country_counts.head(8).items():
-                            st.write(f"• **{country}**: {count} publicação(ões)")
-                    
-                    with col_g2:
-                        # Mapa de calor geográfico
-                        if len(country_counts) > 1:
-                            fig_geo = px.pie(values=country_counts.values, names=country_counts.index,
-                                           title="Distribuição Geográfica das Publicações")
-                            fig_geo.update_layout(
-                                plot_bgcolor="rgba(0,0,0,0)", 
-                                paper_bgcolor="rgba(0,0,0,0)", 
-                                font=dict(color="#d6d9dc")
-                            )
-                            st.plotly_chart(fig_geo, use_container_width=True)
-                else:
-                    st.info("Não há dados geográficos para análise.")
-            else:
-                st.warning("Não há coluna de país/região para análise geográfica.")
+                    if len(country_counts) > 0:
+                        fig_geo = px.pie(
+                            values=country_counts.values, 
+                            names=country_counts.index,
+                            title="Distribuição Geográfica"
+                        )
+                        fig_geo.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
+                        st.plotly_chart(fig_geo, use_container_width=True)
         
         with tab_temp:
-            year_col = None
-            for col in ['ano', 'year', 'data', 'date']:
-                if col in df.columns:
-                    try:
-                        df[col] = pd.to_numeric(df[col], errors='coerce')
-                        if not df[col].isna().all():
-                            year_col = col
-                            break
-                    except:
-                        pass
+            temporal_analysis = analyzer._temporal_analysis()
+            st.markdown(temporal_analysis)
             
+            # Gráfico temporal
+            year_col = next((col for col in ['ano', 'year'] if col in df.columns), None)
             if year_col:
-                st.write("#### Análise Temporal")
                 years = df[year_col].dropna()
-                
-                if not years.empty:
+                if not years.empty and len(years.unique()) > 1:
                     year_counts = years.value_counts().sort_index()
-                    
-                    col_y1, col_y2 = st.columns(2)
-                    with col_y1:
-                        st.write("**Evolução Temporal:**")
-                        if len(year_counts) > 1:
-                            fig_temp = px.line(x=year_counts.index, y=year_counts.values,
-                                             title="Publicações por Ano",
-                                             labels={'x': 'Ano', 'y': 'Número de Publicações'})
-                            fig_temp.update_layout(
-                                plot_bgcolor="rgba(0,0,0,0)", 
-                                paper_bgcolor="rgba(0,0,0,0)", 
-                                font=dict(color="#d6d9dc")
-                            )
-                            st.plotly_chart(fig_temp, use_container_width=True)
-                        else:
-                            st.write(f"**Ano principal**: {int(years.iloc[0])}")
-                    
-                    with col_y2:
-                        st.write("**Estatísticas Temporais:**")
-                        st.write(f"- **Período**: {int(years.min())} - {int(years.max())}")
-                        st.write(f"- **Variação**: {int(years.max() - years.min())} anos")
-                        st.write(f"- **Ano mais produtivo**: {int(year_counts.idxmax())}")
-                else:
-                    st.info("Não há dados temporais suficientes.")
-            else:
-                st.warning("Não há coluna de ano/data para análise temporal.")
-        
-        # Visualizações interativas
-        st.markdown("---")
-        st.write("### 📈 Visualizações Interativas")
-        
-        # Gráficos dinâmicos baseados nos dados disponíveis
-        available_viz = []
-        if 'autor' in df.columns:
-            available_viz.append("Autores")
-        if any(col in df.columns for col in ['país', 'pais', 'country']):
-            available_viz.append("Geografia")
-        if any(col in df.columns for col in ['ano', 'year']):
-            available_viz.append("Temporal")
-        
-        if available_viz:
-            viz_type = st.selectbox("Tipo de visualização:", available_viz)
-            
-            if viz_type == "Autores" and 'autor' in df.columns:
-                # Gráfico de autores
-                all_authors = []
-                for authors_str in df['autor'].dropna():
-                    if isinstance(authors_str, str):
-                        authors = re.split(r'[;,]|\be\b', authors_str)
-                        all_authors.extend([a.strip() for a in authors if a.strip() and a.strip() not in ['', 'e', 'and']])
-                
-                if all_authors:
-                    author_counts = pd.Series(all_authors).value_counts().head(10)
-                    fig_auth = px.bar(x=author_counts.index, y=author_counts.values,
-                                    title="Top 10 Autores Mais Produtivos",
-                                    labels={'x': 'Autor', 'y': 'Número de Publicações'})
-                    fig_auth.update_layout(xaxis_tickangle=-45)
-                    st.plotly_chart(fig_auth, use_container_width=True)
-            
-            elif viz_type == "Geografia":
-                country_col = next((col for col in ['país', 'pais', 'country'] if col in df.columns), None)
-                if country_col:
-                    country_counts = df[country_col].value_counts().head(10)
-                    fig_geo = px.bar(x=country_counts.index, y=country_counts.values,
-                                   title="Top 10 Países/Regiões",
-                                   labels={'x': 'País', 'y': 'Número de Publicações'})
-                    st.plotly_chart(fig_geo, use_container_width=True)
-            
-            elif viz_type == "Temporal":
-                year_col = next((col for col in ['ano', 'year'] if col in df.columns), None)
-                if year_col:
-                    year_counts = df[year_col].value_counts().sort_index()
-                    fig_temp = px.area(x=year_counts.index, y=year_counts.values,
-                                     title="Evolução Temporal das Publicações",
-                                     labels={'x': 'Ano', 'y': 'Número de Publicações'})
+                    fig_temp = px.line(
+                        x=year_counts.index, 
+                        y=year_counts.values,
+                        title="Evolução Temporal das Publicações",
+                        labels={'x': 'Ano', 'y': 'Número de Publicações'}
+                    )
+                    fig_temp.update_layout(plot_bgcolor="rgba(0,0,0,0)", paper_bgcolor="rgba(0,0,0,0)")
                     st.plotly_chart(fig_temp, use_container_width=True)
 
     st.markdown("</div>", unsafe_allow_html=True)
