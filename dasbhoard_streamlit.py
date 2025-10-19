@@ -11,6 +11,7 @@ import random
 import string
 import unicodedata
 import html
+import math
 from pathlib import Path
 from datetime import datetime
 
@@ -600,235 +601,544 @@ class DataAnalyzer:
         
         return text
 
+# -------------------------
+# SISTEMA DE IA INTELIGENTE MELHORADO
+# -------------------------
 def get_ai_assistant_response(question, context):
-    """Assistente de IA SUPER INTELIGENTE - Responde perguntas complexas"""
+    """Assistente de IA SUPER INTELIGENTE - Responde qualquer tipo de pergunta"""
     
     question_lower = question.lower().strip()
     df = context.df
     
-    # PERGUNTAS SOBRE AUTORES RELEVANTES
-    if any(word in question_lower for word in ['autor', 'autores', 'relevantes', 'pesquisador', 'escritor', 'quem escreveu', 'principais autores']):
-        author_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
-        
-        if not author_col:
-            return "**❌ Autores**: Não encontrei coluna de autores na planilha. Verifique se há colunas como 'autor', 'autores' ou 'author'."
-        
-        # ANÁLISE AVANÇADA DE AUTORES
-        autores_contagem = {}
-        colaboracoes = 0
-        
-        for authors_str in df[author_col].dropna():
-            if isinstance(authors_str, str):
-                autores = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
-                autores_lista = [a.strip() for a in autores if a.strip()]
-                
-                # Contar colaborações
-                if len(autores_lista) > 1:
-                    colaboracoes += 1
-                
-                for autor in autores_lista:
-                    if len(autor) > 2 and not autor.isdigit():
-                        autores_contagem[autor] = autores_contagem.get(autor, 0) + 1
-        
-        if not autores_contagem:
-            return "**⚠️ Autores**: Coluna encontrada mas não consegui extrair nomes válidos. Verifique o formato dos dados."
-        
-        # Ordenar por produtividade
-        autores_ordenados = sorted(autores_contagem.items(), key=lambda x: x[1], reverse=True)
-        
-        resposta = "**👥 AUTORES MAIS RELEVANTES**\n\n"
-        resposta += f"**Total de autores únicos**: {len(autores_contagem)}\n"
-        resposta += f"**Taxa de colaboração**: {(colaboracoes/len(df[author_col].dropna())*100):.1f}%\n\n"
-        
-        resposta += "**Top autores por produtividade:**\n"
-        for i, (autor, count) in enumerate(autores_ordenados[:8], 1):
-            resposta += f"{i}. **{autor}** - {count} publicação(ões)\n"
-        
-        # Análise de redes de colaboração
-        if colaboracoes > 0:
-            resposta += f"\n**💡 Insight**: Rede colaborativa ativa com {colaboracoes} trabalhos em coautoria"
-        
-        return resposta
+    # PERGUNTAS SOBRE AUTORES
+    if any(word in question_lower for word in ['autor', 'autores', 'pesquisador', 'escritor', 'quem escreveu', 'quem publicou']):
+        return _analyze_authors(df, question_lower)
     
-    # PERGUNTAS SOBRE DISTRIBUIÇÃO GEOGRÁFICA
-    elif any(word in question_lower for word in ['país', 'países', 'geográfica', 'geografia', 'distribuição', 'localização', 'onde']):
-        country_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['país', 'pais', 'country', 'local'])), None)
-        
-        if not country_col:
-            return "**❌ Países**: Não encontrei coluna de países. Adicione 'país', 'country' ou similar."
-        
-        paises = df[country_col].dropna()
-        if paises.empty:
-            return "**⚠️ Países**: Coluna encontrada mas sem dados válidos."
-        
-        contagem_paises = paises.value_counts()
-        total_paises = len(contagem_paises)
-        
-        resposta = "**🌎 DISTRIBUIÇÃO GEOGRÁFICA**\n\n"
-        resposta += f"**Total de países/regiões**: {total_paises}\n"
-        resposta += f"**Diversidade geográfica**: {(total_paises/len(paises)*100):.1f}%\n\n"
-        
-        resposta += "**Principais localizações:**\n"
-        for pais, count in contagem_paises.head(10).items():
-            percentual = (count / len(paises)) * 100
-            resposta += f"• **{pais}**: {count} ({percentual:.1f}%)\n"
-        
-        # Análise de concentração
-        if total_paises == 1:
-            resposta += "\n**🎯 Concentração**: Pesquisa focada em uma única região"
-        elif total_paises <= 3:
-            resposta += f"\n**🎯 Foco regional**: {total_paises} regiões principais"
-        else:
-            resposta += f"\n**🎯 Abrangência global**: {total_paises} regiões diferentes"
-        
-        return resposta
+    # PERGUNTAS SOBRE PAÍSES/GEOGRAFIA
+    elif any(word in question_lower for word in ['país', 'países', 'geográfica', 'geografia', 'distribuição', 'local', 'região', 'onde']):
+        return _analyze_geography(df, question_lower)
     
-    # PERGUNTAS SOBRE EVOLUÇÃO TEMPORAL
-    elif any(word in question_lower for word in ['ano', 'anos', 'temporal', 'evolução', 'cronologia', 'linha do tempo', 'como evoluiu']):
-        year_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['ano', 'year', 'data'])), None)
-        
-        if not year_col:
-            return "**❌ Anos**: Não encontrei coluna temporal. Adicione 'ano', 'year' ou similar."
-        
-        try:
-            anos = pd.to_numeric(df[year_col], errors='coerce').dropna()
-            if anos.empty:
-                return "**⚠️ Anos**: Coluna encontrada mas sem valores numéricos válidos."
-            
-            min_ano = int(anos.min())
-            max_ano = int(anos.max())
-            periodo = max_ano - min_ano
-            
-            resposta = "**📈 EVOLUÇÃO TEMPORAL**\n\n"
-            resposta += f"**Período analisado**: {min_ano} - {max_ano} ({periodo} anos)\n"
-            resposta += f"**Total de registros com ano**: {len(anos)}\n\n"
-            
-            # Análise por década/período
-            if periodo > 10:
-                decadas = (anos // 10) * 10
-                contagem_decadas = decadas.value_counts().sort_index()
-                resposta += "**Distribuição por década:**\n"
-                for decada, count in contagem_decadas.items():
-                    resposta += f"• **{int(decada)}s**: {int(count)} publicações\n"
-            
-            # Tendência
-            contagem_por_ano = anos.value_counts().sort_index()
-            if len(contagem_por_ano) > 3:
-                anos_recentes = contagem_por_ano.tail(3).sum()
-                anos_anteriores = contagem_por_ano.head(len(contagem_por_ano)-3).sum()
-                
-                if anos_recentes > anos_anteriores * 1.5:
-                    tendencia = "📈 **CRESCENTE** - Produção aumentando recentemente"
-                elif anos_recentes < anos_anteriores * 0.7:
-                    tendencia = "📉 **DECRESCENTE** - Produção mais concentrada no passado"
-                else:
-                    tendencia = "➡️ **ESTÁVEL** - Produção constante"
-                
-                resposta += f"\n**Tendência**: {tendencia}"
-            
-            return resposta
-            
-        except Exception as e:
-            return f"**❌ Erro**: Não consegui analisar os dados temporais: {str(e)}"
+    # PERGUNTAS SOBRE TEMPO/EVOLUÇÃO
+    elif any(word in question_lower for word in ['ano', 'anos', 'temporal', 'evolução', 'cronologia', 'linha do tempo', 'como evoluiu', 'quando', 'período']):
+        return _analyze_temporal(df, question_lower)
     
     # PERGUNTAS SOBRE TEMAS/CONCEITOS
-    elif any(word in question_lower for word in ['tema', 'temas', 'conceito', 'conceitos', 'palavras', 'frequentes', 'termos', 'assuntos']):
-        # Combinar texto das colunas principais
-        texto_analise = ""
-        colunas_texto = [col for col in df.columns if df[col].dtype == 'object']
-        for col in colunas_texto[:4]:
-            texto_analise += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
+    elif any(word in question_lower for word in ['tema', 'temas', 'conceito', 'conceitos', 'palavras', 'frequentes', 'termos', 'assuntos', 'palavras-chave', 'keywords']):
+        return _analyze_themes(df, question_lower)
+    
+    # PERGUNTAS SOBRE COLABORAÇÕES
+    elif any(word in question_lower for word in ['colaboração', 'colaborações', 'coautoria', 'parceria', 'trabalho conjunto', 'rede']):
+        return _analyze_collaborations(df, question_lower)
+    
+    # PERGUNTAS SOBRE ESTATÍSTICAS GERAIS
+    elif any(word in question_lower for word in ['estatística', 'estatísticas', 'números', 'quantidade', 'total', 'quantos', 'resumo', 'visão geral']):
+        return _analyze_statistics(df, question_lower)
+    
+    # PERGUNTAS SOBRE TENDÊNCIAS
+    elif any(word in question_lower for word in ['tendência', 'tendências', 'futuro', 'emergente', 'novo', 'recente']):
+        return _analyze_trends(df, question_lower)
+    
+    # PERGUNTAS COMPLEXAS/ANÁLISE
+    elif any(word in question_lower for word in ['análise', 'analisar', 'insight', 'interpretação', 'o que significa', 'significado']):
+        return _analyze_complex_questions(df, question_lower)
+    
+    # SUGESTÕES
+    elif any(word in question_lower for word in ['sugestão', 'sugestões', 'recomendação', 'recomendações', 'o que fazer', 'próximo passo', 'como melhorar']):
+        return _provide_suggestions(df, question_lower)
+    
+    # PERGUNTAS SOBRE A BASE DE DADOS
+    elif any(word in question_lower for word in ['dados', 'base de dados', 'planilha', 'dataset', 'qualidade']):
+        return _analyze_data_quality(df, question_lower)
+    
+    # RESPOSTA PADRÃO PARA PERGUNTAS NÃO IDENTIFICADAS
+    else:
+        return _general_analysis_response(df, question)
+
+def _analyze_authors(df, question):
+    """Análise avançada de autores"""
+    author_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
+    
+    if not author_col:
+        return "**❌ Autores**: Não encontrei coluna de autores na planilha."
+    
+    autores_contagem = {}
+    colaboracoes = 0
+    autores_por_trabalho = []
+    
+    for authors_str in df[author_col].dropna():
+        if isinstance(authors_str, str):
+            autores = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
+            autores_lista = [a.strip() for a in autores if a.strip() and len(a.strip()) > 2]
+            
+            autores_por_trabalho.append(len(autores_lista))
+            
+            if len(autores_lista) > 1:
+                colaboracoes += 1
+            
+            for autor in autores_lista:
+                autores_contagem[autor] = autores_contagem.get(autor, 0) + 1
+    
+    if not autores_contagem:
+        return "**⚠️ Autores**: Coluna encontrada mas não consegui extrair nomes válidos."
+    
+    autores_ordenados = sorted(autores_contagem.items(), key=lambda x: x[1], reverse=True)
+    total_autores = len(autores_contagem)
+    total_trabalhos = len(df[author_col].dropna())
+    media_autores = np.mean(autores_por_trabalho) if autores_por_trabalho else 0
+    
+    resposta = "**👥 ANÁLISE DE AUTORES**\n\n"
+    resposta += f"**Total de autores únicos**: {total_autores}\n"
+    resposta += f"**Total de trabalhos com autores**: {total_trabalhos}\n"
+    resposta += f"**Média de autores por trabalho**: {media_autores:.1f}\n"
+    resposta += f"**Taxa de colaboração**: {(colaboracoes/total_trabalhos)*100:.1f}%\n\n"
+    
+    resposta += "**Top 10 autores mais produtivos:**\n"
+    for i, (autor, count) in enumerate(autores_ordenados[:10], 1):
+        resposta += f"{i}. **{autor}** - {count} publicação(ões)\n"
+    
+    # Análises específicas baseadas na pergunta
+    if 'relevante' in question:
+        resposta += f"\n**💡 Autores mais relevantes**: {', '.join([autor for autor, _ in autores_ordenados[:5]])}"
+    
+    if 'colaboração' in question:
+        resposta += f"\n**🤝 Colaborações**: {colaboracoes} trabalhos em coautoria"
+    
+    if 'produtivo' in question:
+        resposta += f"\n**🏆 Autor mais produtivo**: {autores_ordenados[0][0]} com {autores_ordenados[0][1]} publicações"
+    
+    return resposta
+
+def _analyze_geography(df, question):
+    """Análise geográfica avançada"""
+    country_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['país', 'pais', 'country', 'local'])), None)
+    
+    if not country_col:
+        return "**❌ Geografia**: Não encontrei coluna de países/regiões."
+    
+    paises = df[country_col].dropna()
+    if paises.empty:
+        return "**⚠️ Geografia**: Coluna encontrada mas sem dados válidos."
+    
+    contagem_paises = paises.value_counts()
+    total_paises = len(contagem_paises)
+    total_registros = len(paises)
+    
+    resposta = "**🌎 ANÁLISE GEOGRÁFICA**\n\n"
+    resposta += f"**Total de países/regiões**: {total_paises}\n"
+    resposta += f"**Total de registros com localização**: {total_registros}\n"
+    resposta += f"**Diversidade geográfica**: {(total_paises/total_registros)*100:.1f}%\n\n"
+    
+    resposta += "**Distribuição geográfica:**\n"
+    for pais, count in contagem_paises.head(10).items():
+        percentual = (count / total_registros) * 100
+        resposta += f"• **{pais}**: {count} ({percentual:.1f}%)\n"
+    
+    # Análises específicas
+    if 'distribuição' in question:
+        pais_principal = contagem_paises.index[0]
+        percentual_principal = (contagem_paises.iloc[0] / total_registros) * 100
+        resposta += f"\n**🎯 Foco principal**: {pais_principal} concentra {percentual_principal:.1f}% da produção"
+    
+    if 'diversidade' in question:
+        if total_paises > 10:
+            resposta += f"\n**🌐 Alta diversidade**: Pesquisa com abrangência internacional ({total_paises} regiões)"
+        elif total_paises > 3:
+            resposta += f"\n**🎯 Diversidade moderada**: {total_paises} regiões principais"
+        else:
+            resposta += f"\n**📍 Foco concentrado**: Pesquisa concentrada em {total_paises} região(ões)"
+    
+    return resposta
+
+def _analyze_temporal(df, question):
+    """Análise temporal avançada"""
+    year_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['ano', 'year', 'data'])), None)
+    
+    if not year_col:
+        return "**❌ Anos**: Não encontrei coluna temporal."
+    
+    try:
+        anos = pd.to_numeric(df[year_col], errors='coerce').dropna()
+        if anos.empty:
+            return "**⚠️ Anos**: Coluna encontrada mas sem valores numéricos válidos."
         
-        if not texto_analise.strip():
-            return "**❌ Temas**: Não há texto suficiente para análise temática."
+        min_ano = int(anos.min())
+        max_ano = int(anos.max())
+        periodo = max_ano - min_ano
+        anos_unicos = len(anos.unique())
         
-        # Análise avançada de temas
-        palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_analise.lower())
-        palavras_filtradas = [p for p in palavras if p not in PORTUGUESE_STOP_WORDS and len(p) > 3]
+        resposta = "**📈 ANÁLISE TEMPORAL**\n\n"
+        resposta += f"**Período analisado**: {min_ano} - {max_ano} ({periodo} anos)\n"
+        resposta += f"**Anos com registros**: {anos_unicos}\n"
+        resposta += f"**Total de registros temporais**: {len(anos)}\n\n"
         
-        if not palavras_filtradas:
-            return "**🔍 Temas**: Texto analisado mas não identifiquei palavras-chave significativas."
+        # Análise por década
+        if periodo > 10:
+            decadas = (anos // 10) * 10
+            contagem_decadas = decadas.value_counts().sort_index()
+            resposta += "**Distribuição por década:**\n"
+            for decada, count in contagem_decadas.items():
+                resposta += f"• **{int(decada)}s**: {int(count)} publicações\n"
+        
+        # Análise de tendência
+        contagem_por_ano = anos.value_counts().sort_index()
+        if len(contagem_por_ano) > 3:
+            # Últimos 3 anos vs anteriores
+            anos_recentes = contagem_por_ano.tail(3)
+            anos_anteriores = contagem_por_ano.head(len(contagem_por_ano)-3)
+            
+            media_recente = anos_recentes.mean()
+            media_anterior = anos_anteriores.mean() if len(anos_anteriores) > 0 else 0
+            
+            if media_recente > media_anterior * 1.3:
+                tendencia = "📈 **CRESCENTE** - Produção em crescimento"
+            elif media_recente < media_anterior * 0.7:
+                tendencia = "📉 **DECRESCENTE** - Produção reduzindo"
+            else:
+                tendencia = "➡️ **ESTÁVEL** - Produção constante"
+            
+            resposta += f"\n**Tendência**: {tendencia}"
+        
+        # Ano mais produtivo
+        if not contagem_por_ano.empty:
+            ano_mais_produtivo = contagem_por_ano.idxmax()
+            producao_pico = contagem_por_ano.max()
+            resposta += f"\n**🏆 Ano mais produtivo**: {int(ano_mais_produtivo)} ({producao_pico} publicações)"
+        
+        return resposta
+        
+    except Exception as e:
+        return f"**❌ Erro na análise temporal**: {str(e)}"
+
+def _analyze_themes(df, question):
+    """Análise temática avançada"""
+    texto_analise = ""
+    colunas_texto = [col for col in df.columns if df[col].dtype == 'object']
+    
+    for col in colunas_texto[:5]:  # Analisar até 5 colunas de texto
+        texto_analise += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
+    
+    if len(texto_analise.strip()) < 100:
+        return "**❌ Temas**: Não há texto suficiente para análise temática."
+    
+    # Análise avançada de palavras-chave
+    palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_analise.lower())
+    palavras_filtradas = [p for p in palavras if p not in PORTUGUESE_STOP_WORDS and len(p) > 3]
+    
+    if not palavras_filtradas:
+        return "**🔍 Temas**: Texto analisado mas não identifiquei palavras-chave significativas."
+    
+    from collections import Counter
+    contador = Counter(palavras_filtradas)
+    temas_comuns = contador.most_common(15)
+    
+    resposta = "**🔤 ANÁLISE TEMÁTICA**\n\n"
+    resposta += f"**Total de palavras únicas**: {len(contador)}\n"
+    resposta += f"**Texto analisado**: {len(texto_analise):,} caracteres\n\n"
+    
+    resposta += "**Palavras-chave mais frequentes:**\n"
+    for i, (tema, count) in enumerate(temas_comuns[:12], 1):
+        resposta += f"{i}. **{tema}** - {count} palavras repetidas\n"
+    
+    # Análise de bigramas (palavras que aparecem juntas)
+    if len(palavras_filtradas) > 10:
+        bigramas = []
+        for i in range(len(palavras_filtradas)-1):
+            bigrama = f"{palavras_filtradas[i]} {palavras_filtradas[i+1]}"
+            bigramas.append(bigrama)
+        
+        contador_bigramas = Counter(bigramas)
+        bigramas_comuns = contador_bigramas.most_common(8)
+        
+        if bigramas_comuns:
+            resposta += "\n**Conceitos relacionados (bigramas):**\n"
+            for bigrama, count in bigramas_comuns[:6]:
+                resposta += f"• **{bigrama}** ({count})\n"
+    
+    # Temas emergentes (palavras menos frequentes mas significativas)
+    temas_emergentes = [tema for tema, count in temas_comuns[8:15] if count >= 2]
+    if temas_emergentes:
+        resposta += f"\n**💡 Temas emergentes**: {', '.join(temas_emergentes[:5])}"
+    
+    return resposta
+
+def _analyze_collaborations(df, question):
+    """Análise de colaborações"""
+    author_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
+    
+    if not author_col:
+        return "**❌ Colaborações**: Não encontrei dados de autores para análise."
+    
+    colaboracoes = 0
+    total_trabalhos = 0
+    autores_por_trabalho = []
+    
+    for authors_str in df[author_col].dropna():
+        if isinstance(authors_str, str):
+            total_trabalhos += 1
+            autores = re.split(r'[;,]', authors_str)
+            num_autores = len([a for a in autores if a.strip()])
+            autores_por_trabalho.append(num_autores)
+            
+            if num_autores > 1:
+                colaboracoes += 1
+    
+    if total_trabalhos == 0:
+        return "**⚠️ Colaborações**: Sem dados válidos para análise."
+    
+    taxa_colaboracao = (colaboracoes / total_trabalhos) * 100
+    media_autores = np.mean(autores_por_trabalho)
+    
+    resposta = "**🤝 ANÁLISE DE COLABORAÇÕES**\n\n"
+    resposta += f"**Total de trabalhos analisados**: {total_trabalhos}\n"
+    resposta += f"**Trabalhos em colaboração**: {colaboracoes}\n"
+    resposta += f"**Taxa de colaboração**: {taxa_colaboracao:.1f}%\n"
+    resposta += f"**Média de autores por trabalho**: {media_autores:.1f}\n\n"
+    
+    # Classificação do nível de colaboração
+    if taxa_colaboracao > 60:
+        resposta += "**🎯 Alto nível de colaboração** - Pesquisa fortemente colaborativa"
+    elif taxa_colaboracao > 30:
+        resposta += "**🤝 Bom nível de colaboração** - Equilíbrio entre trabalho individual e em grupo"
+    else:
+        resposta += "**💡 Oportunidade para colaboração** - Predominância de trabalho individual"
+    
+    return resposta
+
+def _analyze_statistics(df, question):
+    """Análise estatística geral"""
+    total_registros = len(df)
+    total_colunas = len(df.columns)
+    
+    colunas_numericas = df.select_dtypes(include=[np.number]).columns.tolist()
+    colunas_texto = df.select_dtypes(include=['object']).columns.tolist()
+    
+    resposta = "**📊 ESTATÍSTICAS GERAIS**\n\n"
+    resposta += f"**Total de registros**: {total_registros}\n"
+    resposta += f"**Total de colunas**: {total_colunas}\n"
+    resposta += f"**Colunas numéricas**: {len(colunas_numericas)}\n"
+    resposta += f"**Colunas de texto**: {len(colunas_texto)}\n\n"
+    
+    # Completude dos dados
+    colunas_principais = ['autor', 'ano', 'título', 'resumo']
+    colunas_presentes = []
+    
+    for col in colunas_principais:
+        if any(col in col_name.lower() for col_name in df.columns):
+            colunas_presentes.append(col)
+    
+    completude = (len(colunas_presentes) / len(colunas_principais)) * 100
+    resposta += f"**Completude dos metadados**: {completude:.1f}%\n"
+    resposta += f"**Metadados presentes**: {', '.join(colunas_presentes) if colunas_presentes else 'Nenhum'}\n\n"
+    
+    # Tamanho da base
+    if total_registros < 20:
+        resposta += "**📈 Tamanho**: Base pequena - considere expandir para análises mais robustas"
+    elif total_registros < 50:
+        resposta += "**📈 Tamanho**: Base média - adequada para análises básicas"
+    elif total_registros < 100:
+        resposta += "**📈 Tamanho**: Base boa - permite análises detalhadas"
+    else:
+        resposta += "**📈 Tamanho**: Base excelente - ideal para análises complexas"
+    
+    return resposta
+
+def _analyze_trends(df, question):
+    """Análise de tendências"""
+    year_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['ano', 'year'])), None)
+    
+    resposta = "**🚀 ANÁLISE DE TENDÊNCIAS**\n\n"
+    
+    if year_col:
+        try:
+            anos = pd.to_numeric(df[year_col], errors='coerce').dropna()
+            if len(anos) > 5:
+                anos_recentes = anos[anos >= anos.max() - 5]
+                if len(anos_recentes) > 0:
+                    resposta += f"**Foco recente**: {len(anos_recentes)} publicações nos últimos 5 anos\n\n"
+        
+        except:
+            pass
+    
+    # Análise de temas emergentes (simplificada)
+    texto_analise = ""
+    for col in df.select_dtypes(include=['object']).columns[:3]:
+        texto_analise += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
+    
+    if len(texto_analise) > 500:
+        palavras = re.findall(r'\b[a-zà-ú]{5,}\b', texto_analise.lower())
+        palavras_filtradas = [p for p in palavras if p not in PORTUGUESE_STOP_WORDS]
         
         from collections import Counter
         contador = Counter(palavras_filtradas)
-        temas_comuns = contador.most_common(12)
+        temas_tendencia = [pal for pal, cnt in contador.most_common(10) if cnt >= 3]
         
-        resposta = "**🔤 CONCEITOS MAIS FREQUENTES**\n\n"
-        resposta += f"**Total de palavras únicas**: {len(contador)}\n"
-        resposta += f"**Texto analisado**: {len(texto_analise)} caracteres\n\n"
-        
-        resposta += "**Palavras-chave principais:**\n"
-        for i, (tema, count) in enumerate(temas_comuns, 1):
-            resposta += f"{i}. **{tema}** - {count} palavras repetidas\n"
-        
-        # Identificar temas emergentes (palavras menos comuns mas significativas)
-        if len(temas_comuns) > 8:
-            temas_emergentes = [tema for tema, count in temas_comuns[8:] if count >= 2]
-            if temas_emergentes:
-                resposta += f"\n**💡 Temas emergentes**: {', '.join(temas_emergentes[:3])}"
-        
-        return resposta
+        if temas_tendencia:
+            resposta += "**Temas em destaque:**\n"
+            for tema in temas_tendencia[:5]:
+                resposta += f"• {tema}\n"
     
-    # PERGUNTAS SOBRE SUGESTÕES
-    elif any(word in question_lower for word in ['sugestão', 'sugestões', 'o que fazer', 'próximo', 'passo', 'recomendações']):
-        # Análise inteligente para sugestões personalizadas
+    resposta += "\n**💡 Para análises mais profundas:**\n"
+    resposta += "- Use a aba 'Análise' para gráficos detalhados\n"
+    resposta += "- Explore o mapa mental para conexões entre conceitos\n"
+    resposta += "- Consulte as recomendações para trabalhos relacionados"
+    
+    return resposta
+
+def _analyze_complex_questions(df, question):
+    """Resposta para perguntas complexas de análise"""
+    resposta = "**🔍 ANÁLISE COMPLEXA**\n\n"
+    
+    # Análise multidimensional baseada na pergunta
+    if any(word in question for word in ['correlação', 'relação', 'associação']):
+        resposta += "Para análise de correlações entre variáveis, sugiro:\n"
+        resposta += "1. Verifique se há colunas numéricas na sua planilha\n"
+        resposta += "2. Use a aba 'Análise' para visualizar correlações\n"
+        resposta += "3. Considere adicionar mais dados para análises estatísticas\n"
+    
+    elif any(word in question for word in ['padrão', 'padrões', 'comportamento']):
+        resposta += "**Identificação de Padrões**:\n"
+        resposta += "- Padrões temporais: Evolução ao longo dos anos\n"
+        resposta += "- Padrões geográficos: Distribuição por regiões\n"
+        resposta += "- Padrões de colaboração: Redes entre autores\n"
+        resposta += "- Padrões temáticos: Frequência de conceitos\n\n"
+        resposta += "**Use as ferramentas disponíveis**:\n"
+        resposta += "• Gráficos na aba 'Análise'\n"
+        resposta += "• Mapa mental para conexões conceituais\n"
+        resposta += "• Busca inteligente para comparações"
+    
+    else:
+        resposta += "**Análise Inteligente dos Seus Dados**:\n\n"
+        
+        # Análise rápida da base
         total = len(df)
+        if total < 30:
+            resposta += "📋 **Base em desenvolvimento** - Ideal para explorar direções iniciais\n"
+        elif total < 100:
+            resposta += "📊 **Base consolidada** - Permite análises confiáveis\n"
+        else:
+            resposta += "🚀 **Base robusta** - Excelente para análises complexas\n"
+        
+        # Verificar completude
         tem_autores = any('autor' in col.lower() for col in df.columns)
         tem_anos = any('ano' in col.lower() for col in df.columns)
         tem_paises = any('país' in col.lower() for col in df.columns)
         
-        resposta = "**🎯 SUGESTÕES INTELIGENTES**\n\n"
+        resposta += f"\n**Metadados**: "
+        metadados = []
+        if tem_autores: metadados.append("Autores")
+        if tem_anos: metadados.append("Anos") 
+        if tem_paises: metadados.append("Países")
         
-        if total < 20:
-            resposta += "**1. 📥 EXPANSÃO DE DADOS**\n"
-            resposta += "• Colete mais registros (mínimo 20-30 para análises confiáveis)\n"
-            resposta += "• Use a busca integrada para encontrar trabalhos relacionados\n\n"
-        elif total < 50:
-            resposta += "**1. 📊 ANÁLISES BÁSICAS**\n"
-            resposta += "• Explore os gráficos na aba 'Análise'\n"
-            resposta += "• Use o mapa mental para organizar conceitos\n\n"
-        else:
-            resposta += "**1. 🚀 ANÁLISES AVANÇADAS**\n"
-            resposta += "• Dados suficientes para machine learning\n"
-            resposta += "• Explore redes de colaboração entre autores\n\n"
+        resposta += f"{', '.join(metadados) if metadados else 'Básicos'}\n\n"
         
-        resposta += "**2. 🔧 MELHORIAS ESTRUTURAIS**\n"
-        if not tem_autores:
-            resposta += "• Adicione coluna 'autores' para análise de redes\n"
-        if not tem_anos:
-            resposta += "• Adicione coluna 'ano' para análise temporal\n"
-        if not tem_paises:
-            resposta += "• Adicione coluna 'país' para análise geográfica\n"
-        
-        if tem_autores and tem_anos and tem_paises:
-            resposta += "• Estrutura completa - explore todas as funcionalidades\n"
-        
-        resposta += "\n**3. 🎨 FERRAMENTAS RECOMENDADAS**\n"
-        resposta += "• **Mapa Mental**: Para organizar ideias e conceitos\n"
-        resposta += "• **Busca Inteligente**: Para encontrar trabalhos similares\n"
-        resposta += "• **Recomendações**: Para descobrir novos artigos\n"
-        resposta += "• **Análise IA**: Para insights automáticos dos dados\n"
-        
-        return resposta
+        resposta += "**Próximos passos para análise aprofundada**:\n"
+        resposta += "1. Explore visualizações específicas\n"
+        resposta += "2. Use perguntas diretas sobre autores, anos ou temas\n"
+        resposta += "3. Considere expandir dados para análises mais complexas"
     
-    # RESPOSTA PADRÃO PARA PERGUNTAS NÃO IDENTIFICADAS
+    return resposta
+
+def _provide_suggestions(df, question):
+    """Sugestões inteligentes baseadas nos dados"""
+    total = len(df)
+    
+    resposta = "**💡 SUGESTÕES INTELIGENTES**\n\n"
+    
+    # Sugestões baseadas no tamanho da base
+    if total < 20:
+        resposta += "**🎯 PRIORIDADE: Expansão de Dados**\n"
+        resposta += "• Colete mais 20-30 registros para análises confiáveis\n"
+        resposta += "• Use a busca integrada para encontrar trabalhos similares\n"
+        resposta += "• Complete metadados essenciais (autores, anos, países)\n\n"
+    
+    elif total < 50:
+        resposta += "**📊 Análises Recomendadas**:\n"
+        resposta += "• Explore distribuição temporal e geográfica\n"
+        resposta += "• Identifique autores e colaborações principais\n"
+        resposta += "• Use o mapa mental para organizar conceitos\n\n"
+    
     else:
-        return """**🤖 ASSISTENTE INTELIGENTE NUGEP-PQR**
+        resposta += "**🚀 Análises Avançadas Possíveis**:\n"
+        resposta += "• Redes de colaboração entre autores\n"
+        resposta += "• Análise de tendências temporais\n"
+        resposta += "• Mapeamento de temas emergentes\n"
+        resposta += "• Correlações entre diferentes variáveis\n\n"
+    
+    # Sugestões específicas baseadas na pergunta
+    if 'melhorar' in question or 'qualidade' in question:
+        resposta += "**🔧 Melhoria da Qualidade**:\n"
+        resposta += "• Verifique completude dos metadados\n"
+        resposta += "• Padronize formatos (datas, autores)\n"
+        resposta += "• Adicione resumos e palavras-chave\n"
+    
+    elif 'próximo' in question or 'futuro' in question:
+        resposta += "**🔮 Direções Futuras**:\n"
+        resposta += "• Identifique lacunas na literatura\n"
+        resposta += "• Explore colaborações potenciais\n"
+        resposta += "• Considere novas fontes de dados\n"
+    
+    resposta += "\n**🛠️ Ferramentas Recomendadas**:\n"
+    resposta += "• Mapa Mental: Para organizar ideias\n"
+    resposta += "• Análise IA: Para insights automáticos\n"
+    resposta += "• Busca: Para encontrar referências\n"
+    resposta += "• Recomendações: Para descoberta de conteúdo"
+    
+    return resposta
 
-Não entendi completamente sua pergunta. Posso ajudar com:
+def _analyze_data_quality(df, question):
+    """Análise da qualidade dos dados"""
+    total = len(df)
+    colunas = df.columns.tolist()
+    
+    resposta = "**📋 QUALIDADE DOS DADOS**\n\n"
+    resposta += f"**Total de registros**: {total}\n"
+    resposta += f"**Colunas disponíveis**: {len(colunas)}\n\n"
+    
+    # Análise de completude
+    resposta += "**Completude por coluna**:\n"
+    for col in df.columns[:8]:  # Mostrar até 8 colunas
+        na_count = df[col].isna().sum()
+        preenchimento = ((total - na_count) / total) * 100
+        resposta += f"• **{col}**: {preenchimento:.1f}% preenchido\n"
+    
+    # Metadados essenciais
+    essenciais = ['autor', 'ano', 'título']
+    presentes = [col for col in essenciais if any(col in col_name.lower() for col_name in df.columns)]
+    
+    resposta += f"\n**Metadados essenciais**: {len(presentes)} de {len(essenciais)} presentes\n"
+    
+    if len(presentes) < len(essenciais):
+        resposta += "**💡 Sugestão**: Considere adicionar colunas para autores, anos e títulos"
+    
+    return resposta
 
-**📊 PERGUNTAS ESPECÍFICAS SOBRE SEUS DADOS:**
-• *"Quais são os autores mais relevantes?"*
-• *"Qual a distribuição geográfica da pesquisa?"*  
-• *"Como evoluiu a pesquisa ao longo do tempo?"*
-• *"Quais são os conceitos mais frequentes?"*
-• *"O que devo fazer em seguida na minha pesquisa?"*
+def _general_analysis_response(df, original_question):
+    """Resposta geral para perguntas não categorizadas"""
+    return f"""**🤖 ASSISTENTE INTELIGENTE NUGEP-PQR**
 
-**🎯 SUGESTÕES DE ANÁLISE:**
-• *"Analise colaborações entre autores"*
-• *"Mostre tendências temporais"*
-• *"Identifique temas emergentes"*
-• *"Sugira próximos passos"*
+Não entendi completamente: "*{original_question}*"
+
+**Posso ajudar com estas análises:**
+
+📊 **PERGUNTAS ESPECÍFICAS:**
+• "Quais são os autores mais relevantes?"
+• "Qual a distribuição geográfica?"  
+• "Como evoluiu a pesquisa ao longo do tempo?"
+• "Quais são os conceitos mais frequentes?"
+• "Quantas colaborações existem?"
+
+🔍 **ANÁLISES COMPLEXAS:**
+• "Analise os padrões de colaboração"
+• "Mostre tendências temporais" 
+• "Identifique temas emergentes"
+• "Avalie a qualidade dos dados"
+
+💡 **SUGESTÕES:**
+• "O que devo fazer em seguida?"
+• "Como posso melhorar minha pesquisa?"
+• "Quais são as próximas etapas?"
+
+**Sua base atual:** {len(df)} registros, {len(df.columns)} colunas
 
 Faça uma pergunta mais específica sobre sua planilha!"""
 
@@ -861,6 +1171,45 @@ class MiroStyleMindMap:
             "font": {"color": "#FFFFFF", "size": 14, "face": "Arial"},
             "size": 20
         }
+    
+    def _calculate_smart_position(self, existing_nodes, selected_node_id):
+        """Calcula posição inteligente para novo nó"""
+        if not existing_nodes:
+            return 500, 400  # Posição central se não há nós
+        
+        # Se há nó selecionado, posicionar próximo a ele
+        if selected_node_id:
+            selected_node = next((n for n in existing_nodes if n["id"] == selected_node_id), None)
+            if selected_node:
+                # Posicionar em um raio de 150px do nó selecionado
+                angle = random.uniform(0, 2 * math.pi)
+                distance = random.uniform(100, 200)
+                x = selected_node.get("x", 500) + distance * math.cos(angle)
+                y = selected_node.get("y", 400) + distance * math.sin(angle)
+                return x, y
+        
+        # Se não há nó selecionado, encontrar área menos congestionada
+        occupied_positions = [(n.get("x", 0), n.get("y", 0)) for n in existing_nodes]
+        
+        # Tentar posições em espiral a partir do centro
+        center_x, center_y = 500, 400
+        for radius in range(200, 801, 100):  # De 200 a 800 pixels
+            for angle in range(0, 360, 45):  # A cada 45 graus
+                rad = math.radians(angle)
+                x = center_x + radius * math.cos(rad)
+                y = center_y + radius * math.sin(rad)
+                
+                # Verificar se está longe o suficiente de outros nós
+                too_close = any(
+                    math.sqrt((x - ox)**2 + (y - oy)**2) < 150 
+                    for ox, oy in occupied_positions
+                )
+                
+                if not too_close:
+                    return x, y
+        
+        # Fallback: posição aleatória
+        return random.randint(200, 800), random.randint(150, 650)
     
     def generate_layout(self, nodes, edges, layout_type="hierarchical"):
         """Gera layout automático para as ideias"""
@@ -907,25 +1256,61 @@ class MiroStyleMindMap:
 
     def _force_directed_layout(self, nodes, edges):
         """Layout de força direcionada - CORRIGIDO: estabilidade REAL melhorada"""
+        if not nodes:
+            return nodes
+        
         G = nx.Graph()
+        
+        # Adicionar nós mantendo referências
         for node in nodes:
             G.add_node(node["id"])
+        
+        # Adicionar arestas
         for edge in edges:
             G.add_edge(edge["source"], edge["target"])
         
         try:
-            # FORÇAS OTIMIZADAS - MAIS ESTÁVEL
-            pos = nx.spring_layout(G, k=5, iterations=200, scale=3, seed=42)
+            # CONFIGURAÇÃO OTIMIZADA PARA ESTABILIDADE
+            # Usar posições existentes como ponto de partida
+            pos_existente = {}
+            for node in nodes:
+                if "x" in node and "y" in node:
+                    pos_existente[node["id"]] = [node["x"], node["y"]]
+            
+            # Parâmetros para layout suave
+            k = 3  # Distância ideal entre nós
+            iterations = 50  # Menos iterações para mais velocidade
+            scale = 2  # Escala moderada
+            
+            if pos_existente:
+                # Se temos posições existentes, usar como seed
+                pos = nx.spring_layout(G, pos=pos_existente, k=k, iterations=iterations, 
+                                     scale=scale, seed=42)
+            else:
+                # Se não, começar do zero
+                pos = nx.spring_layout(G, k=k, iterations=iterations, scale=scale, seed=42)
+            
+            # Aplicar novas posições suavemente
             for node in nodes:
                 if node["id"] in pos:
-                    node["x"] = pos[node["id"]][0] * 800 + 300
-                    node["y"] = pos[node["id"]][1] * 600 + 200
+                    # Se o nó já tinha posição, fazer transição suave
+                    if "x" in node and "y" in node:
+                        # Transição de 50% para manter estabilidade
+                        node["x"] = (node["x"] + pos[node["id"]][0] * 800) / 2
+                        node["y"] = (node["y"] + pos[node["id"]][1] * 600) / 2
+                    else:
+                        # Novo nó, posicionar normalmente
+                        node["x"] = pos[node["id"]][0] * 800 + 400
+                        node["y"] = pos[node["id"]][1] * 600 + 300
+                        
         except Exception as e:
             print(f"Layout automático falhou: {e}")
-            # Fallback organizado em grid
+            # Fallback: grid organizado que mantém a estabilidade
             for i, node in enumerate(nodes):
-                node["x"] = 300 + (i % 4) * 250
-                node["y"] = 200 + (i // 4) * 150
+                if "x" not in node or "y" not in node:
+                    # Só reposicionar nós sem posição
+                    node["x"] = 400 + (i % 4) * 200
+                    node["y"] = 300 + (i // 4) * 150
         
         return nodes
 
@@ -2070,8 +2455,15 @@ elif st.session_state.page == "mapa":
                 if st.form_submit_button("🎯 Adicionar Ideia", use_container_width=True):
                     if node_label:
                         node_id = f"node_{int(time.time())}_{random.randint(1000,9999)}"
+                        
+                        # POSICIONAMENTO INTELIGENTE - próximo ao nó selecionado ou em área vazia
+                        x, y = st.session_state.miro_map._calculate_smart_position(
+                            st.session_state.miro_nodes, 
+                            st.session_state.miro_selected_node
+                        )
+                        
                         new_node = st.session_state.miro_map.create_node(
-                            node_id, node_label, node_type, node_desc
+                            node_id, node_label, node_type, node_desc, x, y
                         )
                         st.session_state.miro_nodes.append(new_node)
                         st.session_state.miro_selected_node = node_id
@@ -2169,248 +2561,199 @@ elif st.session_state.page == "mapa":
                     elif node["color"] == "#45B7D1": node["color"] = "#0099FF"  # Tarefa - azul brilhante
                     elif node["color"] == "#96CEB4": node["color"] = "#66FF99"  # Pergunta - verde brilhante
                     elif node["color"] == "#FECA57": node["color"] = "#FFCC00"  # Recurso - amarelo brilhante
-                    elif node["color"] == "#FF6B6B": node["color"] = "#FF3366"  # Objetivo - rosa brilhante
+                    elif node["color"] == "#FF6B6B": node["color"] = "#FF3333"  # Objetivo - vermelho brilhante
                     elif node["color"] == "#A29BFE": node["color"] = "#9966FF"  # Nota - roxo brilhante
-                    
+                    node["size"] = node_size * 1.5  # Aumentar tamanho no 3D
+                    node["font"] = {"size": font_size, "color": "#FFFFFF"}
+
             elif visualization_mode == "Fluxograma":
-                # Estilo fluxograma - caixas retangulares
+                # Estilo fluxograma - organizado e estruturado
                 st.markdown('<div class="flowchart-box">', unsafe_allow_html=True)
-                st.info("📦 **Modo Fluxograma**: Use caixas para processos e decisões!")
+                st.info("📋 **Modo Fluxograma**: Visualização estruturada e sequencial!")
                 
-                for node in st.session_state.miro_nodes:
-                    node["shape"] = "square"  # Forçar formato quadrado
                 node_size = 25
                 font_size = st.session_state.settings.get("node_font_size", 14)
                 physics_enabled = False
                 hierarchical_enabled = True
                 
-            else:  # Mapa 2D
-                node_size = 20
+                # Aplicar estilo de fluxograma
+                for node in st.session_state.miro_nodes:
+                    node["shape"] = "square"  # Padronizar formato
+                    node["color"] = "#2E86AB"  # Azul profissional para fluxograma
+                    node["size"] = node_size
+                    node["font"] = {"size": font_size, "color": "#FFFFFF"}
+
+            else:  # Mapa 2D padrão
+                node_size = 25
                 font_size = st.session_state.settings.get("node_font_size", 14)
                 physics_enabled = True
-                hierarchical_enabled = True
-            
-            # Preparar ideias para visualização
+                hierarchical_enabled = False
+
+            # Preparar nós e arestas para visualização
             nodes_for_viz = []
             for node in st.session_state.miro_nodes:
-                is_selected = node["id"] == st.session_state.miro_selected_node
-                
-                # Ajustar tamanho baseado no modo
-                current_size = node_size + 5 if is_selected else node_size
-                
-                nodes_for_viz.append(Node(
-                    id=node["id"],
-                    label=node["label"],
-                    color=node["color"],
-                    size=current_size,
-                    shape=node["shape"],
-                    font={"color": "#FFFFFF", "size": font_size, "face": "Arial"},
-                    x=node.get("x", 0),
-                    y=node.get("y", 0)
-                ))
-            
-            # Preparar conexões
+                nodes_for_viz.append(
+                    Node(
+                        id=node["id"],
+                        label=node["label"],
+                        size=node.get("size", node_size),
+                        color=node["color"],
+                        shape=node.get("shape", "dot"),
+                        font=node.get("font", {"color": "#FFFFFF", "size": font_size}),
+                        x=node.get("x", 0),
+                        y=node.get("y", 0)
+                    )
+                )
+
             edges_for_viz = []
             for edge in st.session_state.miro_edges:
-                edges_for_viz.append(Edge(
-                    source=edge["source"],
-                    target=edge["target"],
-                    label=edge.get("label", ""),
-                    color="#B0B0B0",
-                    width=3 if visualization_mode == "Mapa 3D" else 2,
-                    font={"size": 10, "color": "#bfc6cc"}
-                ))
-            
-            # Configuração do gráfico - CORRIGIDA: estabilidade melhorada
+                edges_for_viz.append(
+                    Edge(
+                        source=edge["source"],
+                        target=edge["target"],
+                        label=edge.get("label", ""),
+                        color="#rgba(200,200,200,0.8)",
+                        width=2
+                    )
+                )
+
+            # Configuração do gráfico
             config = Config(
-                width="100%",
-                height=700,
+                width=800,
+                height=600,
                 directed=True,
                 physics=physics_enabled,
                 hierarchical=hierarchical_enabled,
-                nodeHighlightBehavior=True,
-                highlightColor="#F8F8F8",
-                collapsible=True,
-                node={"labelProperty": "label"},
-                link={"labelProperty": "label", "renderLabel": True},
-                # Configurações de física otimizadas para estabilidade
-                physics_config={
-                    "barnesHut": {
-                        "gravitationalConstant": -2000,  # Reduzida repulsão
-                        "centralGravity": 0.3,
-                        "springLength": 100,
-                        "springConstant": 0.05,
-                        "damping": 0.09,
-                        "avoidOverlap": 0.5
-                    },
-                    "minVelocity": 0.75
-                } if physics_enabled else None
+                # Configurações específicas para cada modo
+                **({
+                    "hierarchical": {
+                        "enabled": hierarchical_enabled,
+                        "levelSeparation": 150,
+                        "nodeSpacing": 100,
+                        "treeSpacing": 200,
+                        "blockShifting": True,
+                        "edgeMinimization": True,
+                        "parentCentralization": True,
+                        "direction": "UD",  # Up-Down
+                        "sortMethod": "hubsize"
+                    }
+                } if hierarchical_enabled else {})
             )
-            
+
+            # Renderizar o gráfico
             try:
-                # Renderizar mapa interativo
-                clicked_node = agraph(nodes=nodes_for_viz, edges=edges_for_viz, config=config)
-                if clicked_node:
-                    st.session_state.miro_selected_node = clicked_node
-                    safe_rerun()
-                    
-                if visualization_mode in ["Mapa 3D", "Fluxograma"]:
-                    st.markdown('</div>', unsafe_allow_html=True)
-                    
+                return_value = agraph(nodes=nodes_for_viz, 
+                                    edges=edges_for_viz, 
+                                    config=config)
+
+                # Processar interações com o gráfico
+                if return_value:
+                    st.session_state.miro_selected_node = return_value
+                    st.write(f"**Ideia selecionada:** {return_value}")
+
             except Exception as e:
-                st.error(f"Erro na visualização: {e}")
-                st.info("Tente reorganizar o mapa nas configurações.")
+                st.error(f"Erro ao renderizar o mapa: {e}")
+                st.info("Tente reorganizar o mapa ou reduzir o número de ideias")
+
+            # Fechar divs de estilo
+            if visualization_mode == "Mapa 3D":
+                st.markdown('</div>', unsafe_allow_html=True)
+            elif visualization_mode == "Fluxograma":
+                st.markdown('</div>', unsafe_allow_html=True)
+
         else:
-            # Tela inicial vazia
-            st.markdown("""
-            <div style='text-align: center; padding: 50px; background: rgba(255,255,255,0.02); border-radius: 10px;'>
-                <h3 style='color: #bfc6cc;'>🎯 Seu Mapa de Ideias Vazio</h3>
-                <p style='color: #8b9bab;'>Comece adicionando sua primeira ideia usando o painel lateral!</p>
-                <div style='margin-top: 20px;'>
-                    <div style='display: inline-block; margin: 10px; padding: 15px; background: rgba(78, 205, 196, 0.1); border-radius: 8px;'>
-                        💡 Ideias
-                    </div>
-                    <div style='display: inline-block; margin: 10px; padding: 15px; background: rgba(69, 183, 209, 0.1); border-radius: 8px;'>
-                        ✅ Tarefas
-                    </div>
-                    <div style='display: inline-block; margin: 10px; padding: 15px; background: rgba(150, 206, 180, 0.1); border-radius: 8px;'>
-                        ❓ Perguntas
-                    </div>
-                </div>
-            </div>
-            """, unsafe_allow_html=True)
-    
+            st.info("🌟 **Comece criando sua primeira ideia!** Use o painel à esquerda para adicionar ideias e conectar conceitos.")
+
     with col2:
-        st.subheader("✏️ Editor de Ideia")
+        st.subheader("📋 Ideias & Conexões")
         
-        selected_node_id = st.session_state.miro_selected_node
-        if selected_node_id and st.session_state.miro_nodes:
-            selected_node = next((n for n in st.session_state.miro_nodes if n["id"] == selected_node_id), None)
+        # Lista de ideias existentes
+        if st.session_state.miro_nodes:
+            st.write(f"**{len(st.session_state.miro_nodes)} ideias no mapa:**")
             
-            if selected_node:
-                with st.form(f"edit_miro_node_{selected_node_id}"):
-                    st.write(f"**Editando:** {selected_node['label']}")
+            for node in st.session_state.miro_nodes:
+                is_selected = st.session_state.miro_selected_node == node["id"]
+                emoji = "🔵" if not is_selected else "🟢"
+                
+                with st.expander(f"{emoji} {node['label']}", expanded=is_selected):
+                    st.write(f"**Tipo:** {node['type']}")
+                    if node.get('description'):
+                        st.write(f"**Descrição:** {node['description']}")
                     
-                    # Extrair label sem emoji
-                    current_label = selected_node['label']
-                    if ' ' in current_label:
-                        current_label = current_label.split(' ', 1)[1]
+                    # Mostrar conexões desta ideia
+                    connections = []
+                    for edge in st.session_state.miro_edges:
+                        if edge['source'] == node['id']:
+                            target_node = next((n for n in st.session_state.miro_nodes if n['id'] == edge['target']), None)
+                            if target_node:
+                                connections.append(f"→ {target_node['label']}")
+                        elif edge['target'] == node['id']:
+                            source_node = next((n for n in st.session_state.miro_nodes if n['id'] == edge['source']), None)
+                            if source_node:
+                                connections.append(f"← {source_node['label']}")
                     
-                    new_label = st.text_input("Título:", value=current_label, key=f"label_{selected_node_id}")
-                    new_type = st.selectbox("Tipo:", 
-                                          options=list(st.session_state.miro_map.node_types.keys()),
-                                          index=list(st.session_state.miro_map.node_types.keys()).index(selected_node["type"]),
-                                          key=f"type_{selected_node_id}")
-                    new_desc = st.text_area("Descrição:", 
-                                          value=selected_node.get("description", ""), 
-                                          height=120,
-                                          key=f"desc_{selected_node_id}")
+                    if connections:
+                        st.write("**Conexões:**")
+                        for conn in connections[:5]:  # Mostrar até 5 conexões
+                            st.write(f"• {conn}")
+                        if len(connections) > 5:
+                            st.write(f"... e mais {len(connections) - 5} conexões")
+                    else:
+                        st.write("_Sem conexões ainda_")
                     
-                    col_edit1, col_edit2 = st.columns(2)
-                    with col_edit1:
-                        if st.form_submit_button("💾 Salvar", use_container_width=True):
-                            if new_label.strip():
-                                node_type_data = st.session_state.miro_map.node_types[new_type]
-                                selected_node["label"] = f"{node_type_data['icon']} {new_label.strip()}"
-                                selected_node["type"] = new_type
-                                selected_node["description"] = new_desc
-                                selected_node["color"] = node_type_data["color"]
-                                selected_node["shape"] = node_type_data["shape"]
-                                st.success("Ideia atualizada!")
-                                safe_rerun()
-                            else:
-                                st.warning("O título não pode ser vazio.")
-                    
-                    with col_edit2:
-                        if st.form_submit_button("🗑️ Excluir", type="secondary", use_container_width=True):
-                            # Remover ideia e suas conexões
-                            st.session_state.miro_nodes = [n for n in st.session_state.miro_nodes if n["id"] != selected_node_id]
-                            st.session_state.miro_edges = [e for e in st.session_state.miro_edges 
-                                                         if e["source"] != selected_node_id and e["target"] != selected_node_id]
-                            st.session_state.miro_selected_node = None
-                            st.success("Ideia excluída!")
+                    # Botões de ação para cada ideia
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        if st.button("✏️ Editar", key=f"edit_{node['id']}", use_container_width=True):
+                            st.session_state.editing_node = node['id']
                             safe_rerun()
-                
-                # Visualização da descrição
-                if selected_node.get("description"):
-                    st.markdown("---")
-                    st.write("**Descrição atual:**")
-                    st.markdown(f'<div class="node-preview">{selected_node["description"]}</div>', unsafe_allow_html=True)
-                
-                # Conexões desta ideia
+                    
+                    with col_btn2:
+                        if st.button("🗑️ Excluir", key=f"delete_{node['id']}", use_container_width=True):
+                            # Remover nó e suas conexões
+                            st.session_state.miro_nodes = [n for n in st.session_state.miro_nodes if n['id'] != node['id']]
+                            st.session_state.miro_edges = [e for e in st.session_state.miro_edges 
+                                                          if e['source'] != node['id'] and e['target'] != node['id']]
+                            if st.session_state.miro_selected_node == node['id']:
+                                st.session_state.miro_selected_node = None
+                            st.success("Ideia removida!")
+                            safe_rerun()
+        
+        # Editor de ideias
+        if hasattr(st.session_state, 'editing_node'):
+            editing_node_id = st.session_state.editing_node
+            editing_node = next((n for n in st.session_state.miro_nodes if n['id'] == editing_node_id), None)
+            
+            if editing_node:
                 st.markdown("---")
-                st.write("**🔗 Conexões:**")
+                st.subheader("✏️ Editando Ideia")
                 
-                incoming = [e for e in st.session_state.miro_edges if e["target"] == selected_node_id]
-                outgoing = [e for e in st.session_state.miro_edges if e["source"] == selected_node_id]
-                
-                if incoming:
-                    st.write("**Recebe de:**")
-                    for edge in incoming:
-                        source_node = next((n for n in st.session_state.miro_nodes if n["id"] == edge["source"]), None)
-                        if source_node:
-                            st.write(f"• {source_node['label']}")
-                
-                if outgoing:
-                    st.write("**Conecta para:**")
-                    for edge in outgoing:
-                        target_node = next((n for n in st.session_state.miro_nodes if n["id"] == edge["target"]), None)
-                        if target_node:
-                            st.write(f"• {target_node['label']}")
-                
-                if not incoming and not outgoing:
-                    st.info("Esta ideia não possui conexões.")
-        else:
-            st.info("👆 Selecione uma ideia no mapa para editar.")
-    
-    # Ferramentas de exportação
-    st.markdown("---")
-    st.subheader("📤 Exportar Mapa")
-    
-    exp_col1, exp_col2 = st.columns(2)
-    
-    with exp_col1:
-        if st.button("💾 Salvar como JSON", use_container_width=True):
-            map_data = {
-                "nodes": st.session_state.miro_nodes,
-                "edges": st.session_state.miro_edges,
-                "metadata": {
-                    "created": datetime.now().isoformat(),
-                    "user": USERNAME,
-                    "version": "miro_style_1.0"
-                }
-            }
-            json_str = json.dumps(map_data, ensure_ascii=False, indent=2)
-            st.download_button(
-                "⬇️ Baixar JSON",
-                data=json_str,
-                file_name=f"mapa_ideias_{USERNAME}_{int(time.time())}.json",
-                mime="application/json"
-            )
-    
-    with exp_col2:
-        if st.button("🖼️ Exportar como PNG", use_container_width=True):
-            # Gerar visualização estática
-            try:
-                plt.figure(figsize=(16, 12))
-                plt.title("Mapa de Ideias", fontsize=16, color='white', pad=20)
-                plt.axis('off')
-                
-                # Salvar imagem temporária
-                buf = io.BytesIO()
-                plt.savefig(buf, format='png', dpi=150, bbox_inches='tight', 
-                           facecolor='#0E192A', edgecolor='none')
-                plt.close()
-                buf.seek(0)
-                
-                st.download_button(
-                    "⬇️ Baixar PNG",
-                    data=buf.getvalue(),
-                    file_name=f"mapa_ideias_{USERNAME}_{int(time.time())}.png",
-                    mime="image/png"
-                )
-            except Exception as e:
-                st.error(f"Erro ao gerar imagem: {e}")
+                with st.form(f"edit_node_{editing_node_id}"):
+                    new_label = st.text_input("Título:", value=editing_node['label'].replace("💡 ", "").replace("✅ ", "").replace("❓ ", "").replace("📚 ", "").replace("🎯 ", "").replace("📝 ", ""), 
+                                            key=f"edit_label_{editing_node_id}")
+                    new_type = st.selectbox("Tipo:", options=list(st.session_state.miro_map.node_types.keys()), 
+                                          index=list(st.session_state.miro_map.node_types.keys()).index(editing_node['type']),
+                                          key=f"edit_type_{editing_node_id}")
+                    new_desc = st.text_area("Descrição:", value=editing_node.get('description', ''), 
+                                          key=f"edit_desc_{editing_node_id}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.form_submit_button("💾 Salvar", use_container_width=True):
+                            editing_node['label'] = f"{st.session_state.miro_map.node_types[new_type]['icon']} {new_label}"
+                            editing_node['type'] = new_type
+                            editing_node['description'] = new_desc
+                            editing_node['color'] = st.session_state.miro_map.node_types[new_type]['color']
+                            editing_node['shape'] = st.session_state.miro_map.node_types[new_type]['shape']
+                            
+                            del st.session_state.editing_node
+                            st.success("Ideia atualizada!")
+                            safe_rerun()
+                    
+                    with col2:
+                        if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                            del st.session_state.editing_node
+                            safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -2419,140 +2762,165 @@ elif st.session_state.page == "mapa":
 # -------------------------
 elif st.session_state.page == "anotacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("📝 Anotações")
-    st.info("Use ==texto== para destacar.")
-    notes = st.text_area("Digite suas anotações", value=st.session_state.notes, height=260, key=f"notes_{USERNAME}")
-    st.session_state.notes = notes
-    pdf_bytes = generate_pdf_with_highlights(st.session_state.notes)
-    st.download_button("Baixar Anotações (PDF)", data=pdf_bytes, file_name="anotacoes.pdf", mime="application/pdf")
+    st.subheader("📝 Anotações Pessoais")
+    
+    notes_content = st.text_area("Escreva suas anotações aqui (use ==destaque== para realçar texto):", 
+                                value=st.session_state.notes, 
+                                height=400,
+                                key="notes_editor")
+    
+    if notes_content != st.session_state.notes:
+        st.session_state.notes = notes_content
+        if st.session_state.autosave:
+            save_user_state_minimal(USER_STATE)
+            st.toast("Anotações salvas automaticamente.", icon="💾")
+    
+    # Visualização com highlights
+    st.subheader("📄 Visualização com Destaques")
+    if notes_content:
+        highlighted_html = re.sub(r'==(.*?)==', r'<mark class="card-mark">\1</mark>', escape_html(notes_content))
+        st.markdown(f'<div class="card">{highlighted_html.replace(chr(10), "<br>")}</div>', unsafe_allow_html=True)
+    else:
+        st.info("Nenhuma anotação ainda. Comece a escrever acima!")
+    
+    # Exportação
+    col1, col2, col3 = st.columns(3)
+    with col1:
+        if st.button("💾 Salvar Anotações", use_container_width=True):
+            if save_user_state_minimal(USER_STATE):
+                st.success("Anotações salvas!")
+            else:
+                st.error("Erro ao salvar.")
+    
+    with col2:
+        if st.button("📄 Exportar PDF", use_container_width=True):
+            if notes_content:
+                pdf_bytes = generate_pdf_with_highlights(notes_content)
+                st.download_button(
+                    "⬇️ Baixar PDF",
+                    data=pdf_bytes,
+                    file_name=f"anotacoes_{USERNAME}_{datetime.now().strftime('%Y%m%d_%H%M')}.pdf",
+                    mime="application/pdf",
+                    use_container_width=True
+                )
+            else:
+                st.warning("Nenhuma anotação para exportar.")
+    
+    with col3:
+        if st.button("🗑️ Limpar Tudo", type="secondary", use_container_width=True):
+            if st.checkbox("Confirmar limpeza de todas as anotações?"):
+                st.session_state.notes = ""
+                save_user_state_minimal(USER_STATE)
+                st.success("Anotações limpas!")
+                safe_rerun()
+
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos - ORGANIZADO COM ABAS
+# Page: graficos
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("📊 Análise Inteligente com IA")
+    st.subheader("📊 Análise e Visualização de Dados")
     
-    if st.session_state.df is None:
-        st.warning("Carregue uma planilha na página 'Planilha' para gerar análises.")
+    if st.session_state.df is None or st.session_state.df.empty:
+        st.info("📁 Carregue uma planilha na aba 'Planilha' para ver análises e gráficos.")
     else:
-        df = st.session_state.df.copy()
+        df = st.session_state.df
         
-        # Inicializar analisador de IA
-        analyzer = DataAnalyzer(df)
+        # Análise inteligente automática
+        st.subheader("🤖 Análise Inteligente dos Dados")
+        if st.button("🔍 Gerar Análise Completa", use_container_width=True):
+            with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
+                analyzer = DataAnalyzer(df)
+                analysis = analyzer.generate_comprehensive_analysis()
+                st.markdown(analysis)
         
-        # Organização com abas - SIMPLIFICADA
-        tab_overview, tab_analysis, tab_ai = st.tabs([
-            "📊 Visão Geral", "🧠 Análise Inteligente", "🤖 IA"
-        ])
+        # Assistente de IA para perguntas
+        st.subheader("💬 Assistente de IA - Faça uma Pergunta")
+        question = st.text_input("Pergunte algo sobre seus dados:", 
+                               placeholder="Ex: Quais são os autores mais relevantes? Como está a distribuição por anos?")
         
-        with tab_overview:
-            # Análise simplificada - APENAS O ESSENCIAL
-            st.write("### 📊 Resumo da Base de Dados")
-            
-            # Estatísticas rápidas
-            col1, col2, col3, col4 = st.columns(4)
-            with col1:
-                st.metric("Total de Registros", len(df))
-            with col2:
-                st.metric("Colunas", len(df.columns))
-            with col3:
-                numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-                st.metric("Colunas Numéricas", len(numeric_cols))
-            with col4:
-                text_cols = df.select_dtypes(include=['object']).columns.tolist()
-                st.metric("Colunas Texto", len(text_cols))
-            
-            # Informações básicas da planilha
-            st.write("#### 📋 Estrutura da Planilha")
-            st.write(f"**Colunas disponíveis:** {', '.join(df.columns.tolist())}")
-            
-            # Verificação de dados essenciais
-            st.write("#### ✅ Verificação de Dados")
-            
-            has_authors = any(col.lower() in ['autor', 'author'] for col in df.columns)
-            has_years = any(col.lower() in ['ano', 'year'] for col in df.columns)
-            has_countries = any(col.lower() in ['país', 'pais', 'country'] for col in df.columns)
-            
-            col_check1, col_check2, col_check3 = st.columns(3)
-            with col_check1:
-                st.write("👥 Autores:", "✅ Disponível" if has_authors else "❌ Faltando")
-            with col_check2:
-                st.write("📅 Anos:", "✅ Disponível" if has_years else "❌ Faltando")
-            with col_check3:
-                st.write("🌎 Países:", "✅ Disponível" if has_countries else "❌ Faltando")
+        if question:
+            with st.spinner("Processando sua pergunta..."):
+                analyzer = DataAnalyzer(df)
+                response = get_ai_assistant_response(question, analyzer)
+                st.markdown(response)
         
-        with tab_analysis:
-            # Análise inteligente simplificada - REMOVIDAS REDUNDÂNCIAS
-            st.write("### 🧠 Análise Inteligente")
-            
-            # Apenas as análises mais importantes
-            analysis_parts = []
-            
-            # Análise de autores (se disponível)
-            if any(col.lower() in ['autor', 'author'] for col in df.columns):
-                author_analysis = analyzer._author_analysis()
-                # Extrair apenas a parte principal
-                lines = author_analysis.split('\n')
-                main_content = [line for line in lines if not line.startswith('❌') and not line.startswith('⚠️')]
-                analysis_parts.append("### 👥 Autores\n" + '\n'.join(main_content[:10]))  # Limitar conteúdo
-            
-            # Análise temporal (se disponível)
-            if any(col.lower() in ['ano', 'year'] for col in df.columns):
-                temporal_analysis = analyzer._temporal_analysis()
-                lines = temporal_analysis.split('\n')
-                main_content = [line for line in lines if not line.startswith('❌') and not line.startswith('⚠️')]
-                analysis_parts.append("### 📅 Timeline\n" + '\n'.join(main_content[:8]))
-            
-            # Análise geográfica (se disponível)
-            if any(col.lower() in ['país', 'pais', 'country'] for col in df.columns):
-                geo_analysis = analyzer._geographic_analysis()
-                lines = geo_analysis.split('\n')
-                main_content = [line for line in lines if not line.startswith('❌') and not line.startswith('⚠️')]
-                analysis_parts.append("### 🌎 Geografia\n" + '\n'.join(main_content[:8]))
-            
-            # Análise de temas (sempre disponível)
-            thematic_analysis = analyzer._thematic_analysis()
-            lines = thematic_analysis.split('\n')
-            main_content = [line for line in lines if not line.startswith('❌') and not line.startswith('⚠️')]
-            analysis_parts.append("### 🔤 Temas\n" + '\n'.join(main_content[:8]))
-            
-            # Exibir análises
-            for analysis_part in analysis_parts:
-                st.markdown(analysis_part)
-                st.markdown("---")
-            
-            # Sugestões finais
-            st.write("### 💡 Próximos Passos")
-            if len(df) < 20:
-                st.info("**Expanda sua base**: Adicione mais registros para análises mais confiáveis.")
-            elif len(df) < 50:
-                st.success("**Boa base em desenvolvimento**: Continue expandindo e complete os metadados.")
+        # Visualizações gráficas
+        st.subheader("📈 Visualizações Gráficas")
+        
+        # Seleção de tipo de gráfico
+        chart_type = st.selectbox("Escolha o tipo de gráfico:", 
+                                ["Barras", "Linhas", "Pizza", "Dispersão", "Histograma", "Heatmap"])
+        
+        # Configurações comuns
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            # Eixo X
+            x_axis = st.selectbox("Eixo X:", options=df.columns.tolist())
+        
+        with col2:
+            # Eixo Y (para alguns gráficos)
+            if chart_type in ["Barras", "Linhas", "Dispersão"]:
+                y_axis = st.selectbox("Eixo Y:", options=df.columns.tolist())
             else:
-                st.success("**Base sólida**: Excelente para análises detalhadas e estudos avançados.")
+                y_axis = None
         
-        with tab_ai:
-            # Assistente de IA MELHORADO
-            st.write("### 🤖 Assistente de IA - Análise Personalizada")
+        # Gráficos específicos
+        try:
+            if chart_type == "Barras":
+                if df[x_axis].dtype == 'object' and (y_axis and df[y_axis].dtype in ['int64', 'float64']):
+                    # Gráfico de barras agrupado
+                    fig = px.bar(df, x=x_axis, y=y_axis, title=f"{y_axis} por {x_axis}")
+                else:
+                    # Contagem de valores categóricos
+                    value_counts = df[x_axis].value_counts().head(15)
+                    fig = px.bar(x=value_counts.index, y=value_counts.values, 
+                               title=f"Distribuição de {x_axis}")
+                st.plotly_chart(fig, use_container_width=True)
             
-            col_ai1, col_ai2 = st.columns([3, 1])
-            with col_ai1:
-                ai_question = st.text_input(
-                    "Pergunte sobre seus dados:",
-                    placeholder="Ex: Quais são os autores mais relevantes? Quais temas aparecem juntos?",
-                    key="ai_question"
-                )
-            with col_ai2:
-               ai_ask = st.button("🔍 Analisar com IA", use_container_width=True)
+            elif chart_type == "Linhas":
+                if y_axis and df[x_axis].dtype in ['datetime64[ns]', 'int64']:
+                    fig = px.line(df, x=x_axis, y=y_axis, title=f"{y_axis} ao longo do {x_axis}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Para gráfico de linhas, o eixo X deve ser numérico ou data.")
             
-            if ai_ask and ai_question:
-                with st.spinner("🤔 Analisando seus dados..."):
-                    time.sleep(1)  # Simular processamento
-                    response = get_ai_assistant_response(ai_question, analyzer)
-                    st.success("Análise concluída!")
-                    st.markdown(f"**Resposta da IA:**")
-                    st.markdown(response)
+            elif chart_type == "Pizza":
+                value_counts = df[x_axis].value_counts().head(8)
+                fig = px.pie(values=value_counts.values, names=value_counts.index, 
+                           title=f"Distribuição de {x_axis}")
+                st.plotly_chart(fig, use_container_width=True)
+            
+            elif chart_type == "Dispersão":
+                if y_axis:
+                    fig = px.scatter(df, x=x_axis, y=y_axis, title=f"{y_axis} vs {x_axis}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Selecione um eixo Y para dispersão.")
+            
+            elif chart_type == "Histograma":
+                if df[x_axis].dtype in ['int64', 'float64']:
+                    fig = px.histogram(df, x=x_axis, title=f"Distribuição de {x_axis}")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Para histograma, selecione uma coluna numérica.")
+            
+            elif chart_type == "Heatmap":
+                # Matriz de correlação para colunas numéricas
+                numeric_cols = df.select_dtypes(include=[np.number]).columns
+                if len(numeric_cols) >= 2:
+                    corr_matrix = df[numeric_cols].corr()
+                    fig = px.imshow(corr_matrix, title="Matriz de Correlação")
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Heatmap requer pelo menos 2 colunas numéricas.")
+        
+        except Exception as e:
+            st.error(f"Erro ao gerar gráfico: {e}")
+            st.info("Tente selecionar diferentes colunas ou tipos de gráfico")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -2560,490 +2928,474 @@ elif st.session_state.page == "graficos":
 # Page: busca
 # -------------------------
 elif st.session_state.page == "busca":
-    st.markdown("<div class='glass-box' style='position:relative;padding:18px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🔍 Busca Inteligente")
+    st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.subheader("🔍 Busca Avançada")
+    
+    try:
+        with st.spinner("Carregando dados..."):
+            df_total = collect_latest_backups()
+    except Exception as e:
+        st.error(f"Erro ao carregar dados: {e}")
+        df_total = pd.DataFrame()
 
-    def extract_keywords(text, n=6):
-        if not text: return []
-        text = re.sub(r"[^\w\s]", " ", str(text or "")).lower()
-        stop = {"de","da","do","e","a","o","em","para","por","com"}
-        words = [w for w in text.split() if len(w) > 2 and w not in stop]
-        freq = {w: words.count(w) for w in set(words)}
-        return [w for w, _ in sorted(freq.items(), key=lambda item: item[1], reverse=True)][:n]
-
-    col_q, col_meta, col_actions = st.columns([0.6, 0.25, 0.15])
-    with col_q: query = st.text_input("Termo de busca", key="ui_query_search", placeholder="...")
-    with col_meta:
-        backups_df_tmp = collect_latest_backups()
-        all_cols = list(backups_df_tmp.columns) if not backups_df_tmp.empty else []
-        search_col = st.selectbox("Buscar em", options=[c for c in all_cols if c != '_artemis_username'] or ["(sem dados)"], key="ui_search_col")
-    with col_actions:
-        per_page = st.selectbox("Por página", [5, 8, 12, 20], index=1, key="ui_search_pp")
-        search_clicked = st.button("🔎 Buscar", use_container_width=True, key=f"ui_search_btn_{USERNAME}")
-
-    if search_clicked:
-        st.session_state.search_view_index = None
-        if not query or backups_df_tmp.empty:
-            st.info("Digite um termo e certifique-se de que há dados para pesquisar.")
-            st.session_state.search_results = pd.DataFrame()
-        else:
-            norm_query = normalize_text(query)
-            if search_col not in backups_df_tmp.columns:
-                st.info("Coluna inválida para busca. Selecione outra coluna.")
-                st.session_state.search_results = pd.DataFrame()
-            else:
-                ser = backups_df_tmp[search_col].astype(str).apply(normalize_text)
-                hits = backups_df_tmp[ser.str.contains(norm_query, na=False)]
-                st.session_state.search_results = hits.reset_index(drop=True)
-                st.session_state.search_query_meta = {"col": search_col, "query": query}
-                st.session_state.search_page = 1
-
-    results_df = st.session_state.get('search_results', pd.DataFrame())
-    users_map = load_users()
-
-    if not results_df.empty:
-        total = len(results_df)
-        max_pages = max(1, (total + per_page - 1) // per_page)
-        page = max(1, min(st.session_state.get("search_page", 1), max_pages))
-        start, end = (page - 1) * per_page, min(page * per_page, total)
-        page_df = results_df.iloc[start:end]
-
-        st.markdown(f"**{total}** resultado(s) — exibindo {start+1} a {end}.")
-        for orig_i in page_df.index:
-            result_data = results_df.loc[orig_i].to_dict()
-            origin_uid = result_data.get("_artemis_username", "N/A")
-            
-            # CORREÇÃO: Mostrar apenas o nome, sem CPF
-            if origin_uid == "web":
-                user_display_name = "Fonte: Web"
-            else:
-                user_obj = users_map.get(str(origin_uid), {})
-                user_display_name = user_obj.get("name", "Usuário")  # Removido o CPF
-
-            initials = "".join([p[0] for p in str(user_display_name).split()[:2]]).upper() or "U"
-            title_raw = str(result_data.get('título') or result_data.get('titulo') or '(Sem título)')
-            resumo_raw = str(result_data.get('resumo') or result_data.get('abstract') or "")
-            year = result_data.get('ano') or result_data.get('year') or ""
-            country = result_data.get('país') or result_data.get('pais') or result_data.get('country') or ""
-            
-            st.markdown(f"""
-            <div class="card">
-                <div style="display:flex; gap:12px; align-items:center;">
-                    <div class="avatar">{escape_html(initials)}</div>
-                    <div style="flex:1;">
-                        <div class="card-title">{highlight_search_terms(title_raw, query)}</div>
-                        <div class="small-muted">De <strong>{escape_html(user_display_name)}</strong> • {escape_html(result_data.get('autor', ''))}</div>
-                        <div class="small-muted">Ano: {escape_html(str(year))} • País: {escape_html(country)}</div>
-                        <div style="margin-top:6px;font-size:13px;color:#e6e8ea;">{highlight_search_terms(resumo_raw, query) if resumo_raw else ''}</div>
-                    </div>
-                </div>
-            </div>""", unsafe_allow_html=True)
-            
-            a1, a2 = st.columns([0.28, 0.72])
-            with a1:
-                if st.button("⭐ Favoritar", key=f"fav_search_{orig_i}_{USERNAME}", use_container_width=True):
-                    if add_to_favorites(result_data): st.toast("Adicionado!", icon="⭐")
-                    else: st.toast("Já está nos favoritos.")
-            with a2:
-                if st.button("🔎 Ver detalhes", key=f"view_search_{orig_i}_{USERNAME}", use_container_width=True):
-                    st.session_state.search_view_index = int(orig_i)
-                    safe_rerun()
+    if df_total.empty:
+        st.info("Ainda não há dados disponíveis para busca.")
+    else:
+        # Interface de busca
+        col1, col2 = st.columns([3, 1])
         
-        st.markdown("---")
-        p1, p2, p3 = st.columns([1,1,1])
-        with p1: 
-            if st.button("◀", disabled=(page <= 1), key=f"search_prev_{USERNAME}"):
-                st.session_state.search_page -= 1; safe_rerun()
-        with p2: st.markdown(f"<div style='text-align:center; padding-top:8px'><b>Página {page}/{max_pages}</b></div>", unsafe_allow_html=True)
-        with p3: 
-            if st.button("▶", disabled=(page >= max_pages), key=f"search_next_{USERNAME}"):
-                st.session_state.search_page += 1; safe_rerun()
+        with col1:
+            search_query = st.text_input("Buscar em todas as planilhas:", 
+                                       placeholder="Digite palavras-chave, autores, temas...",
+                                       key="search_input_main")
+        
+        with col2:
+            search_column = st.selectbox("Buscar em:", 
+                                       options=["Todas as colunas"] + df_total.columns.tolist(),
+                                       key="search_column_select")
 
-        if st.session_state.get("search_view_index") is not None:
-            vi = int(st.session_state.search_view_index)
-            if 0 <= vi < len(results_df):
-                det = results_df.loc[vi].to_dict()
-                det = enrich_article_metadata(det)
-                origin_user = det.get("_artemis_username", "N/A")
-                
-                # CORREÇÃO: Mostrar apenas o nome, sem CPF
-                if origin_user == "web":
-                    origin_display = "Fonte: Web"
+        # Filtros avançados
+        with st.expander("🎛️ Filtros Avançados"):
+            col_f1, col_f2, col_f3 = st.columns(3)
+            
+            with col_f1:
+                if 'ano' in df_total.columns:
+                    anos = sorted(df_total['ano'].dropna().unique())
+                    anos_filtro = st.multiselect("Filtrar por ano:", options=anos)
                 else:
-                    ou = users_map.get(str(origin_user), {})
-                    origin_display = ou.get("name", "Usuário")  # Removido o CPF
-                    
-                st.markdown("## Detalhes do Registro")
+                    anos_filtro = []
+            
+            with col_f2:
+                if 'autor' in df_total.columns:
+                    autores = sorted(df_total['autor'].dropna().unique())[:50]  # Limitar para performance
+                    autores_filtro = st.multiselect("Filtrar por autor:", options=autores)
+                else:
+                    autores_filtro = []
+            
+            with col_f3:
+                if 'país' in df_total.columns:
+                    paises = sorted(df_total['país'].dropna().unique())[:50]
+                    paises_filtro = st.multiselect("Filtrar por país:", options=paises)
+                else:
+                    paises_filtro = []
+
+        # Executar busca
+        if st.button("🔍 Executar Busca", use_container_width=True):
+            if search_query or anos_filtro or autores_filtro or paises_filtro:
+                results = df_total.copy()
                 
-                col1, col2 = st.columns([3, 1])
-                with col1:
+                # Aplicar filtros de texto
+                if search_query:
+                    if search_column == "Todas as colunas":
+                        mask = pd.Series(False, index=results.index)
+                        for col in results.columns:
+                            if results[col].dtype == 'object':
+                                mask = mask | results[col].str.contains(search_query, case=False, na=False)
+                        results = results[mask]
+                    else:
+                        results = results[results[search_column].str.contains(search_query, case=False, na=False)]
+                
+                # Aplicar filtros de ano
+                if anos_filtro:
+                    results = results[results['ano'].isin(anos_filtro)]
+                
+                # Aplicar filtros de autor
+                if autores_filtro:
+                    results = results[results['autor'].isin(autores_filtro)]
+                
+                # Aplicar filtros de país
+                if paises_filtro:
+                    results = results[results['país'].isin(paises_filtro)]
+                
+                st.session_state.search_results = results
+                st.session_state.search_page = 1
+                st.session_state.search_query_meta = {"col": search_column, "query": search_query}
+                
+                if results.empty:
+                    st.info("Nenhum resultado encontrado com os filtros aplicados.")
+                else:
+                    st.success(f"Encontrados {len(results)} resultados!")
+            else:
+                st.warning("Digite um termo de busca ou aplique filtros.")
+
+        # Mostrar resultados
+        results_df = st.session_state.get('search_results', pd.DataFrame())
+        
+        if not results_df.empty:
+            if st.session_state.get("search_view_index") is not None:
+                # Visualização detalhada de um resultado
+                vi = st.session_state.search_view_index
+                if 0 <= vi < len(results_df):
+                    det = results_df.iloc[vi].to_dict()
+                    det = enrich_article_metadata(det)
+
+                    st.markdown("### 📄 Detalhes do Resultado")
+                    if st.button("⬅️ Voltar para resultados", key=f"search_back_{USERNAME}"):
+                        st.session_state.search_view_index = None
+                        safe_rerun()
+
                     st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
-                    st.markdown(f"**Autor(es):** {escape_html(det.get('autor','— —'))}")
-                    st.markdown(f"**Ano:** {escape_html(str(det.get('ano', det.get('year','— —'))))}")
-                    st.markdown(f"**País:** {escape_html(det.get('país', det.get('pais', det.get('country','— —'))))}")
-                    st.markdown(f"**Fonte:** {escape_html(origin_display)}")
+                    st.markdown(f"_Autor(es):_ {escape_html(det.get('autor','— —'))}")
+                    st.markdown(f"_Ano:_ {escape_html(str(det.get('ano','— —')))}")
                     
                     if det.get('doi'):
                         doi_link = f"https://doi.org/{det.get('doi')}"
-                        st.markdown(f"**DOI:** [{det.get('doi')}]({doi_link})")
-                    elif det.get('url'):
-                        st.markdown(f"**Link:** [{det.get('url')}]({det.get('url')})")
+                        st.markdown(f"_DOI:_ [{det.get('doi')}]({doi_link})")
                     
                     st.markdown("---")
-                    st.markdown("**Resumo**")
                     st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
-                
-                with col2:
-                    if det.get('similarity'):
-                        st.metric("Similaridade", f"{det['similarity']:.2f}")
                     
-                    if st.button("⭐ Adicionar aos Favoritos", key=f"fav_search_detail_{vi}", use_container_width=True):
-                        if add_to_favorites(det): 
-                            st.toast("Adicionado aos favoritos!", icon="⭐")
-                        else: 
-                            st.toast("Já está nos favoritos.")
-                    
-                    if st.button("📝 Anotações", key=f"notes_search_{vi}", use_container_width=True):
-                        st.session_state.page = "anotacoes"
-                        safe_rerun()
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        if st.button("⭐ Adicionar aos Favoritos", use_container_width=True, key=f"fav_search_{vi}_{USERNAME}"):
+                            if add_to_favorites(det):
+                                st.toast("Adicionado aos favoritos!", icon="⭐")
+                            else:
+                                st.toast("Este artigo já está nos favoritos.")
+                    with col_btn2:
+                        if st.button("📝 Ver Anotações", use_container_width=True, key=f"notes_search_{vi}_{USERNAME}"):
+                            st.session_state.page = "anotacoes"
+                            safe_rerun()
 
-                st.markdown("---")
-                st.markdown("### ✉️ Contatar autor")
-                if origin_user != "N/A" and origin_user != "web":
-                    with st.form(key=f"inline_compose_{vi}_{USERNAME}"):
-                        subj_fill = st.text_input("Assunto:", value=f"Sobre: {det.get('título', '')[:50]}...")
-                        body_fill = st.text_area("Mensagem:", value=f"Olá {origin_display},\n\nVi seu registro '{det.get('título', '')}' na plataforma e gostaria de conversar.\n\n")
-                        c1, c2 = st.columns(2)
-                        with c1:
-                            if st.form_submit_button("✉️ Enviar"):
-                                send_message(USERNAME, str(origin_user), subj_fill, body_fill)
-                                st.success(f"Mensagem enviada para {origin_display}.")
-                                time.sleep(2); safe_rerun()
-                        with c2:
-                            if st.form_submit_button("❌ Cancelar"):
-                                st.session_state.search_view_index = None; safe_rerun()
-                else:
-                    st.warning("Origem indisponível para contato (registro público/web).")
+            else:
+                # Lista de resultados
+                per_page = 8
+                total = len(results_df)
+                max_pages = max(1, (total + per_page - 1) // per_page)
+                page = max(1, min(st.session_state.get("search_page", 1), max_pages))
+                start, end = (page - 1) * per_page, min(page * per_page, total)
+                page_df = results_df.iloc[start:end]
+
+                st.markdown(f"**📊 {total}** resultado(s) encontrado(s) — exibindo {start+1} a {end}.")
+
+                for idx, (_, row) in enumerate(page_df.iterrows()):
+                    user_src = row.get("_artemis_username", "N/A")
+                    title = str(row.get('título') or row.get('titulo') or '(Sem título)')
+                    author_snippet = (row.get('autor') or "")[:100]
+                    year = row.get('ano') or ""
                     
-                if st.button("⬅️ Voltar para resultados", key=f"back_search_{vi}"):
-                    st.session_state.search_view_index = None
-                    safe_rerun()
-    else:
-        st.info("Nenhum resultado de busca (executar uma pesquisa com dados carregados).")
+                    # Destacar termos de busca
+                    if search_query:
+                        title = highlight_search_terms(title, search_query)
+                        author_snippet = highlight_search_terms(author_snippet, search_query)
+                    else:
+                        title = escape_html(title)
+                        author_snippet = escape_html(author_snippet)
+
+                    st.markdown(f"""
+                    <div class="card">
+                        <div class="card-title">{title}</div>
+                        <div class="small-muted">{author_snippet}</div>
+                        <div class="small-muted">Ano: {escape_html(str(year))} • Fonte: {escape_html(user_src)}</div>
+                    </div>""", unsafe_allow_html=True)
+
+                    b_col1, b_col2 = st.columns(2)
+                    with b_col1:
+                        if st.button("⭐ Favoritar", key=f"fav_{idx}_{USERNAME}", use_container_width=True):
+                            if add_to_favorites(row.to_dict()):
+                                st.toast("Adicionado aos favoritos!", icon="⭐")
+                            else:
+                                st.toast("Já está nos favoritos.")
+                    with b_col2:
+                        if st.button("🔎 Ver detalhes", key=f"view_{idx}_{USERNAME}", use_container_width=True):
+                            st.session_state.search_view_index = start + idx
+                            safe_rerun()
+                    st.markdown("---")
+                
+                # Navegação de páginas
+                if max_pages > 1:
+                    p1, p2, p3 = st.columns([1, 1, 1])
+                    with p1:
+                        if st.button("◀ Anterior", key=f"search_prev_{USERNAME}", disabled=(page <= 1), use_container_width=True):
+                            st.session_state.search_page -= 1
+                            safe_rerun()
+                    with p2:
+                        st.markdown(f"<div style='text-align:center; padding-top:8px'><b>Página {page} / {max_pages}</b></div>", unsafe_allow_html=True)
+                    with p3:
+                        if st.button("Próxima ▶", key=f"search_next_{USERNAME}", disabled=(page >= max_pages), use_container_width=True):
+                            st.session_state.search_page += 1
+                            safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mensagens - CORREÇÃO: REMOVER CPF DA EXIBIÇÃO
+# Page: mensagens
 # -------------------------
 elif st.session_state.page == "mensagens":
-    st.markdown("<div class='glass-box' style='position:relative;padding:12px;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("✉️ Mensagens")
+    st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.subheader("✉️ Sistema de Mensagens")
 
-    tab_inbox, tab_sent, tab_compose = st.tabs(["Caixa de Entrada", "Enviados", "Escrever Nova"])
+    # Abas para caixa de entrada, enviadas e nova mensagem
+    tab1, tab2, tab3 = st.tabs(["📥 Caixa de Entrada", "📤 Enviadas", "📝 Nova Mensagem"])
 
-    with tab_inbox:
-        if st.session_state.get("view_message_id"):
-            msg = next((m for m in all_msgs if m['id'] == st.session_state.view_message_id), None)
-            if msg:
-                mark_message_read(msg['id'], USERNAME)
-                
-                # CORREÇÃO: Mostrar apenas o nome, sem CPF
-                users_map = load_users()
-                from_user = msg.get('from')
-                from_display = users_map.get(from_user, {}).get('name', from_user)  # Removido CPF
-                
-                st.markdown(f"**De:** {escape_html(from_display)}")
-                st.markdown(f"**Assunto:** {escape_html(msg.get('subject'))}")
-                st.markdown(f"**Data:** {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}")
-                st.markdown("---")
-                st.markdown(f"<div style='white-space:pre-wrap; padding:10px; border-radius:8px; background:rgba(0,0,0,0.2);'>{escape_html(msg.get('body'))}</div>", unsafe_allow_html=True)
-                
-                if msg.get('attachment') and isinstance(msg['attachment'], dict) and msg['attachment'].get('path') and Path(msg['attachment']['path']).exists():
-                    with open(msg['attachment']['path'], "rb") as fp:
-                        st.download_button(
-                            f"⬇️ Baixar anexo: {msg['attachment']['name']}", 
-                            data=fp, 
-                            file_name=msg['attachment']['name'],
-                            use_container_width=True
-                        )
-
-                st.markdown("---")
-                c1, c2, c3 = st.columns(3)
-                with c1:
-                    if st.button("↩️ Voltar", key=f"back_inbox_{USERNAME}", use_container_width=True):
-                        st.session_state.view_message_id = None; safe_rerun()
-                with c2:
-                    if st.button("↪️ Responder", key=f"reply_msg_{USERNAME}", use_container_width=True):
-                        st.session_state.reply_message_id = msg['id']; st.session_state.view_message_id = None; safe_rerun()
-                with c3:
-                    if st.button("🗑️ Excluir", key=f"del_inbox_msg_{msg['id']}_{USERNAME}", use_container_width=True):
-                        if delete_message(msg['id'], USERNAME): 
-                            st.session_state.view_message_id = None; 
-                            st.toast("Mensagem excluída.")
-                            safe_rerun()
-            else:
-                st.warning("Mensagem não encontrada."); st.session_state.view_message_id = None
+    with tab1:
+        inbox_msgs = get_user_messages(USERNAME, 'inbox')
+        if not inbox_msgs:
+            st.info("Nenhuma mensagem na caixa de entrada.")
         else:
-            inbox_msgs = get_user_messages(USERNAME, 'inbox')
-            if not inbox_msgs:
-                st.info("Caixa de entrada vazia.")
+            st.write(f"**{len(inbox_msgs)} mensagem(s) não lida(s)**" if UNREAD_COUNT > 0 else "Todas as mensagens lidas.")
+            
             for msg in inbox_msgs:
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    read_marker = "" if msg.get('read', False) else "🔵 "
+                is_unread = not msg.get('read', False)
+                unread_indicator = "🔵" if is_unread else "⚪"
+                
+                with st.expander(f"{unread_indicator} {msg['subject']} — De: {msg['from']}", expanded=is_unread):
+                    st.write(f"**Assunto:** {msg['subject']}")
+                    st.write(f"**De:** {msg['from']}")
+                    st.write(f"**Data:** {datetime.fromisoformat(msg['ts']).strftime('%d/%m/%Y %H:%M')}")
+                    st.markdown("---")
+                    st.write(msg['body'])
                     
-                    # CORREÇÃO: Mostrar apenas o nome, sem CPF
-                    users_map = load_users()
-                    from_user = msg.get('from')
-                    from_display = users_map.get(from_user, {}).get('name', from_user)  # Removido CPF
+                    if msg.get('attachment'):
+                        att = msg['attachment']
+                        if os.path.exists(att['path']):
+                            with open(att['path'], 'rb') as f:
+                                st.download_button(
+                                    f"📎 Baixar {att['name']}",
+                                    data=f.read(),
+                                    file_name=att['name'],
+                                    mime="application/octet-stream"
+                                )
                     
-                    st.markdown(f"**{read_marker}{escape_html(msg.get('subject', '(sem assunto)'))}**")
-                    st.markdown(f"<span class='small-muted'>De: {escape_html(from_display)} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
-                with col2:
-                    if st.button("Ler", key=f"read_{msg['id']}_{USERNAME}", use_container_width=True):
-                        st.session_state.view_message_id = msg['id']; safe_rerun()
-                st.markdown("---")
+                    col1, col2, col3 = st.columns(3)
+                    with col1:
+                        if is_unread and st.button("✅ Marcar como lida", key=f"read_{msg['id']}"):
+                            mark_message_read(msg['id'], USERNAME)
+                            st.success("Mensagem marcada como lida!")
+                            safe_rerun()
+                    with col2:
+                        if st.button("📧 Responder", key=f"reply_{msg['id']}"):
+                            st.session_state.reply_message_id = msg['id']
+                            st.session_state.compose_inline = True
+                            safe_rerun()
+                    with col3:
+                        if st.button("🗑️ Excluir", key=f"delete_inbox_{msg['id']}"):
+                            if delete_message(msg['id'], USERNAME):
+                                st.success("Mensagem excluída!")
+                                safe_rerun()
+                            else:
+                                st.error("Erro ao excluir mensagem.")
 
-    with tab_sent:
+    with tab2:
         sent_msgs = get_user_messages(USERNAME, 'sent')
         if not sent_msgs:
             st.info("Nenhuma mensagem enviada.")
-        for msg in sent_msgs:
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                # CORREÇÃO: Mostrar apenas o nome, sem CPF
-                users_map = load_users()
-                to_user = msg.get('to')
-                to_display = users_map.get(to_user, {}).get('name', to_user)  # Removido CPF
-                
-                st.markdown(f"**{escape_html(msg.get('subject', '(sem assunto)'))}**")
-                st.markdown(f"<span class='small-muted'>Para: {escape_html(to_display)} em {datetime.fromisoformat(msg.get('ts')).strftime('%d/%m/%Y %H:%M')}</span>", unsafe_allow_html=True)
-            with col2:
-                if st.button("🗑️ Excluir", key=f"del_sent_{msg['id']}_{USERNAME}", use_container_width=True):
-                    if delete_message(msg['id'], USERNAME): 
-                        st.toast("Mensagem excluída.")
-                        safe_rerun()
-            st.markdown("---")
-
-    with tab_compose:
-        if st.session_state.get("reply_message_id"):
-            original_msg = next((m for m in all_msgs if m['id'] == st.session_state.reply_message_id), None)
-            if original_msg:
-                users_map = load_users()
-                from_user = original_msg.get('from')
-                from_display = users_map.get(from_user, {}).get('name', from_user)  # Removido CPF
-                
-                st.info(f"Respondendo a: {from_display}")
-                default_to, default_subj, default_body = original_msg['from'], f"Re: {original_msg['subject']}", f"\n\n---\nEm resposta a:\n{original_msg['body']}"
-            else:
-                st.session_state.reply_message_id = None; default_to, default_subj, default_body = "", "", ""
-        elif st.session_state.get("compose_open"):
-            default_to = st.session_state.get("compose_to", "")
-            default_subj = st.session_state.get("compose_subject", "")
-            default_body = st.session_state.get("compose_prefill", "")
-            st.session_state.compose_open = False
         else:
-            default_to, default_subj, default_body = "", "", ""
+            for msg in sent_msgs:
+                with st.expander(f"📤 {msg['subject']} — Para: {msg['to']}"):
+                    st.write(f"**Assunto:** {msg['subject']}")
+                    st.write(f"**Para:** {msg['to']}")
+                    st.write(f"**Data:** {datetime.fromisoformat(msg['ts']).strftime('%d/%m/%Y %H:%M')}")
+                    st.markdown("---")
+                    st.write(msg['body'])
+                    
+                    if st.button("🗑️ Excluir", key=f"delete_sent_{msg['id']}"):
+                        if delete_message(msg['id'], USERNAME):
+                            st.success("Mensagem excluída!")
+                            safe_rerun()
+                        else:
+                            st.error("Erro ao excluir mensagem.")
 
-        with st.form("compose_form", clear_on_submit=True):
+    with tab3:
+        st.subheader("✍️ Nova Mensagem")
+        
+        # Se é uma resposta, preencher alguns campos automaticamente
+        reply_to_msg = None
+        if st.session_state.get('reply_message_id'):
+            reply_to_msg = next((m for m in all_msgs if m['id'] == st.session_state.reply_message_id), None)
+        
+        with st.form("compose_message", clear_on_submit=True):
+            # Lista de usuários disponíveis
             users = load_users()
-            # CORREÇÃO: Mostrar apenas nomes na lista de destinatários
-            user_options = []
-            user_mapping = {}
+            user_list = [username for username in users.keys() if username != USERNAME]
             
-            for username, user_data in users.items():
-                if username != USERNAME:
-                    display_name = user_data.get('name', 'Usuário')  # Removido CPF
-                    user_options.append(display_name)
-                    user_mapping[display_name] = username
+            recipients = st.multiselect("Para:", options=user_list)
+            subject = st.text_input("Assunto:", 
+                                  value=f"Re: {reply_to_msg['subject']}" if reply_to_msg else "")
+            body = st.text_area("Mensagem:", height=200,
+                              value=f"\n\n---\nEm resposta à mensagem de {reply_to_msg['from']}:\n{reply_to_msg['body'][:500]}..." if reply_to_msg else "")
             
-            if not user_options:
-                st.warning("Nenhum outro usuário cadastrado — não é possível enviar mensagens.")
-            else:
-                # Selecionar pelo nome de exibição
-                selected_display = st.selectbox(
-                    "Para:", 
-                    options=user_options,
-                    index=user_options.index(default_to) if default_to in user_options else 0
-                )
-                
-                # Obter o CPF real do usuário selecionado
-                to_user = user_mapping.get(selected_display, "")
-                
-                subject = st.text_input("Assunto:", value=default_subj)
-                body = st.text_area("Mensagem:", height=200, value=default_body)
-                attachment = st.file_uploader("Anexo (opcional)", type=['pdf', 'txt', 'doc', 'docx', 'xls', 'xlsx'])
+            attachment = st.file_uploader("Anexar arquivo", type=['pdf', 'docx', 'txt', 'jpg', 'png'])
             
-            col_send, col_cancel = st.columns(2)
-            with col_send:
-                if st.form_submit_button("✉️ Enviar Mensagem", use_container_width=True):
-                    if not to_user:
-                        st.error("Selecione um destinatário.")
-                    elif not subject.strip():
+            col1, col2 = st.columns(2)
+            with col1:
+                if st.form_submit_button("📤 Enviar Mensagem", use_container_width=True):
+                    if not recipients:
+                        st.error("Selecione pelo menos um destinatário.")
+                    elif not subject:
                         st.error("Digite um assunto.")
-                    elif not body.strip():
+                    elif not body:
                         st.error("Digite uma mensagem.")
                     else:
-                        send_message(USERNAME, to_user, subject.strip(), body.strip(), attachment)
-                        st.session_state.reply_message_id = None
-                        st.session_state.compose_open = False
-                        st.success("Mensagem enviada!")
-                        time.sleep(1); safe_rerun()
-            with col_cancel:
+                        for recipient in recipients:
+                            sent_msg = send_message(USERNAME, recipient, subject, body, attachment)
+                            st.success(f"Mensagem enviada para {recipient}!")
+                        
+                        # Limpar estado de resposta se existir
+                        if st.session_state.get('reply_message_id'):
+                            st.session_state.reply_message_id = None
+                        if st.session_state.get('compose_inline'):
+                            st.session_state.compose_inline = False
+                        
+                        safe_rerun()
+            
+            with col2:
                 if st.form_submit_button("❌ Cancelar", type="secondary", use_container_width=True):
-                    st.session_state.reply_message_id = None
-                    st.session_state.compose_open = False
+                    if st.session_state.get('reply_message_id'):
+                        st.session_state.reply_message_id = None
+                    if st.session_state.get('compose_inline'):
+                        st.session_state.compose_inline = False
                     safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: configurações - ADICIONADO CONTROLE DE FONTE
+# Page: configuracoes
 # -------------------------
 elif st.session_state.page == "config":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("⚙️ Configurações")
+    st.subheader("⚙️ Configurações e Personalização")
+
+    # Configurações de aparência
+    st.subheader("🎨 Aparência e Visual")
     
-    # Configurações de fonte - NOVO
-    st.markdown('<div class="font-config">', unsafe_allow_html=True)
-    st.write("### 👁️ Configurações de Visualização")
+    col1, col2 = st.columns(2)
     
-    col_font1, col_font2 = st.columns(2)
-    
-    with col_font1:
-        # Tamanho da fonte geral
-        font_size = st.slider(
-            "Tamanho da Fonte Geral",
-            min_value=8,
-            max_value=32,
-            value=st.session_state.settings.get("font_size", 14),
-            key="config_font_size",
-            help="Ajusta o tamanho do texto em toda a aplicação"
-        )
+    with col1:
+        # Escala de fonte
+        font_scale = st.slider("Tamanho da fonte:", 
+                              min_value=0.8, 
+                              max_value=1.5, 
+                              value=st.session_state.settings.get("font_scale", 1.0),
+                              step=0.1,
+                              help="Ajusta o tamanho geral do texto")
         
-        # Tamanho da fonte dos nós do mapa mental
-        node_font_size = st.slider(
-            "Tamanho da Fonte dos Nós",
-            min_value=8,
-            max_value=24,
-            value=st.session_state.settings.get("node_font_size", 14),
-            key="config_node_font_size",
-            help="Ajusta o tamanho do texto nos nós do mapa mental"
-        )
+        # Tamanho da fonte dos nós (mapa mental)
+        node_font_size = st.slider("Tamanho da fonte nos mapas:", 
+                                  min_value=10, 
+                                  max_value=24, 
+                                  value=st.session_state.settings.get("node_font_size", 14),
+                                  step=1,
+                                  help="Tamanho do texto nos nós do mapa mental")
     
-    with col_font2:
-        # Escala geral da fonte
-        font_scale = st.slider(
-            "Escala Geral da Fonte (%)",
-            min_value=50,
-            max_value=150,
-            value=int(st.session_state.settings.get("font_scale", 1.0) * 100),
-            key="config_font_scale",
-            help="Ajusta a escala geral de todos os textos"
-        )
-        
+    with col2:
         # Altura dos gráficos
-        plot_height = st.slider(
-            "Altura dos Gráficos",
-            min_value=400,
-            max_value=1200,
-            value=st.session_state.settings.get("plot_height", 720),
-            key="config_plot_height",
-            help="Altura dos gráficos e visualizações"
-        )
-    
+        plot_height = st.slider("Altura dos gráficos (px):", 
+                               min_value=400, 
+                               max_value=1200, 
+                               value=st.session_state.settings.get("plot_height", 600),
+                               step=100,
+                               help="Altura padrão para visualizações de gráficos")
+        
+        # Opacidade dos nós
+        node_opacity = st.slider("Opacidade dos nós:", 
+                                min_value=0.3, 
+                                max_value=1.0, 
+                                value=st.session_state.settings.get("node_opacity", 0.8),
+                                step=0.1,
+                                help="Transparência dos elementos no mapa mental")
+
     # Aplicar configurações
     if st.button("💾 Aplicar Configurações", use_container_width=True):
         st.session_state.settings.update({
-            "font_size": font_size,
-            "node_font_size": node_font_size,
-            "font_scale": font_scale / 100.0,
-            "plot_height": plot_height
+            "font_scale": font_scale,
+            "plot_height": plot_height,
+            "node_opacity": node_opacity,
+            "node_font_size": node_font_size
         })
-        
-        # Aplicar CSS imediatamente
-        apply_global_styles(font_scale / 100.0)
-        
-        st.success("Configurações aplicadas com sucesso!")
-        if save_user_state_minimal(USER_STATE):
-            st.toast("Configurações salvas permanentemente.")
+        apply_global_styles(font_scale)
+        save_user_state_minimal(USER_STATE)
+        st.success("Configurações aplicadas! A página será recarregada.")
+        time.sleep(1)
         safe_rerun()
+
+    # Gerenciamento de dados
+    st.subheader("📊 Gerenciamento de Dados")
     
-    st.markdown('</div>', unsafe_allow_html=True)
+    col3, col4 = st.columns(2)
     
-    # Visualização de prévia
-    st.markdown("---")
-    st.write("### 👀 Prévia do Texto")
-    
-    col_preview1, col_preview2 = st.columns(2)
-    
-    with col_preview1:
-        st.markdown(f"""
-        <div style='font-size: {font_size}px; padding: 15px; background: rgba(255,255,255,0.05); border-radius: 8px;'>
-            <h3 style='font-size: {font_size + 4}px;'>Texto de Exemplo</h3>
-            <p>Este é um exemplo de texto com o tamanho de fonte selecionado.</p>
-            <p style='font-size: {font_size - 2}px;'>Texto menor para referência.</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col_preview2:
-        st.markdown(f"""
-        <div style='font-size: {node_font_size}px; padding: 15px; background: rgba(78, 205, 196, 0.1); border-radius: 8px; border-left: 4px solid #4ECDC4;'>
-            <strong>💡 Nó do Mapa Mental</strong>
-            <p style='margin: 5px 0 0 0;'>Texto do nó com tamanho selecionado</p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    # Configurações de backup
-    st.markdown("---")
-    st.write("### 💾 Backup e Dados")
-    
-    col_data1, col_data2 = st.columns(2)
-    
-    with col_data1:
+    with col3:
         if st.button("🗑️ Limpar Todos os Dados", type="secondary", use_container_width=True):
-            if st.checkbox("Confirmar limpeza completa de TODOS os dados?"):
-                try:
-                    # Limpar dados da sessão
-                    for key in list(st.session_state.keys()):
-                        if key not in ['authenticated', 'username', 'user_obj']:
-                            del st.session_state[key]
-                    
-                    # Limpar arquivos de estado
-                    if USER_STATE.exists():
-                        USER_STATE.unlink()
-                    
-                    st.success("Dados locais limpos com sucesso!")
-                    safe_rerun()
-                except Exception as e:
-                    st.error(f"Erro ao limpar dados: {e}")
+            if st.checkbox("CONFIRMAR: Esta ação não pode ser desfeita. Todos os seus dados serão perdidos."):
+                # Limpar estado da sessão
+                for key in list(st.session_state.keys()):
+                    if key not in ['authenticated', 'username', 'user_obj']:
+                        del st.session_state[key]
+                
+                # Limpar arquivos de estado
+                if USER_STATE.exists():
+                    USER_STATE.unlink()
+                
+                st.success("Todos os dados locais foram removidos!")
+                time.sleep(2)
+                safe_rerun()
     
-    with col_data2:
-        if st.button("📥 Exportar Configurações", use_container_width=True):
-            settings_data = {
-                "user": USERNAME,
-                "exported_at": datetime.now().isoformat(),
-                "settings": st.session_state.settings,
-                "favorites_count": len(get_session_favorites()),
-                "tutorial_completed": st.session_state.get("tutorial_completed", False)
-            }
+    with col4:
+        if st.button("📥 Exportar Backup Completo", use_container_width=True):
+            # Criar um arquivo ZIP com todos os dados do usuário
+            import zipfile
+            from io import BytesIO
             
-            settings_json = json.dumps(settings_data, ensure_ascii=False, indent=2)
+            zip_buffer = BytesIO()
+            with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
+                # Adicionar estado atual
+                state_data = {
+                    "notes": st.session_state.get("notes", ""),
+                    "favorites": st.session_state.get("favorites", []),
+                    "settings": st.session_state.get("settings", {}),
+                    "tutorial_completed": st.session_state.get("tutorial_completed", False)
+                }
+                zip_file.writestr("user_state.json", json.dumps(state_data, indent=2))
+                
+                # Adicionar backup da planilha se existir
+                backup_path = st.session_state.get("last_backup_path")
+                if backup_path and Path(backup_path).exists():
+                    zip_file.write(backup_path, "planilha_backup.csv")
+            
             st.download_button(
-                "⬇️ Baixar Configurações",
-                data=settings_json,
-                file_name=f"nugep_config_{USERNAME}_{int(time.time())}.json",
-                mime="application/json"
+                "⬇️ Baixar Backup",
+                data=zip_buffer.getvalue(),
+                file_name=f"nugep_pqr_backup_{USERNAME}_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+                mime="application/zip",
+                use_container_width=True
             )
+
+    # Informações do sistema
+    st.subheader("ℹ️ Informações do Sistema")
+    
+    st.write(f"**Usuário:** {USERNAME}")
+    st.write(f"**Nome:** {USER_OBJ.get('name', 'Não informado')}")
+    st.write(f"**Bolsa:** {USER_OBJ.get('scholarship', 'Não informada')}")
+    st.write(f"**Cadastrado em:** {USER_OBJ.get('created_at', 'Data não disponível')}")
+    
+    st.write("**Estatísticas:**")
+    st.write(f"- Favoritos salvos: {len(get_session_favorites())}")
+    st.write(f"- Mensagens não lidas: {UNREAD_COUNT}")
+    st.write(f"- Planilha carregada: {'Sim' if st.session_state.df is not None else 'Não'}")
+    
+    if st.session_state.df is not None:
+        st.write(f"- Registros na planilha: {len(st.session_state.df)}")
+        st.write(f"- Colunas na planilha: {len(st.session_state.df.columns)}")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Auto-save final
+# Finalização e salvamento automático
 # -------------------------
-if st.session_state.autosave and st.session_state.authenticated:
+if st.session_state.autosave and st.session_state.get('notes') is not None:
     try:
         save_user_state_minimal(USER_STATE)
     except Exception:
         pass
+
+# -------------------------
+# Rodapé
+# -------------------------
+st.markdown("---")
+st.markdown(
+    "<div style='text-align:center; color:#bfc6cc; font-size:0.9em; padding:10px;'>"
+    "NUGEP-PQR — Sistema de Gestão de Pesquisa e Análise | "
+    "Desenvolvido para pesquisadores e bolsistas"
+    "</div>", 
+    unsafe_allow_html=True
+)
