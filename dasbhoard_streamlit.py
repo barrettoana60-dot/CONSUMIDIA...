@@ -283,7 +283,7 @@ class DataAnalyzer:
             text += f"**Dica**: Verifique o formato dos dados na coluna '{author_col}'\n\n"
         
         return text
-
+    
     def _temporal_analysis(self):
         """Análise temporal dos dados - CORRIGIDA E MELHORADA"""
         text = "### 📈 Análise Temporal\n\n"
@@ -365,7 +365,7 @@ class DataAnalyzer:
             text += f"⚠️ **Anos**: Coluna '{year_col}' encontrada mas sem dados numéricos válidos\n\n"
         
         return text
-
+    
     def _thematic_analysis(self):
         """Análise temática dos dados"""
         text = "### 🔍 Análise Temática\n\n"
@@ -396,7 +396,7 @@ class DataAnalyzer:
             text += "⚠️ **Temas**: Não foi possível identificar palavras-chave frequentes\n\n"
         
         return text
-
+    
     def _collaboration_analysis(self):
         """Análise de colaborações e redes"""
         text = "### 🤝 Análise de Colaborações\n\n"
@@ -436,7 +436,7 @@ class DataAnalyzer:
             text += "\n"
         
         return text
-
+    
     def _geographic_analysis(self):
         """Análise geográfica dos dados - CORRIGIDA E MELHORADA"""
         text = "### 🌎 Análise Geográfica\n\n"
@@ -499,7 +499,7 @@ class DataAnalyzer:
             text += f"⚠️ **Países**: Coluna '{country_col}' encontrada mas sem dados válidos\n\n"
         
         return text
-
+    
     def _trend_analysis(self):
         """Análise de tendências e insights - SUGESTÕES INTELIGENTES REAIS"""
         text = "### 💡 Análise e Sugestões Inteligentes\n\n"
@@ -599,6 +599,239 @@ class DataAnalyzer:
             text += f"• Coluna anos: '{year_col}'\n"
         
         return text
+
+def get_ai_assistant_response(question, context):
+    """Assistente de IA SUPER INTELIGENTE - Responde perguntas complexas"""
+    
+    question_lower = question.lower().strip()
+    df = context.df
+    
+    # PERGUNTAS SOBRE AUTORES RELEVANTES
+    if any(word in question_lower for word in ['autor', 'autores', 'relevantes', 'pesquisador', 'escritor', 'quem escreveu', 'principais autores']):
+        author_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
+        
+        if not author_col:
+            return "**❌ Autores**: Não encontrei coluna de autores na planilha. Verifique se há colunas como 'autor', 'autores' ou 'author'."
+        
+        # ANÁLISE AVANÇADA DE AUTORES
+        autores_contagem = {}
+        colaboracoes = 0
+        
+        for authors_str in df[author_col].dropna():
+            if isinstance(authors_str, str):
+                autores = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
+                autores_lista = [a.strip() for a in autores if a.strip()]
+                
+                # Contar colaborações
+                if len(autores_lista) > 1:
+                    colaboracoes += 1
+                
+                for autor in autores_lista:
+                    if len(autor) > 2 and not autor.isdigit():
+                        autores_contagem[autor] = autores_contagem.get(autor, 0) + 1
+        
+        if not autores_contagem:
+            return "**⚠️ Autores**: Coluna encontrada mas não consegui extrair nomes válidos. Verifique o formato dos dados."
+        
+        # Ordenar por produtividade
+        autores_ordenados = sorted(autores_contagem.items(), key=lambda x: x[1], reverse=True)
+        
+        resposta = "**👥 AUTORES MAIS RELEVANTES**\n\n"
+        resposta += f"**Total de autores únicos**: {len(autores_contagem)}\n"
+        resposta += f"**Taxa de colaboração**: {(colaboracoes/len(df[author_col].dropna())*100):.1f}%\n\n"
+        
+        resposta += "**Top autores por produtividade:**\n"
+        for i, (autor, count) in enumerate(autores_ordenados[:8], 1):
+            resposta += f"{i}. **{autor}** - {count} publicação(ões)\n"
+        
+        # Análise de redes de colaboração
+        if colaboracoes > 0:
+            resposta += f"\n**💡 Insight**: Rede colaborativa ativa com {colaboracoes} trabalhos em coautoria"
+        
+        return resposta
+    
+    # PERGUNTAS SOBRE DISTRIBUIÇÃO GEOGRÁFICA
+    elif any(word in question_lower for word in ['país', 'países', 'geográfica', 'geografia', 'distribuição', 'localização', 'onde']):
+        country_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['país', 'pais', 'country', 'local'])), None)
+        
+        if not country_col:
+            return "**❌ Países**: Não encontrei coluna de países. Adicione 'país', 'country' ou similar."
+        
+        paises = df[country_col].dropna()
+        if paises.empty:
+            return "**⚠️ Países**: Coluna encontrada mas sem dados válidos."
+        
+        contagem_paises = paises.value_counts()
+        total_paises = len(contagem_paises)
+        
+        resposta = "**🌎 DISTRIBUIÇÃO GEOGRÁFICA**\n\n"
+        resposta += f"**Total de países/regiões**: {total_paises}\n"
+        resposta += f"**Diversidade geográfica**: {(total_paises/len(paises)*100):.1f}%\n\n"
+        
+        resposta += "**Principais localizações:**\n"
+        for pais, count in contagem_paises.head(10).items():
+            percentual = (count / len(paises)) * 100
+            resposta += f"• **{pais}**: {count} ({percentual:.1f}%)\n"
+        
+        # Análise de concentração
+        if total_paises == 1:
+            resposta += "\n**🎯 Concentração**: Pesquisa focada em uma única região"
+        elif total_paises <= 3:
+            resposta += f"\n**🎯 Foco regional**: {total_paises} regiões principais"
+        else:
+            resposta += f"\n**🎯 Abrangência global**: {total_paises} regiões diferentes"
+        
+        return resposta
+    
+    # PERGUNTAS SOBRE EVOLUÇÃO TEMPORAL
+    elif any(word in question_lower for word in ['ano', 'anos', 'temporal', 'evolução', 'cronologia', 'linha do tempo', 'como evoluiu']):
+        year_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['ano', 'year', 'data'])), None)
+        
+        if not year_col:
+            return "**❌ Anos**: Não encontrei coluna temporal. Adicione 'ano', 'year' ou similar."
+        
+        try:
+            anos = pd.to_numeric(df[year_col], errors='coerce').dropna()
+            if anos.empty:
+                return "**⚠️ Anos**: Coluna encontrada mas sem valores numéricos válidos."
+            
+            min_ano = int(anos.min())
+            max_ano = int(anos.max())
+            periodo = max_ano - min_ano
+            
+            resposta = "**📈 EVOLUÇÃO TEMPORAL**\n\n"
+            resposta += f"**Período analisado**: {min_ano} - {max_ano} ({periodo} anos)\n"
+            resposta += f"**Total de registros com ano**: {len(anos)}\n\n"
+            
+            # Análise por década/período
+            if periodo > 10:
+                decadas = (anos // 10) * 10
+                contagem_decadas = decadas.value_counts().sort_index()
+                resposta += "**Distribuição por década:**\n"
+                for decada, count in contagem_decadas.items():
+                    resposta += f"• **{int(decada)}s**: {int(count)} publicações\n"
+            
+            # Tendência
+            contagem_por_ano = anos.value_counts().sort_index()
+            if len(contagem_por_ano) > 3:
+                anos_recentes = contagem_por_ano.tail(3).sum()
+                anos_anteriores = contagem_por_ano.head(len(contagem_por_ano)-3).sum()
+                
+                if anos_recentes > anos_anteriores * 1.5:
+                    tendencia = "📈 **CRESCENTE** - Produção aumentando recentemente"
+                elif anos_recentes < anos_anteriores * 0.7:
+                    tendencia = "📉 **DECRESCENTE** - Produção mais concentrada no passado"
+                else:
+                    tendencia = "➡️ **ESTÁVEL** - Produção constante"
+                
+                resposta += f"\n**Tendência**: {tendencia}"
+            
+            return resposta
+            
+        except Exception as e:
+            return f"**❌ Erro**: Não consegui analisar os dados temporais: {str(e)}"
+    
+    # PERGUNTAS SOBRE TEMAS/CONCEITOS
+    elif any(word in question_lower for word in ['tema', 'temas', 'conceito', 'conceitos', 'palavras', 'frequentes', 'termos', 'assuntos']):
+        # Combinar texto das colunas principais
+        texto_analise = ""
+        colunas_texto = [col for col in df.columns if df[col].dtype == 'object']
+        for col in colunas_texto[:4]:
+            texto_analise += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
+        
+        if not texto_analise.strip():
+            return "**❌ Temas**: Não há texto suficiente para análise temática."
+        
+        # Análise avançada de temas
+        palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_analise.lower())
+        palavras_filtradas = [p for p in palavras if p not in PORTUGUESE_STOP_WORDS and len(p) > 3]
+        
+        if not palavras_filtradas:
+            return "**🔍 Temas**: Texto analisado mas não identifiquei palavras-chave significativas."
+        
+        from collections import Counter
+        contador = Counter(palavras_filtradas)
+        temas_comuns = contador.most_common(12)
+        
+        resposta = "**🔤 CONCEITOS MAIS FREQUENTES**\n\n"
+        resposta += f"**Total de palavras únicas**: {len(contador)}\n"
+        resposta += f"**Texto analisado**: {len(texto_analise)} caracteres\n\n"
+        
+        resposta += "**Palavras-chave principais:**\n"
+        for i, (tema, count) in enumerate(temas_comuns, 1):
+            resposta += f"{i}. **{tema}** - {count} palavras repetidas\n"
+        
+        # Identificar temas emergentes (palavras menos comuns mas significativas)
+        if len(temas_comuns) > 8:
+            temas_emergentes = [tema for tema, count in temas_comuns[8:] if count >= 2]
+            if temas_emergentes:
+                resposta += f"\n**💡 Temas emergentes**: {', '.join(temas_emergentes[:3])}"
+        
+        return resposta
+    
+    # PERGUNTAS SOBRE SUGESTÕES
+    elif any(word in question_lower for word in ['sugestão', 'sugestões', 'o que fazer', 'próximo', 'passo', 'recomendações']):
+        # Análise inteligente para sugestões personalizadas
+        total = len(df)
+        tem_autores = any('autor' in col.lower() for col in df.columns)
+        tem_anos = any('ano' in col.lower() for col in df.columns)
+        tem_paises = any('país' in col.lower() for col in df.columns)
+        
+        resposta = "**🎯 SUGESTÕES INTELIGENTES**\n\n"
+        
+        if total < 20:
+            resposta += "**1. 📥 EXPANSÃO DE DADOS**\n"
+            resposta += "• Colete mais registros (mínimo 20-30 para análises confiáveis)\n"
+            resposta += "• Use a busca integrada para encontrar trabalhos relacionados\n\n"
+        elif total < 50:
+            resposta += "**1. 📊 ANÁLISES BÁSICAS**\n"
+            resposta += "• Explore os gráficos na aba 'Análise'\n"
+            resposta += "• Use o mapa mental para organizar conceitos\n\n"
+        else:
+            resposta += "**1. 🚀 ANÁLISES AVANÇADAS**\n"
+            resposta += "• Dados suficientes para machine learning\n"
+            resposta += "• Explore redes de colaboração entre autores\n\n"
+        
+        resposta += "**2. 🔧 MELHORIAS ESTRUTURAIS**\n"
+        if not tem_autores:
+            resposta += "• Adicione coluna 'autores' para análise de redes\n"
+        if not tem_anos:
+            resposta += "• Adicione coluna 'ano' para análise temporal\n"
+        if not tem_paises:
+            resposta += "• Adicione coluna 'país' para análise geográfica\n"
+        
+        if tem_autores and tem_anos and tem_paises:
+            resposta += "• Estrutura completa - explore todas as funcionalidades\n"
+        
+        resposta += "\n**3. 🎨 FERRAMENTAS RECOMENDADAS**\n"
+        resposta += "• **Mapa Mental**: Para organizar ideias e conceitos\n"
+        resposta += "• **Busca Inteligente**: Para encontrar trabalhos similares\n"
+        resposta += "• **Recomendações**: Para descobrir novos artigos\n"
+        resposta += "• **Análise IA**: Para insights automáticos dos dados\n"
+        
+        return resposta
+    
+    # RESPOSTA PADRÃO PARA PERGUNTAS NÃO IDENTIFICADAS
+    else:
+        return """**🤖 ASSISTENTE INTELIGENTE NUGEP-PQR**
+
+Não entendi completamente sua pergunta. Posso ajudar com:
+
+**📊 PERGUNTAS ESPECÍFICAS SOBRE SEUS DADOS:**
+• *"Quais são os autores mais relevantes?"*
+• *"Qual a distribuição geográfica da pesquisa?"*  
+• *"Como evoluiu a pesquisa ao longo do tempo?"*
+• *"Quais são os conceitos mais frequentes?"*
+• *"O que devo fazer em seguida na minha pesquisa?"*
+
+**🎯 SUGESTÕES DE ANÁLISE:**
+• *"Analise colaborações entre autores"*
+• *"Mostre tendências temporais"*
+• *"Identifique temas emergentes"*
+• *"Sugira próximos passos"*
+
+Faça uma pergunta mais específica sobre sua planilha!"""
+
 # -------------------------
 # Miro-like Mind Map Components - ATUALIZADO E TRADUZIDO
 # -------------------------
@@ -673,28 +906,28 @@ class MiroStyleMindMap:
         return nodes
 
     def _force_directed_layout(self, nodes, edges):
-    """Layout de força direcionada - CORRIGIDO: estabilidade REAL melhorada"""
-    G = nx.Graph()
-    for node in nodes:
-        G.add_node(node["id"])
-    for edge in edges:
-        G.add_edge(edge["source"], edge["target"])
-    
-    try:
-        # FORÇAS OTIMIZADAS - MAIS ESTÁVEL
-        pos = nx.spring_layout(G, k=5, iterations=200, scale=3, seed=42)
+        """Layout de força direcionada - CORRIGIDO: estabilidade REAL melhorada"""
+        G = nx.Graph()
         for node in nodes:
-            if node["id"] in pos:
-                node["x"] = pos[node["id"]][0] * 800 + 300
-                node["y"] = pos[node["id"]][1] * 600 + 200
-    except Exception as e:
-        print(f"Layout automático falhou: {e}")
-        # Fallback organizado em grid
-        for i, node in enumerate(nodes):
-            node["x"] = 300 + (i % 4) * 250
-            node["y"] = 200 + (i // 4) * 150
-    
-    return nodes
+            G.add_node(node["id"])
+        for edge in edges:
+            G.add_edge(edge["source"], edge["target"])
+        
+        try:
+            # FORÇAS OTIMIZADAS - MAIS ESTÁVEL
+            pos = nx.spring_layout(G, k=5, iterations=200, scale=3, seed=42)
+            for node in nodes:
+                if node["id"] in pos:
+                    node["x"] = pos[node["id"]][0] * 800 + 300
+                    node["y"] = pos[node["id"]][1] * 600 + 200
+        except Exception as e:
+            print(f"Layout automático falhou: {e}")
+            # Fallback organizado em grid
+            for i, node in enumerate(nodes):
+                node["x"] = 300 + (i % 4) * 250
+                node["y"] = 200 + (i // 4) * 150
+        
+        return nodes
 
 # -------------------------
 # Utilities: CPF / hashing / formatting
@@ -1989,32 +2222,30 @@ elif st.session_state.page == "mapa":
                 ))
             
             # Configuração do gráfico - CORRIGIDA: estabilidade melhorada
-           config = Config(
-    width="100%",
-    height=700,
-    directed=True,
-    physics=physics_enabled,
-    hierarchical=hierarchical_enabled,
-    nodeHighlightBehavior=True,
-    highlightColor="#F8F8F8",
-    collapsible=True,
-    node={"labelProperty": "label"},
-    link={"labelProperty": "label", "renderLabel": True},
-    # CONFIGURAÇÃO DE FÍSICA MELHORADA
-    physics_config={
-        "enabled": physics_enabled,
-        "stabilization": {"iterations": 100},
-        "barnesHut": {
-            "gravitationalConstant": -8000,
-            "centralGravity": 0.3,
-            "springLength": 150,
-            "springConstant": 0.04,
-            "damping": 0.09,
-            "avoidOverlap": 0.8
-        },
-        "minVelocity": 0.75
-    } if physics_enabled else None
-)
+            config = Config(
+                width="100%",
+                height=700,
+                directed=True,
+                physics=physics_enabled,
+                hierarchical=hierarchical_enabled,
+                nodeHighlightBehavior=True,
+                highlightColor="#F8F8F8",
+                collapsible=True,
+                node={"labelProperty": "label"},
+                link={"labelProperty": "label", "renderLabel": True},
+                # Configurações de física otimizadas para estabilidade
+                physics_config={
+                    "barnesHut": {
+                        "gravitationalConstant": -2000,  # Reduzida repulsão
+                        "centralGravity": 0.3,
+                        "springLength": 100,
+                        "springConstant": 0.05,
+                        "damping": 0.09,
+                        "avoidOverlap": 0.5
+                    },
+                    "minVelocity": 0.75
+                } if physics_enabled else None
+            )
             
             try:
                 # Renderizar mapa interativo
