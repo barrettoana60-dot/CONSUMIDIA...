@@ -208,99 +208,39 @@ class DataAnalyzer:
         
         return text
     
- def _author_analysis(self):
-    """Análise de autores e colaborações - CORRIGIDA E FUNCIONANDO"""
-    text = "### 👥 Análise de Autores\n\n"
-    
-    # BUSCA MAIS AGRESSIVA POR COLUNA DE AUTORES
-    author_col = None
-    possible_author_cols = []
-    
-    for col in self.df.columns:
-        col_lower = col.lower()
-        # Adicionar mais palavras-chave e verificar conteúdo
-        if any(keyword in col_lower for keyword in ['autor', 'author', 'pesquisador', 'escritor', 'writer', 'nome']):
-            possible_author_cols.append(col)
-            
-            # Verificar se a coluna tem dados que parecem nomes
-            sample_data = self.df[col].dropna().head(5)
-            if len(sample_data) > 0:
-                # Verificar se contém vírgulas, pontos e vírgulas (indicando múltiplos autores)
-                has_multiple_authors = any(';' in str(val) or ',' in str(val) for val in sample_data)
-                if has_multiple_authors or any(len(str(val).split()) >= 2 for val in sample_data):
-                    author_col = col
-                    break
-    
-    # Se não encontrou, usar a primeira possível
-    if not author_col and possible_author_cols:
-        author_col = possible_author_cols[0]
-    
-    if not author_col:
-        return "❌ **Autores**: Nenhuma coluna de autores identificada. Verifique se há colunas como 'autor', 'autores', 'author' na sua planilha.\n\n"
-    
-    text += f"**Coluna utilizada**: '{author_col}'\n\n"
-    
-    # PROCESSAMENTO MELHORADO DOS AUTORES
-    all_authors = []
-    authors_found = 0
-    
-    for authors_str in self.df[author_col].dropna():
-        if isinstance(authors_str, str) and authors_str.strip():
-            authors_found += 1
-            # Múltiplas estratégias de parsing
-            authors = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
-            for author in authors:
-                author_clean = author.strip()
-                if (author_clean and len(author_clean) > 2 and 
-                    author_clean.lower() not in ['', 'e', 'and', 'et', 'de', 'da', 'do', 'dos', 'das'] and
-                    not author_clean.isdigit() and
-                    not author_clean.replace('.', '').isdigit()):
-                    all_authors.append(author_clean)
-    
-    if all_authors:
-        author_counts = pd.Series(all_authors).value_counts()
-        text += "**Principais autores identificados:**\n"
-        for author, count in author_counts.head(8).items():
-            text += f"- **{author}**: {count} publicação(ões)\n"
+    def _author_analysis(self):
+        """Análise de autores e colaborações - CORRIGIDA E FUNCIONANDO"""
+        text = "### 👥 Análise de Autores\n\n"
         
-        # Colaborações
-        collaborations = 0
-        for authors_str in self.df[author_col].dropna():
-            if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b|&', authors_str)) > 1:
-                collaborations += 1
+        # BUSCA MAIS AGRESSIVA POR COLUNA DE AUTORES
+        author_col = None
+        possible_author_cols = []
         
-        if collaborations > 0:
-            collaboration_rate = (collaborations / authors_found) * 100
-            text += f"\n**Colaborações**: {collaborations} trabalhos com coautoria ({collaboration_rate:.1f}%)\n"
-        else:
-            text += f"\n**Colaborações**: Nenhuma colaboração identificada\n"
+        for col in self.df.columns:
+            col_lower = col.lower()
+            # Adicionar mais palavras-chave e verificar conteúdo
+            if any(keyword in col_lower for keyword in ['autor', 'author', 'pesquisador', 'escritor', 'writer', 'nome']):
+                possible_author_cols.append(col)
+                
+                # Verificar se a coluna tem dados que parecem nomes
+                sample_data = self.df[col].dropna().head(5)
+                if len(sample_data) > 0:
+                    # Verificar se contém vírgulas, pontos e vírgulas (indicando múltiplos autores)
+                    has_multiple_authors = any(';' in str(val) or ',' in str(val) for val in sample_data)
+                    if has_multiple_authors or any(len(str(val).split()) >= 2 for val in sample_data):
+                        author_col = col
+                        break
         
-        text += f"\n**Total de registros com autores**: {authors_found}\n"
-        text += f"**Total de nomes extraídos**: {len(all_authors)}\n\n"
-        
-    else:
-        text += f"⚠️ **Autores**: Coluna '{author_col}' encontrada mas não foi possível extrair autores válidos\n\n"
-        text += f"**Dica**: Verifique o formato dos dados na coluna '{author_col}'\n\n"
-    
-    return text
-        
-        if not author_data_found:
-            # Tentar encontrar dados de autor em qualquer coluna
-            for col in self.df.columns:
-                if self.df[col].dtype == 'object':
-                    # Verificar se a coluna contém nomes (palavras com letras maiúsculas)
-                    sample_data = self.df[col].dropna().head(10)
-                    if len(sample_data) > 0:
-                        has_names = any(any(word.istitle() for word in str(val).split()) for val in sample_data)
-                        if has_names:
-                            author_col = col
-                            author_data_found = True
-                            text += f"⚠️ **Atenção**: Usando coluna '{col}' para análise de autores (detecção automática)\n\n"
-                            break
+        # Se não encontrou, usar a primeira possível
+        if not author_col and possible_author_cols:
+            author_col = possible_author_cols[0]
         
         if not author_col:
-            return "❌ **Autores**: Nenhuma coluna de autores identificada na planilha\n\n"
-            
+            return "❌ **Autores**: Nenhuma coluna de autores identificada. Verifique se há colunas como 'autor', 'autores', 'author' na sua planilha.\n\n"
+        
+        text += f"**Coluna utilizada**: '{author_col}'\n\n"
+        
+        # PROCESSAMENTO MELHORADO DOS AUTORES
         all_authors = []
         authors_found = 0
         
@@ -312,8 +252,9 @@ class DataAnalyzer:
                 for author in authors:
                     author_clean = author.strip()
                     if (author_clean and len(author_clean) > 2 and 
-                        author_clean.lower() not in ['', 'e', 'and', 'et', 'de', 'da', 'do'] and
-                        not author_clean.isdigit()):
+                        author_clean.lower() not in ['', 'e', 'and', 'et', 'de', 'da', 'do', 'dos', 'das'] and
+                        not author_clean.isdigit() and
+                        not author_clean.replace('.', '').isdigit()):
                         all_authors.append(author_clean)
         
         if all_authors:
@@ -342,7 +283,7 @@ class DataAnalyzer:
             text += f"**Dica**: Verifique o formato dos dados na coluna '{author_col}'\n\n"
         
         return text
-    
+
     def _temporal_analysis(self):
         """Análise temporal dos dados - CORRIGIDA E MELHORADA"""
         text = "### 📈 Análise Temporal\n\n"
@@ -424,7 +365,7 @@ class DataAnalyzer:
             text += f"⚠️ **Anos**: Coluna '{year_col}' encontrada mas sem dados numéricos válidos\n\n"
         
         return text
-    
+
     def _thematic_analysis(self):
         """Análise temática dos dados"""
         text = "### 🔍 Análise Temática\n\n"
@@ -449,13 +390,13 @@ class DataAnalyzer:
             temas = pd.Series(palavras_filtradas).value_counts().head(12)
             text += "**Palavras-chave mais frequentes:**\n"
             for i, (tema, count) in enumerate(temas.items(), 1):
-                text += f"{i}. **{tema}**: {count} ocorrências\n"
+                text += f"{i}. **{tema}**: {count} palavras repetidas\n"
             text += "\n"
         else:
             text += "⚠️ **Temas**: Não foi possível identificar palavras-chave frequentes\n\n"
         
         return text
-    
+
     def _collaboration_analysis(self):
         """Análise de colaborações e redes"""
         text = "### 🤝 Análise de Colaborações\n\n"
@@ -495,7 +436,7 @@ class DataAnalyzer:
             text += "\n"
         
         return text
-    
+
     def _geographic_analysis(self):
         """Análise geográfica dos dados - CORRIGIDA E MELHORADA"""
         text = "### 🌎 Análise Geográfica\n\n"
@@ -558,378 +499,106 @@ class DataAnalyzer:
             text += f"⚠️ **Países**: Coluna '{country_col}' encontrada mas sem dados válidos\n\n"
         
         return text
-    
+
     def _trend_analysis(self):
-    """Análise de tendências e insights - SUGESTÕES INTELIGENTES REAIS"""
-    text = "### 💡 Análise e Sugestões Inteligentes\n\n"
-    
-    insights = []
-    sugestoes_inteligentes = []
-    
-    # ANÁLISE INTELIGENTE BASEADA NOS DADOS REAIS
-    total_registros = len(self.df)
-    
-    # 1. Análise de completude
-    colunas_principais = ['autor', 'ano', 'título', 'resumo']
-    colunas_presentes = [col for col in colunas_principais 
-                        if any(col in col_name.lower() for col_name in self.df.columns)]
-    completude = len(colunas_presentes) / len(colunas_principais) * 100
-    
-    if completude < 50:
-        sugestoes_inteligentes.append("📋 **Melhore a estrutura da planilha** - Adicione colunas básicas como autor, ano, título")
-    elif completude < 80:
-        sugestoes_inteligentes.append("📊 **Estrutura boa** - Considere adicionar mais metadados para análises avançadas")
-    else:
-        sugestoes_inteligentes.append("🎯 **Estrutura excelente** - Todos os elementos essenciais estão presentes")
-    
-    # 2. Análise temporal (se houver anos)
-    year_col = next((col for col in self.df.columns if 'ano' in col.lower() or 'year' in col.lower()), None)
-    if year_col:
-        try:
-            anos = pd.to_numeric(self.df[year_col], errors='coerce').dropna()
-            if len(anos) > 0:
-                range_anos = int(anos.max()) - int(anos.min())
-                if range_anos < 3:
-                    sugestoes_inteligentes.append("⏳ **Expanda o período** - Dados concentrados em poucos anos, busque maior variedade temporal")
-                elif range_anos > 10:
-                    sugestoes_inteligentes.append("📈 **Analise tendências** - Período extenso permite análise de evolução temporal")
-        except:
-            pass
-    
-    # 3. Análise de diversidade de autores
-    author_col = next((col for col in self.df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
-    if author_col:
-        autores_unicos = set()
-        for authors_str in self.df[author_col].dropna():
-            if isinstance(authors_str, str):
-                authors = re.split(r'[;,]', authors_str)
-                for author in authors:
-                    if author.strip():
-                        autores_unicos.add(author.strip())
+        """Análise de tendências e insights - SUGESTÕES INTELIGENTES REAIS"""
+        text = "### 💡 Análise e Sugestões Inteligentes\n\n"
         
-        if len(autores_unicos) < 5:
-            sugestoes_inteligentes.append("👥 **Amplie rede de autores** - Pouca diversidade de pesquisadores")
-        elif len(autores_unicos) > 20:
-            sugestoes_inteligentes.append("🤝 **Rede colaborativa forte** - Excelente diversidade de autores")
-    
-    # 4. Análise de temas emergentes
-    texto_completo = ""
-    for col in self.df.select_dtypes(include=['object']).columns[:3]:
-        texto_completo += " " + self.df[col].fillna('').astype(str).str.cat(sep=' ')
-    
-    if len(texto_completo) > 1000:
-        palavras = re.findall(r'\b[a-zà-ú]{5,}\b', texto_completo.lower())
-        from collections import Counter
-        contagem = Counter(palavras)
-        temas_comuns = [pal for pal, cnt in contagem.most_common(10) 
-                       if pal not in PORTUGUESE_STOP_WORDS and cnt > 2]
+        insights = []
+        sugestoes_inteligentes = []
         
-        if temas_comuns:
-            sugestoes_inteligentes.append(f"🔍 **Foque em**: {', '.join(temas_comuns[:3])}")
-    
-    # 5. Sugestões baseadas no tamanho
-    if total_registros < 15:
-        sugestoes_inteligentes.extend([
-            "📥 **Colete mais dados** - Mínimo 20 registros para análises confiáveis",
-            "🔎 **Use busca integrada** - Encontre trabalhos relacionados na plataforma"
-        ])
-    elif total_registros < 50:
-        sugestoes_inteligentes.extend([
-            "📊 **Análises básicas possíveis** - Explore gráficos e estatísticas",
-            "🗺️ **Organize conceitos** - Use o mapa mental para estruturar ideias"
-        ])
-    else:
-        sugestoes_inteligentes.extend([
-            "📈 **Análises avançadas** - Dados suficientes para ML e redes complexas",
-            "🌐 **Explore colaborações** - Identifique redes de coautoria"
-        ])
-    
-    # Formatar resposta
-    text += "**Sugestões Inteligentes Baseadas na Sua Planilha:**\n\n"
-    for i, sugestao in enumerate(sugestoes_inteligentes, 1):
-        text += f"{i}. {sugestao}\n"
-    
-    text += f"\n**Resumo da Base:**\n"
-    text += f"• Registros: {total_registros}\n"
-    text += f"• Completude: {completude:.1f}%\n"
-    if author_col:
-        text += f"• Coluna autores: '{author_col}'\n"
-    if year_col:
-        text += f"• Coluna anos: '{year_col}'\n"
-    
-    return text
-        # Verificar completude dos dados
-        has_authors = any(col.lower() in ['autor', 'author'] for col in self.df.columns)
-        has_years = any(col.lower() in ['ano', 'year'] for col in self.df.columns)
-        has_countries = any(col.lower() in ['país', 'pais', 'country'] for col in self.df.columns)
+        # ANÁLISE INTELIGENTE BASEADA NOS DADOS REAIS
+        total_registros = len(self.df)
         
-        metadados_completos = has_authors and has_years and has_countries
+        # 1. Análise de completude
+        colunas_principais = ['autor', 'ano', 'título', 'resumo']
+        colunas_presentes = [col for col in colunas_principais 
+                            if any(col in col_name.lower() for col_name in self.df.columns)]
+        completude = len(colunas_presentes) / len(colunas_principais) * 100
         
-        if metadados_completos:
-            insights.append("Metadados completos (autores, anos, países)")
-            sugestoes.append("Todos os elementos essenciais para análise estão presentes")
+        if completude < 50:
+            sugestoes_inteligentes.append("📋 **Melhore a estrutura da planilha** - Adicione colunas básicas como autor, ano, título")
+        elif completude < 80:
+            sugestoes_inteligentes.append("📊 **Estrutura boa** - Considere adicionar mais metadados para análises avançadas")
         else:
-            if not has_authors:
-                sugestoes.append("Adicione informações de autores para análise de colaboração")
-            if not has_years:
-                sugestoes.append("Inclua dados de anos para análise temporal")
-            if not has_countries:
-                sugestoes.append("Adicione países para análise geográfica")
+            sugestoes_inteligentes.append("🎯 **Estrutura excelente** - Todos os elementos essenciais estão presentes")
         
-        # Gerar texto formatado
-        if insights:
-            text += "**Características identificadas:**\n"
-            for insight in insights:
-                text += f"• {insight}\n"
-            text += "\n"
+        # 2. Análise temporal (se houver anos)
+        year_col = next((col for col in self.df.columns if 'ano' in col.lower() or 'year' in col.lower()), None)
+        if year_col:
+            try:
+                anos = pd.to_numeric(self.df[year_col], errors='coerce').dropna()
+                if len(anos) > 0:
+                    range_anos = int(anos.max()) - int(anos.min())
+                    if range_anos < 3:
+                        sugestoes_inteligentes.append("⏳ **Expanda o período** - Dados concentrados em poucos anos, busque maior variedade temporal")
+                    elif range_anos > 10:
+                        sugestoes_inteligentes.append("📈 **Analise tendências** - Período extenso permite análise de evolução temporal")
+            except:
+                pass
         
-        if sugestoes:
-            text += "**Sugestões para melhorar sua pesquisa:**\n"
-            for i, sug in enumerate(sugestoes, 1):
-                text += f"{i}. {sug}\n"
-            text += "\n"
+        # 3. Análise de diversidade de autores
+        author_col = next((col for col in self.df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
+        if author_col:
+            autores_unicos = set()
+            for authors_str in self.df[author_col].dropna():
+                if isinstance(authors_str, str):
+                    authors = re.split(r'[;,]', authors_str)
+                    for author in authors:
+                        if author.strip():
+                            autores_unicos.add(author.strip())
+            
+            if len(autores_unicos) < 5:
+                sugestoes_inteligentes.append("👥 **Amplie rede de autores** - Pouca diversidade de pesquisadores")
+            elif len(autores_unicos) > 20:
+                sugestoes_inteligentes.append("🤝 **Rede colaborativa forte** - Excelente diversidade de autores")
         
-        # Recomendação final baseada nos dados
-        if len(self.df) >= 30 and metadados_completos:
-            text += "🎯 **Sua base permite:**\n- Análises estatísticas confiáveis\n- Estudos de rede de colaboração\n- Análise de tendências temporais\n- Mapeamento geográfico da pesquisa\n"
-        elif len(self.df) >= 15:
-            text += "🎯 **Próximos passos:**\n- Expanda gradualmente sua base\n- Complete os metadados faltantes\n- Defina focos temáticos específicos\n"
+        # 4. Análise de temas emergentes
+        texto_completo = ""
+        for col in self.df.select_dtypes(include=['object']).columns[:3]:
+            texto_completo += " " + self.df[col].fillna('').astype(str).str.cat(sep=' ')
+        
+        if len(texto_completo) > 1000:
+            palavras = re.findall(r'\b[a-zà-ú]{5,}\b', texto_completo.lower())
+            from collections import Counter
+            contagem = Counter(palavras)
+            temas_comuns = [pal for pal, cnt in contagem.most_common(10) 
+                           if pal not in PORTUGUESE_STOP_WORDS and cnt > 2]
+            
+            if temas_comuns:
+                sugestoes_inteligentes.append(f"🔍 **Foque em**: {', '.join(temas_comuns[:3])}")
+        
+        # 5. Sugestões baseadas no tamanho
+        if total_registros < 15:
+            sugestoes_inteligentes.extend([
+                "📥 **Colete mais dados** - Mínimo 20 registros para análises confiáveis",
+                "🔎 **Use busca integrada** - Encontre trabalhos relacionados na plataforma"
+            ])
+        elif total_registros < 50:
+            sugestoes_inteligentes.extend([
+                "📊 **Análises básicas possíveis** - Explore gráficos e estatísticas",
+                "🗺️ **Organize conceitos** - Use o mapa mental para estruturar ideias"
+            ])
         else:
-            text += "🎯 **Para começar:**\n- Foque em coletar mais dados\n- Estruture bem as colunas da planilha\n- Defina objetivos claros de pesquisa\n"
+            sugestoes_inteligentes.extend([
+                "📈 **Análises avançadas** - Dados suficientes para ML e redes complexas",
+                "🌐 **Explore colaborações** - Identifique redes de coautoria"
+            ])
+        
+        # Formatar resposta
+        text += "**Sugestões Inteligentes Baseadas na Sua Planilha:**\n\n"
+        for i, sugestao in enumerate(sugestoes_inteligentes, 1):
+            text += f"{i}. {sugestao}\n"
+        
+        text += f"\n**Resumo da Base:**\n"
+        text += f"• Registros: {total_registros}\n"
+        text += f"• Completude: {completude:.1f}%\n"
+        if author_col:
+            text += f"• Coluna autores: '{author_col}'\n"
+        if year_col:
+            text += f"• Coluna anos: '{year_col}'\n"
         
         return text
-
-def get_ai_assistant_response(question, context):
-    """Assistente de IA SUPER INTELIGENTE - Responde perguntas complexas"""
-    
-    question_lower = question.lower().strip()
-    df = context.df
-    
-    # PERGUNTAS SOBRE AUTORES RELEVANTES
-    if any(word in question_lower for word in ['autor', 'autores', 'relevantes', 'pesquisador', 'escritor', 'quem escreveu', 'principais autores']):
-        author_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
-        
-        if not author_col:
-            return "**❌ Autores**: Não encontrei coluna de autores na planilha. Verifique se há colunas como 'autor', 'autores' ou 'author'."
-        
-        # ANÁLISE AVANÇADA DE AUTORES
-        autores_contagem = {}
-        colaboracoes = 0
-        
-        for authors_str in df[author_col].dropna():
-            if isinstance(authors_str, str):
-                autores = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
-                autores_lista = [a.strip() for a in autores if a.strip()]
-                
-                # Contar colaborações
-                if len(autores_lista) > 1:
-                    colaboracoes += 1
-                
-                for autor in autores_lista:
-                    if len(autor) > 2 and not autor.isdigit():
-                        autores_contagem[autor] = autores_contagem.get(autor, 0) + 1
-        
-        if not autores_contagem:
-            return "**⚠️ Autores**: Coluna encontrada mas não consegui extrair nomes válidos. Verifique o formato dos dados."
-        
-        # Ordenar por produtividade
-        autores_ordenados = sorted(autores_contagem.items(), key=lambda x: x[1], reverse=True)
-        
-        resposta = "**👥 AUTORES MAIS RELEVANTES**\n\n"
-        resposta += f"**Total de autores únicos**: {len(autores_contagem)}\n"
-        resposta += f"**Taxa de colaboração**: {(colaboracoes/len(df[author_col].dropna())*100):.1f}%\n\n"
-        
-        resposta += "**Top autores por produtividade:**\n"
-        for i, (autor, count) in enumerate(autores_ordenados[:8], 1):
-            resposta += f"{i}. **{autor}** - {count} publicação(ões)\n"
-        
-        # Análise de redes de colaboração
-        if colaboracoes > 0:
-            resposta += f"\n**💡 Insight**: Rede colaborativa ativa com {colaboracoes} trabalhos em coautoria"
-        
-        return resposta
-    
-    # PERGUNTAS SOBRE DISTRIBUIÇÃO GEOGRÁFICA
-    elif any(word in question_lower for word in ['país', 'países', 'geográfica', 'geografia', 'distribuição', 'localização', 'onde']):
-        country_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['país', 'pais', 'country', 'local'])), None)
-        
-        if not country_col:
-            return "**❌ Países**: Não encontrei coluna de países. Adicione 'país', 'country' ou similar."
-        
-        paises = df[country_col].dropna()
-        if paises.empty:
-            return "**⚠️ Países**: Coluna encontrada mas sem dados válidos."
-        
-        contagem_paises = paises.value_counts()
-        total_paises = len(contagem_paises)
-        
-        resposta = "**🌎 DISTRIBUIÇÃO GEOGRÁFICA**\n\n"
-        resposta += f"**Total de países/regiões**: {total_paises}\n"
-        resposta += f"**Diversidade geográfica**: {(total_paises/len(paises)*100):.1f}%\n\n"
-        
-        resposta += "**Principais localizações:**\n"
-        for pais, count in contagem_paises.head(10).items():
-            percentual = (count / len(paises)) * 100
-            resposta += f"• **{pais}**: {count} ({percentual:.1f}%)\n"
-        
-        # Análise de concentração
-        if total_paises == 1:
-            resposta += "\n**🎯 Concentração**: Pesquisa focada em uma única região"
-        elif total_paises <= 3:
-            resposta += f"\n**🎯 Foco regional**: {total_paises} regiões principais"
-        else:
-            resposta += f"\n**🎯 Abrangência global**: {total_paises} regiões diferentes"
-        
-        return resposta
-    
-    # PERGUNTAS SOBRE EVOLUÇÃO TEMPORAL
-    elif any(word in question_lower for word in ['ano', 'anos', 'temporal', 'evolução', 'cronologia', 'linha do tempo', 'como evoluiu']):
-        year_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['ano', 'year', 'data'])), None)
-        
-        if not year_col:
-            return "**❌ Anos**: Não encontrei coluna temporal. Adicione 'ano', 'year' ou similar."
-        
-        try:
-            anos = pd.to_numeric(df[year_col], errors='coerce').dropna()
-            if anos.empty:
-                return "**⚠️ Anos**: Coluna encontrada mas sem valores numéricos válidos."
-            
-            min_ano = int(anos.min())
-            max_ano = int(anos.max())
-            periodo = max_ano - min_ano
-            
-            resposta = "**📈 EVOLUÇÃO TEMPORAL**\n\n"
-            resposta += f"**Período analisado**: {min_ano} - {max_ano} ({periodo} anos)\n"
-            resposta += f"**Total de registros com ano**: {len(anos)}\n\n"
-            
-            # Análise por década/período
-            if periodo > 10:
-                decadas = (anos // 10) * 10
-                contagem_decadas = decadas.value_counts().sort_index()
-                resposta += "**Distribuição por década:**\n"
-                for decada, count in contagem_decadas.items():
-                    resposta += f"• **{int(decada)}s**: {int(count)} publicações\n"
-            
-            # Tendência
-            contagem_por_ano = anos.value_counts().sort_index()
-            if len(contagem_por_ano) > 3:
-                anos_recentes = contagem_por_ano.tail(3).sum()
-                anos_anteriores = contagem_por_ano.head(len(contagem_por_ano)-3).sum()
-                
-                if anos_recentes > anos_anteriores * 1.5:
-                    tendencia = "📈 **CRESCENTE** - Produção aumentando recentemente"
-                elif anos_recentes < anos_anteriores * 0.7:
-                    tendencia = "📉 **DECRESCENTE** - Produção mais concentrada no passado"
-                else:
-                    tendencia = "➡️ **ESTÁVEL** - Produção constante"
-                
-                resposta += f"\n**Tendência**: {tendencia}"
-            
-            return resposta
-            
-        except Exception as e:
-            return f"**❌ Erro**: Não consegui analisar os dados temporais: {str(e)}"
-    
-    # PERGUNTAS SOBRE TEMAS/CONCEITOS
-    elif any(word in question_lower for word in ['tema', 'temas', 'conceito', 'conceitos', 'palavras', 'frequentes', 'termos', 'assuntos']):
-        # Combinar texto das colunas principais
-        texto_analise = ""
-        colunas_texto = [col for col in df.columns if df[col].dtype == 'object']
-        for col in colunas_texto[:4]:
-            texto_analise += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
-        
-        if not texto_analise.strip():
-            return "**❌ Temas**: Não há texto suficiente para análise temática."
-        
-        # Análise avançada de temas
-        palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_analise.lower())
-        palavras_filtradas = [p for p in palavras if p not in PORTUGUESE_STOP_WORDS and len(p) > 3]
-        
-        if not palavras_filtradas:
-            return "**🔍 Temas**: Texto analisado mas não identifiquei palavras-chave significativas."
-        
-        from collections import Counter
-        contador = Counter(palavras_filtradas)
-        temas_comuns = contador.most_common(12)
-        
-        resposta = "**🔤 CONCEITOS MAIS FREQUENTES**\n\n"
-        resposta += f"**Total de palavras únicas**: {len(contador)}\n"
-        resposta += f"**Texto analisado**: {len(texto_analise)} caracteres\n\n"
-        
-        resposta += "**Palavras-chave principais:**\n"
-        for i, (tema, count) in enumerate(temas_comuns, 1):
-            resposta += f"{i}. **{tema}** - {count} palavras repetidas\n"
-        
-        # Identificar temas emergentes (palavras menos comuns mas significativas)
-        if len(temas_comuns) > 8:
-            temas_emergentes = [tema for tema, count in temas_comuns[8:] if count >= 2]
-            if temas_emergentes:
-                resposta += f"\n**💡 Temas emergentes**: {', '.join(temas_emergentes[:3])}"
-        
-        return resposta
-    
-    # PERGUNTAS SOBRE SUGESTÕES
-    elif any(word in question_lower for word in ['sugestão', 'sugestões', 'o que fazer', 'próximo', 'passo', 'recomendações']):
-        # Análise inteligente para sugestões personalizadas
-        total = len(df)
-        tem_autores = any('autor' in col.lower() for col in df.columns)
-        tem_anos = any('ano' in col.lower() for col in df.columns)
-        tem_paises = any('país' in col.lower() for col in df.columns)
-        
-        resposta = "**🎯 SUGESTÕES INTELIGENTES**\n\n"
-        
-        if total < 20:
-            resposta += "**1. 📥 EXPANSÃO DE DADOS**\n"
-            resposta += "• Colete mais registros (mínimo 20-30 para análises confiáveis)\n"
-            resposta += "• Use a busca integrada para encontrar trabalhos relacionados\n\n"
-        elif total < 50:
-            resposta += "**1. 📊 ANÁLISES BÁSICAS**\n"
-            resposta += "• Explore os gráficos na aba 'Análise'\n"
-            resposta += "• Use o mapa mental para organizar conceitos\n\n"
-        else:
-            resposta += "**1. 🚀 ANÁLISES AVANÇADAS**\n"
-            resposta += "• Dados suficientes para machine learning\n"
-            resposta += "• Explore redes de colaboração entre autores\n\n"
-        
-        resposta += "**2. 🔧 MELHORIAS ESTRUTURAIS**\n"
-        if not tem_autores:
-            resposta += "• Adicione coluna 'autores' para análise de redes\n"
-        if not tem_anos:
-            resposta += "• Adicione coluna 'ano' para análise temporal\n"
-        if not tem_paises:
-            resposta += "• Adicione coluna 'país' para análise geográfica\n"
-        
-        if tem_autores and tem_anos and tem_paises:
-            resposta += "• Estrutura completa - explore todas as funcionalidades\n"
-        
-        resposta += "\n**3. 🎨 FERRAMENTAS RECOMENDADAS**\n"
-        resposta += "• **Mapa Mental**: Para organizar ideias e conceitos\n"
-        resposta += "• **Busca Inteligente**: Para encontrar trabalhos similares\n"
-        resposta += "• **Recomendações**: Para descobrir novos artigos\n"
-        resposta += "• **Análise IA**: Para insights automáticos dos dados\n"
-        
-        return resposta
-    
-    # RESPOSTA PADRÃO PARA PERGUNTAS NÃO IDENTIFICADAS
-    else:
-        return """**🤖 ASSISTENTE INTELIGENTE NUGEP-PQR**
-
-Não entendi completamente sua pergunta. Posso ajudar com:
-
-**📊 PERGUNTAS ESPECÍFICAS SOBRE SEUS DADOS:**
-• *"Quais são os autores mais relevantes?"*
-• *"Qual a distribuição geográfica da pesquisa?"*  
-• *"Como evoluiu a pesquisa ao longo do tempo?"*
-• *"Quais são os conceitos mais frequentes?"*
-• *"O que devo fazer em seguida na minha pesquisa?"*
-
-**🎯 SUGESTÕES DE ANÁLISE:**
-• *"Analise colaborações entre autores"*
-• *"Mostre tendências temporais"*
-• *"Identifique temas emergentes"*
-• *"Sugira próximos passos"*
-
-Faça uma pergunta mais específica sobre sua planilha!"""
 # -------------------------
 # Miro-like Mind Map Components - ATUALIZADO E TRADUZIDO
 # -------------------------
