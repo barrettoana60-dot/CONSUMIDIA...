@@ -1847,10 +1847,11 @@ _defaults = {
     "tutorial_completed": False, 
     "recommendations": pd.DataFrame(), "recommendation_page": 1, "recommendation_view_index": None,
     "recommendation_onboarding_complete": False,
+    "ia_response": None, # NOVO: para guardar a resposta da IA
     "settings": {
         "plot_height": 720, "font_scale": 1.0, "node_opacity": 1.0,
-        "font_size": 14,  # NOVO: Tamanho da fonte
-        "node_font_size": 14,  # NOVO: Tamanho da fonte dos nós
+        "font_size": 14,
+        "node_font_size": 14,
     }
 }
 for k, v in _defaults.items():
@@ -2606,27 +2607,34 @@ elif st.session_state.page == "mapa":
                     )
                 )
 
-            # Configuração do gráfico
-            config = Config(
-                width=800,
-                height=600,
-                directed=True,
-                physics=physics_enabled,
-                hierarchical=hierarchical_enabled,
-                **({
-                    "hierarchical": {
-                        "enabled": hierarchical_enabled,
-                        "levelSeparation": 150,
-                        "nodeSpacing": 100,
-                        "treeSpacing": 200,
-                        "blockShifting": True,
-                        "edgeMinimization": True,
-                        "parentCentralization": True,
-                        "direction": "UD",
-                        "sortMethod": "hubsize"
-                    }
-                } if hierarchical_enabled else {})
-            )
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+            # INÍCIO DA CORREÇÃO DO TypeError
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+            config_params = {
+                "width": 800,
+                "height": 600,
+                "directed": True,
+                "physics": physics_enabled,
+                "hierarchical": False,
+            }
+
+            if hierarchical_enabled:
+                config_params["hierarchical"] = {
+                    "enabled": True,
+                    "levelSeparation": 150,
+                    "nodeSpacing": 100,
+                    "treeSpacing": 200,
+                    "blockShifting": True,
+                    "edgeMinimization": True,
+                    "parentCentralization": True,
+                    "direction": "UD",
+                    "sortMethod": "hubsize"
+                }
+
+            config = Config(**config_params)
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+            # FIM DA CORREÇÃO DO TypeError
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
             # Renderizar o gráfico
             try:
@@ -2634,7 +2642,7 @@ elif st.session_state.page == "mapa":
 
                 if return_value:
                     st.session_state.miro_selected_node = return_value
-                    st.write(f"**Ideia selecionada:** {return_value}")
+                    # Não precisa de st.write, a seleção já atualiza a outra coluna
 
             except Exception as e:
                 st.error(f"Erro ao renderizar o mapa: {e}")
@@ -2808,160 +2816,173 @@ elif st.session_state.page == "graficos":
         
         # Análise inteligente automática
         st.subheader("🤖 Análise Inteligente dos Dados")
-        col1, col2 = st.columns([1, 1])
+        if st.button("🔍 Gerar Análise Completa da Planilha", use_container_width=True):
+            with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
+                analyzer = DataAnalyzer(df)
+                analysis = analyzer.generate_comprehensive_analysis()
+                st.markdown(analysis)
         
-        with col1:
-            if st.button("🔍 Gerar Análise Completa", use_container_width=True):
-                with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
-                    analyzer = DataAnalyzer(df)
-                    analysis = analyzer.generate_comprehensive_analysis()
-                    st.markdown(analysis)
+        st.markdown("---")
         
-        with col2:
-            # BOTÃO DA IA ADICIONADO AQUI
-            if st.button("💬 Assistente IA", use_container_width=True):
-                st.session_state.show_ia_assistant = True
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # INÍCIO DA MELHORIA DO ASSISTENTE IA
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        st.subheader("💬 Converse com a IA sobre seus dados")
+        ia_col1, ia_col2 = st.columns([4, 1])
+        with ia_col1:
+            question = st.text_input(
+                "Faça uma pergunta sobre a planilha:", 
+                placeholder="Ex: Quais são os autores mais produtivos?",
+                key="ia_question_input",
+                label_visibility="collapsed"
+            )
+        with ia_col2:
+            ask_button = st.button("Perguntar à IA", key="ia_ask_button", use_container_width=True)
+
+        if ask_button and question:
+            with st.spinner("A IA está pensando..."):
+                analyzer = DataAnalyzer(df)
+                response = get_ai_assistant_response(question, analyzer)
+                st.session_state.ia_response = response
+        elif ask_button and not question:
+            st.session_state.ia_response = None
+            st.warning("Por favor, digite uma pergunta.")
+
+        if st.session_state.ia_response:
+            st.markdown(st.session_state.ia_response)
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # FIM DA MELHORIA DO ASSISTENTE IA
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         
-        # Assistente de IA para perguntas - AGORA VISÍVEL
-        if st.session_state.get("show_ia_assistant", False):
-            st.subheader("💬 Assistente de IA - Faça uma Pergunta")
-            question = st.text_input("Pergunte algo sobre seus dados:", 
-                                   placeholder="Ex: Quais são os autores mais relevantes? Como está a distribuição por anos?")
-            
-            if question:
-                with st.spinner("Processando sua pergunta..."):
-                    analyzer = DataAnalyzer(df)
-                    response = get_ai_assistant_response(question, analyzer)
-                    st.markdown(response)
-            
-            if st.button("Fechar Assistente IA", use_container_width=True):
-                st.session_state.show_ia_assistant = False
-                safe_rerun()
+        st.markdown("---")
         
-        # Visualizações gráficas SIMPLIFICADAS - APENAS 3 TIPOS
+        # Visualizações gráficas
         st.subheader("📈 Visualizações Gráficas")
         
-        # Seleção de tipo de gráfico - APENAS OS 3 SOLICITADOS
         chart_type = st.selectbox("Escolha o tipo de gráfico:", 
                                 ["Barras", "Linhas", "Pizza"])
         
-        # Configurações comuns
         col1, col2 = st.columns(2)
         
         with col1:
-            # Eixo X
-            x_axis = st.selectbox("Eixo X:", options=df.columns.tolist())
+            x_axis = st.selectbox("Eixo X (ou Categoria para Pizza):", options=df.columns.tolist())
         
         with col2:
-            # Eixo Y (para alguns gráficos)
             if chart_type in ["Barras", "Linhas"]:
-                y_axis = st.selectbox("Eixo Y:", options=df.columns.tolist())
+                y_axis = st.selectbox("Eixo Y (Valores):", options=[None] + df.columns.tolist())
             else:
                 y_axis = None
         
-        # Gráficos específicos
         try:
             if chart_type == "Barras":
-                if df[x_axis].dtype == 'object' and (y_axis and df[y_axis].dtype in ['int64', 'float64']):
-                    # Gráfico de barras agrupado
-                    fig = px.bar(df, x=x_axis, y=y_axis, title=f"{y_axis} por {x_axis}")
-                else:
-                    # Contagem de valores categóricos
-                    value_counts = df[x_axis].value_counts().head(15)
-                    fig = px.bar(x=value_counts.index, y=value_counts.values, 
-                               title=f"Distribuição de {x_axis}")
-                st.plotly_chart(fig, use_container_width=True)
+                if y_axis: # Se o usuário selecionou um eixo Y, agregue os dados
+                    if df[y_axis].dtype in ['int64', 'float64']:
+                        grouped_df = df.groupby(x_axis)[y_axis].sum().reset_index().sort_values(by=y_axis, ascending=False).head(20)
+                        fig = px.bar(grouped_df, x=x_axis, y=y_axis, title=f"Soma de '{y_axis}' por '{x_axis}'")
+                    else:
+                        st.warning(f"Para agregar, o Eixo Y ('{y_axis}') deve ser numérico.")
+                        fig = None
+                else: # Se não, faça uma contagem de frequência no eixo X
+                    value_counts = df[x_axis].value_counts().head(20)
+                    fig = px.bar(value_counts, x=value_counts.index, y=value_counts.values, 
+                               title=f"Contagem de Ocorrências em '{x_axis}'", labels={'x': x_axis, 'y': 'Contagem'})
+                
+                if fig:
+                    st.plotly_chart(fig, use_container_width=True)
             
             elif chart_type == "Linhas":
-                if y_axis and df[x_axis].dtype in ['datetime64[ns]', 'int64']:
-                    fig = px.line(df, x=x_axis, y=y_axis, title=f"{y_axis} ao longo do {x_axis}")
+                if y_axis and df[y_axis].dtype in ['int64', 'float64']:
+                    # Tenta ordenar o eixo X se for numérico (como ano) ou data
+                    df_sorted = df.sort_values(by=x_axis)
+                    fig = px.line(df_sorted, x=x_axis, y=y_axis, title=f"'{y_axis}' ao longo de '{x_axis}'")
                     st.plotly_chart(fig, use_container_width=True)
                 else:
-                    st.warning("Para gráfico de linhas, o eixo X deve ser numérico ou data.")
+                    st.warning("Para gráfico de linhas, o eixo Y deve ser uma coluna numérica.")
             
             elif chart_type == "Pizza":
-                value_counts = df[x_axis].value_counts().head(8)
+                value_counts = df[x_axis].value_counts().head(10)
                 fig = px.pie(values=value_counts.values, names=value_counts.index, 
-                           title=f"Distribuição de {x_axis}")
+                           title=f"Distribuição de '{x_axis}'")
                 st.plotly_chart(fig, use_container_width=True)
         
         except Exception as e:
             st.error(f"Erro ao gerar gráfico: {e}")
-            st.info("Tente selecionar diferentes colunas ou tipos de gráfico")
+            st.info("Tente selecionar diferentes colunas ou tipos de gráfico.")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: busca - COM FILTROS RESTAURADOS
+# Page: busca - COM FILTROS MELHORADOS
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
     st.subheader("🔍 Busca Avançada")
     
     try:
-        with st.spinner("Carregando dados..."):
+        with st.spinner("Carregando dados de todos os usuários..."):
             df_total = collect_latest_backups()
     except Exception as e:
         st.error(f"Erro ao carregar dados: {e}")
         df_total = pd.DataFrame()
 
     if df_total.empty:
-        st.info("Ainda não há dados disponíveis para busca.")
+        st.info("Ainda não há dados disponíveis na plataforma para busca.")
     else:
-        # FILTROS AVANÇADOS RESTAURADOS
-        with st.expander("🎯 Filtros Avançados", expanded=True):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                filter_tema = st.text_input("Tema:", placeholder="ex: documentação participativa")
-                filter_autor = st.text_input("Autor:", placeholder="ex: João Silva")
-            
-            with col2:
-                filter_pais = st.text_input("País:", placeholder="ex: Brasil")
-                filter_titulo = st.text_input("Título:", placeholder="ex: inovação social")
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # INÍCIO DA MELHORIA DA BUSCA
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        col1, col2 = st.columns([3, 1])
+        with col1:
+            search_query = st.text_input("Digite o termo para buscar:", 
+                                         placeholder="Digite palavras-chave, autores, temas...",
+                                         key="search_input_main")
+        with col2:
+            search_scope = st.selectbox("Buscar em:", 
+                                        ["Todas as colunas", "Título", "Autor", "País", "Tema"], 
+                                        key="search_scope_selector")
 
-        # Busca geral
-        search_query = st.text_input("Buscar em todas as colunas:", 
-                                   placeholder="Digite palavras-chave, autores, temas...",
-                                   key="search_input_main")
-
-        # Executar busca COM FILTROS
         if st.button("🔍 Executar Busca", use_container_width=True):
-            if search_query or filter_tema or filter_autor or filter_pais or filter_titulo:
-                results = df_total.copy()
-                
-                # Aplicar filtros
-                if filter_tema:
-                    results = results[results.astype(str).apply(lambda x: x.str.contains(filter_tema, case=False, na=False)).any(axis=1)]
-                
-                if filter_autor:
-                    results = results[results.astype(str).apply(lambda x: x.str.contains(filter_autor, case=False, na=False)).any(axis=1)]
-                
-                if filter_pais:
-                    results = results[results.astype(str).apply(lambda x: x.str.contains(filter_pais, case=False, na=False)).any(axis=1)]
-                
-                if filter_titulo:
-                    results = results[results.astype(str).apply(lambda x: x.str.contains(filter_titulo, case=False, na=False)).any(axis=1)]
-                
-                # Busca geral
-                if search_query:
-                    mask = pd.Series(False, index=results.index)
-                    for col in results.columns:
-                        if results[col].dtype == 'object':
-                            mask = mask | results[col].str.contains(search_query, case=False, na=False)
-                    results = results[mask]
+            if search_query:
+                with st.spinner("Buscando..."):
+                    results = df_total.copy()
+                    query = search_query.strip()
+                    
+                    if search_scope == "Todas as colunas":
+                        mask = results.astype(str).apply(lambda x: x.str.contains(query, case=False, na=False)).any(axis=1)
+                        results = results[mask]
+                    else:
+                        col_map = {
+                            "Título": ['título', 'titulo', 'title'],
+                            "Autor": ['autor', 'autores', 'author'],
+                            "País": ['país', 'pais', 'country'],
+                            "Tema": ['tema', 'temas', 'keywords', 'resumo', 'abstract']
+                        }
+                        target_cols = col_map.get(search_scope, [])
+                        existing_cols = [col for col in target_cols if col in results.columns]
+                        
+                        if not existing_cols:
+                            st.warning(f"Nenhuma coluna correspondente a '{search_scope}' encontrada. Buscando em todas as colunas.")
+                            mask = results.astype(str).apply(lambda x: x.str.contains(query, case=False, na=False)).any(axis=1)
+                            results = results[mask]
+                        else:
+                            mask = pd.Series(False, index=results.index)
+                            for col in existing_cols:
+                                mask |= results[col].astype(str).str.contains(query, case=False, na=False)
+                            results = results[mask]
                 
                 st.session_state.search_results = results
                 st.session_state.search_page = 1
                 
                 if results.empty:
-                    st.info("Nenhum resultado encontrado.")
+                    st.info("Nenhum resultado encontrado para sua busca.")
                 else:
                     st.success(f"Encontrados {len(results)} resultados!")
             else:
-                st.warning("Digite um termo de busca ou use os filtros.")
+                st.warning("Por favor, digite um termo de busca.")
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # FIM DA MELHORIA DA BUSCA
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
-        # Mostrar resultados
         results_df = st.session_state.get('search_results', pd.DataFrame())
         
         if not results_df.empty:
@@ -2990,7 +3011,6 @@ elif st.session_state.page == "busca":
                     
                     col_btn1, col_btn2 = st.columns(2)
                     with col_btn1:
-                        # BOTÃO FAVORITAR NA BUSCA - CORRIGIDO
                         if st.button("⭐ Adicionar aos Favoritos", use_container_width=True, key=f"fav_search_{vi}_{USERNAME}"):
                             if add_to_favorites(det):
                                 st.toast("Adicionado aos favoritos!", icon="⭐")
@@ -3012,16 +3032,22 @@ elif st.session_state.page == "busca":
 
                 st.markdown(f"**📊 {total}** resultado(s) encontrado(s) — exibindo {start+1} a {end}.")
 
-                for idx, (_, row) in enumerate(page_df.iterrows()):
-                    user_src = row.get("_artemis_username", "N/A")
+                # Obter todos os nomes de usuários de uma vez
+                all_users = load_users()
+
+                for idx, row in page_df.iterrows():
+                    user_src_cpf = row.get("_artemis_username", "N/A")
+                    user_src_name = all_users.get(user_src_cpf, {}).get('name', user_src_cpf)
+
                     title = str(row.get('título') or row.get('titulo') or '(Sem título)')
-                    author_snippet = (row.get('autor') or "")[:100]
+                    author_snippet = str(row.get('autor') or "")[:100]
                     year = row.get('ano') or ""
                     
                     # Destacar termos de busca
-                    if search_query:
-                        title = highlight_search_terms(title, search_query)
-                        author_snippet = highlight_search_terms(author_snippet, search_query)
+                    query_for_highlight = st.session_state.get("search_input_main", "")
+                    if query_for_highlight:
+                        title = highlight_search_terms(title, query_for_highlight)
+                        author_snippet = highlight_search_terms(author_snippet, query_for_highlight)
                     else:
                         title = escape_html(title)
                         author_snippet = escape_html(author_snippet)
@@ -3030,12 +3056,11 @@ elif st.session_state.page == "busca":
                     <div class="card">
                         <div class="card-title">{title}</div>
                         <div class="small-muted">{author_snippet}</div>
-                        <div class="small-muted">Ano: {escape_html(str(year))} • Fonte: {escape_html(user_src)}</div>
+                        <div class="small-muted">Ano: {escape_html(str(year))} • <b>Fonte: {escape_html(user_src_name)}</b></div>
                     </div>""", unsafe_allow_html=True)
 
                     b_col1, b_col2 = st.columns(2)
                     with b_col1:
-                        # BOTÃO FAVORITAR NA LISTA DE RESULTADOS - CORRIGIDO
                         if st.button("⭐ Favoritar", key=f"fav_{idx}_{USERNAME}", use_container_width=True):
                             if add_to_favorites(row.to_dict()):
                                 st.toast("Adicionado aos favoritos!", icon="⭐")
@@ -3043,9 +3068,9 @@ elif st.session_state.page == "busca":
                                 st.toast("Já está nos favoritos.")
                     with b_col2:
                         if st.button("🔎 Ver detalhes", key=f"view_{idx}_{USERNAME}", use_container_width=True):
-                            st.session_state.search_view_index = start + idx
+                            st.session_state.search_view_index = idx
                             safe_rerun()
-                    st.markdown("---")
+                    st.markdown("<hr style='margin-top:8px; margin-bottom:8px; border-color:#233447'>", unsafe_allow_html=True)
                 
                 # Navegação de páginas
                 if max_pages > 1:
@@ -3078,14 +3103,14 @@ elif st.session_state.page == "mensagens":
         if not inbox_msgs:
             st.info("Nenhuma mensagem na caixa de entrada.")
         else:
-            st.write(f"**{len(inbox_msgs)} mensagem(s) não lida(s)**" if UNREAD_COUNT > 0 else "Todas as mensagens lidas.")
+            st.write(f"**{UNREAD_COUNT} mensagem(s) não lida(s)**" if UNREAD_COUNT > 0 else "Todas as mensagens lidas.")
             
+            all_users = load_users()
             for msg in inbox_msgs:
                 is_unread = not msg.get('read', False)
                 unread_indicator = "🔵" if is_unread else "⚪"
                 
-                # CORREÇÃO: Mostrar nome em vez de CPF
-                sender_name = load_users().get(msg['from'], {}).get('name', msg['from'])
+                sender_name = all_users.get(msg['from'], {}).get('name', msg['from'])
                 
                 with st.expander(f"{unread_indicator} {msg['subject']} — De: {sender_name}", expanded=is_unread):
                     st.write(f"**Assunto:** {msg['subject']}")
@@ -3129,9 +3154,9 @@ elif st.session_state.page == "mensagens":
         if not sent_msgs:
             st.info("Nenhuma mensagem enviada.")
         else:
+            all_users = load_users()
             for msg in sent_msgs:
-                # CORREÇÃO: Mostrar nome em vez de CPF
-                recipient_name = load_users().get(msg['to'], {}).get('name', msg['to'])
+                recipient_name = all_users.get(msg['to'], {}).get('name', msg['to'])
                 
                 with st.expander(f"📤 {msg['subject']} — Para: {recipient_name}"):
                     st.write(f"**Assunto:** {msg['subject']}")
@@ -3150,24 +3175,31 @@ elif st.session_state.page == "mensagens":
     with tab3:
         st.subheader("✍️ Nova Mensagem")
         
-        # Se é uma resposta, preencher alguns campos automaticamente
         reply_to_msg = None
         if st.session_state.get('reply_message_id'):
             reply_to_msg = next((m for m in all_msgs if m['id'] == st.session_state.reply_message_id), None)
         
         with st.form("compose_message", clear_on_submit=True):
-            # Lista de usuários disponíveis - MOSTRAR NOMES
             users = load_users()
             user_options = {}
             for username, user_data in users.items():
                 if username != USERNAME:
-                    user_options[f"{user_data.get('name', username)} ({username})"] = username
+                    user_options[f"{user_data.get('name', username)} ({format_cpf_display(username)})"] = username
             
-            recipients = st.multiselect("Para:", options=list(user_options.keys()))
+            # Pre-selecionar destinatário se for uma resposta
+            default_recipient = []
+            if reply_to_msg:
+                sender_cpf = reply_to_msg['from']
+                sender_name = users.get(sender_cpf, {}).get('name', sender_cpf)
+                sender_display = f"{sender_name} ({format_cpf_display(sender_cpf)})"
+                if sender_display in user_options:
+                    default_recipient.append(sender_display)
+
+            recipients = st.multiselect("Para:", options=sorted(list(user_options.keys())), default=default_recipient)
             subject = st.text_input("Assunto:", 
                                   value=f"Re: {reply_to_msg['subject']}" if reply_to_msg else "")
             body = st.text_area("Mensagem:", height=200,
-                              value=f"\n\n---\nEm resposta à mensagem de {load_users().get(reply_to_msg['from'], {}).get('name', reply_to_msg['from'])}:\n{reply_to_msg['body'][:500]}..." if reply_to_msg else "")
+                              value=f"\n\n---\nEm resposta à mensagem de {users.get(reply_to_msg['from'], {}).get('name', reply_to_msg['from'])}:\n> {reply_to_msg['body'][:500].replace(chr(10), chr(10)+'> ')}..." if reply_to_msg else "")
             
             attachment = st.file_uploader("Anexar arquivo", type=['pdf', 'docx', 'txt', 'jpg', 'png'])
             
@@ -3183,15 +3215,15 @@ elif st.session_state.page == "mensagens":
                     else:
                         for recipient_display in recipients:
                             recipient_username = user_options[recipient_display]
-                            sent_msg = send_message(USERNAME, recipient_username, subject, body, attachment)
+                            send_message(USERNAME, recipient_username, subject, body, attachment)
                             st.success(f"Mensagem enviada para {recipient_display.split('(')[0].strip()}!")
                         
-                        # Limpar estado de resposta se existir
                         if st.session_state.get('reply_message_id'):
                             st.session_state.reply_message_id = None
                         if st.session_state.get('compose_inline'):
                             st.session_state.compose_inline = False
                         
+                        time.sleep(1)
                         safe_rerun()
             
             with col2:
@@ -3217,7 +3249,6 @@ elif st.session_state.page == "config":
     col1, col2 = st.columns(2)
     
     with col1:
-        # Escala de fonte
         font_scale = st.slider("Tamanho da fonte:", 
                               min_value=0.8, 
                               max_value=1.5, 
@@ -3225,7 +3256,6 @@ elif st.session_state.page == "config":
                               step=0.1,
                               help="Ajusta o tamanho geral do texto")
         
-        # Tamanho da fonte dos nós (mapa mental)
         node_font_size = st.slider("Tamanho da fonte nos mapas:", 
                                   min_value=10, 
                                   max_value=24, 
@@ -3234,7 +3264,6 @@ elif st.session_state.page == "config":
                                   help="Tamanho do texto nos nós do mapa mental")
     
     with col2:
-        # Altura dos gráficos
         plot_height = st.slider("Altura dos gráficos (px):", 
                                min_value=400, 
                                max_value=1200, 
@@ -3242,7 +3271,6 @@ elif st.session_state.page == "config":
                                step=100,
                                help="Altura padrão para visualizações de gráficos")
         
-        # Opacidade dos nós
         node_opacity = st.slider("Opacidade dos nós:", 
                                 min_value=0.3, 
                                 max_value=1.0, 
@@ -3250,7 +3278,6 @@ elif st.session_state.page == "config":
                                 step=0.1,
                                 help="Transparência dos elementos no mapa mental")
 
-    # Aplicar configurações
     if st.button("💾 Aplicar Configurações", use_container_width=True):
         st.session_state.settings.update({
             "font_scale": font_scale,
@@ -3272,12 +3299,10 @@ elif st.session_state.page == "config":
     with col3:
         if st.button("🗑️ Limpar Todos os Dados", type="secondary", use_container_width=True):
             if st.checkbox("CONFIRMAR: Esta ação não pode ser desfeita. Todos os seus dados serão perdidos."):
-                # Limpar estado da sessão
                 for key in list(st.session_state.keys()):
                     if key not in ['authenticated', 'username', 'user_obj']:
                         del st.session_state[key]
                 
-                # Limpar arquivos de estado
                 if USER_STATE.exists():
                     USER_STATE.unlink()
                 
@@ -3286,42 +3311,43 @@ elif st.session_state.page == "config":
                 safe_rerun()
     
     with col4:
-        if st.button("📥 Exportar Backup Completo", use_container_width=True):
-            # Criar um arquivo ZIP com todos os dados do usuário
-            import zipfile
-            from io import BytesIO
+        import zipfile
+        from io import BytesIO
+        
+        zip_buffer = BytesIO()
+        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
+            state_data = {
+                "notes": st.session_state.get("notes", ""),
+                "favorites": st.session_state.get("favorites", []),
+                "settings": st.session_state.get("settings", {}),
+                "tutorial_completed": st.session_state.get("tutorial_completed", False)
+            }
+            zip_file.writestr("user_state.json", json.dumps(state_data, indent=2))
             
-            zip_buffer = BytesIO()
-            with zipfile.ZipFile(zip_buffer, 'w') as zip_file:
-                # Adicionar estado atual
-                state_data = {
-                    "notes": st.session_state.get("notes", ""),
-                    "favorites": st.session_state.get("favorites", []),
-                    "settings": st.session_state.get("settings", {}),
-                    "tutorial_completed": st.session_state.get("tutorial_completed", False)
-                }
-                zip_file.writestr("user_state.json", json.dumps(state_data, indent=2))
-                
-                # Adicionar backup da planilha se existir
-                backup_path = st.session_state.get("last_backup_path")
-                if backup_path and Path(backup_path).exists():
-                    zip_file.write(backup_path, "planilha_backup.csv")
-            
-            st.download_button(
-                "⬇️ Baixar Backup",
-                data=zip_buffer.getvalue(),
-                file_name=f"nugep_pqr_backup_{USERNAME}_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
-                mime="application/zip",
-                use_container_width=True
-            )
+            backup_path = st.session_state.get("last_backup_path")
+            if backup_path and Path(backup_path).exists():
+                zip_file.write(backup_path, f"planilha_backup_{Path(backup_path).name}")
+        
+        st.download_button(
+            "📥 Exportar Backup Completo",
+            data=zip_buffer.getvalue(),
+            file_name=f"nugep_pqr_backup_{USERNAME}_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
+            mime="application/zip",
+            use_container_width=True
+        )
 
     # Informações do sistema
     st.subheader("ℹ️ Informações do Sistema")
     
-    st.write(f"**Usuário:** {USERNAME}")
+    st.write(f"**Usuário (CPF):** {format_cpf_display(USERNAME)}")
     st.write(f"**Nome:** {USER_OBJ.get('name', 'Não informado')}")
     st.write(f"**Bolsa:** {USER_OBJ.get('scholarship', 'Não informada')}")
-    st.write(f"**Cadastrado em:** {USER_OBJ.get('created_at', 'Data não disponível')}")
+    created_at_str = USER_OBJ.get('created_at', 'Data não disponível')
+    try:
+        created_at_dt = datetime.fromisoformat(created_at_str)
+        st.write(f"**Cadastrado em:** {created_at_dt.strftime('%d/%m/%Y %H:%M')}")
+    except:
+        st.write(f"**Cadastrado em:** {created_at_str}")
     
     st.write("**Estatísticas:**")
     st.write(f"- Favoritos salvos: {len(get_session_favorites())}")
