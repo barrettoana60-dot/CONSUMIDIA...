@@ -1016,7 +1016,10 @@ def _analyze_complex_questions(df, question):
         elif total < 100:
             resposta += "📊 **Base consolidada** - Permite análises confiáveis\n"
         else:
-            resposta += "🚀 **Base robusta** - Excelente para análises complexa
+           resposta += (
+    "🚀 **Base robusta** - Excelente para análises complexa "
+    "e dados estruturados."
+)
             
 def _provide_suggestions(df, question):
     """Sugestões inteligentes baseadas nos dados"""
