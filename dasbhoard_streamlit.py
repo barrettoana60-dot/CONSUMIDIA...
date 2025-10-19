@@ -1,4 +1,3 @@
-
 import os
 import re
 import io
@@ -2796,7 +2795,7 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos - SIMPLIFICADO (APENAS 3 GRÁFICOS)
+# Page: graficos - COM BOTÃO DA IA CORRETO
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -2809,22 +2808,35 @@ elif st.session_state.page == "graficos":
         
         # Análise inteligente automática
         st.subheader("🤖 Análise Inteligente dos Dados")
-        if st.button("🔍 Gerar Análise Completa", use_container_width=True):
-            with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
-                analyzer = DataAnalyzer(df)
-                analysis = analyzer.generate_comprehensive_analysis()
-                st.markdown(analysis)
+        col1, col2 = st.columns([1, 1])
         
-        # Assistente de IA para perguntas
-        st.subheader("💬 Assistente de IA - Faça uma Pergunta")
-        question = st.text_input("Pergunte algo sobre seus dados:", 
-                               placeholder="Ex: Quais são os autores mais relevantes? Como está a distribuição por anos?")
+        with col1:
+            if st.button("🔍 Gerar Análise Completa", use_container_width=True):
+                with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
+                    analyzer = DataAnalyzer(df)
+                    analysis = analyzer.generate_comprehensive_analysis()
+                    st.markdown(analysis)
         
-        if question:
-            with st.spinner("Processando sua pergunta..."):
-                analyzer = DataAnalyzer(df)
-                response = get_ai_assistant_response(question, analyzer)
-                st.markdown(response)
+        with col2:
+            # BOTÃO DA IA ADICIONADO AQUI
+            if st.button("💬 Assistente IA", use_container_width=True):
+                st.session_state.show_ia_assistant = True
+        
+        # Assistente de IA para perguntas - AGORA VISÍVEL
+        if st.session_state.get("show_ia_assistant", False):
+            st.subheader("💬 Assistente de IA - Faça uma Pergunta")
+            question = st.text_input("Pergunte algo sobre seus dados:", 
+                                   placeholder="Ex: Quais são os autores mais relevantes? Como está a distribuição por anos?")
+            
+            if question:
+                with st.spinner("Processando sua pergunta..."):
+                    analyzer = DataAnalyzer(df)
+                    response = get_ai_assistant_response(question, analyzer)
+                    st.markdown(response)
+            
+            if st.button("Fechar Assistente IA", use_container_width=True):
+                st.session_state.show_ia_assistant = False
+                safe_rerun()
         
         # Visualizações gráficas SIMPLIFICADAS - APENAS 3 TIPOS
         st.subheader("📈 Visualizações Gráficas")
@@ -2880,11 +2892,11 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: busca - SEM FILTROS AVANÇADOS
+# Page: busca - COM FILTROS RESTAURADOS
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🔍 Busca Simples")
+    st.subheader("🔍 Busca Avançada")
     
     try:
         with st.spinner("Carregando dados..."):
@@ -2896,22 +2908,48 @@ elif st.session_state.page == "busca":
     if df_total.empty:
         st.info("Ainda não há dados disponíveis para busca.")
     else:
-        # Interface de busca SIMPLIFICADA - SEM FILTROS AVANÇADOS
-        search_query = st.text_input("Buscar em todas as planilhas:", 
+        # FILTROS AVANÇADOS RESTAURADOS
+        with st.expander("🎯 Filtros Avançados", expanded=True):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                filter_tema = st.text_input("Tema:", placeholder="ex: documentação participativa")
+                filter_autor = st.text_input("Autor:", placeholder="ex: João Silva")
+            
+            with col2:
+                filter_pais = st.text_input("País:", placeholder="ex: Brasil")
+                filter_titulo = st.text_input("Título:", placeholder="ex: inovação social")
+
+        # Busca geral
+        search_query = st.text_input("Buscar em todas as colunas:", 
                                    placeholder="Digite palavras-chave, autores, temas...",
                                    key="search_input_main")
 
-        # Executar busca - SEM FILTROS AVANÇADOS
+        # Executar busca COM FILTROS
         if st.button("🔍 Executar Busca", use_container_width=True):
-            if search_query:
+            if search_query or filter_tema or filter_autor or filter_pais or filter_titulo:
                 results = df_total.copy()
                 
-                # Busca em todas as colunas de texto
-                mask = pd.Series(False, index=results.index)
-                for col in results.columns:
-                    if results[col].dtype == 'object':
-                        mask = mask | results[col].str.contains(search_query, case=False, na=False)
-                results = results[mask]
+                # Aplicar filtros
+                if filter_tema:
+                    results = results[results.astype(str).apply(lambda x: x.str.contains(filter_tema, case=False, na=False)).any(axis=1)]
+                
+                if filter_autor:
+                    results = results[results.astype(str).apply(lambda x: x.str.contains(filter_autor, case=False, na=False)).any(axis=1)]
+                
+                if filter_pais:
+                    results = results[results.astype(str).apply(lambda x: x.str.contains(filter_pais, case=False, na=False)).any(axis=1)]
+                
+                if filter_titulo:
+                    results = results[results.astype(str).apply(lambda x: x.str.contains(filter_titulo, case=False, na=False)).any(axis=1)]
+                
+                # Busca geral
+                if search_query:
+                    mask = pd.Series(False, index=results.index)
+                    for col in results.columns:
+                        if results[col].dtype == 'object':
+                            mask = mask | results[col].str.contains(search_query, case=False, na=False)
+                    results = results[mask]
                 
                 st.session_state.search_results = results
                 st.session_state.search_page = 1
@@ -2921,7 +2959,7 @@ elif st.session_state.page == "busca":
                 else:
                     st.success(f"Encontrados {len(results)} resultados!")
             else:
-                st.warning("Digite um termo de busca.")
+                st.warning("Digite um termo de busca ou use os filtros.")
 
         # Mostrar resultados
         results_df = st.session_state.get('search_results', pd.DataFrame())
@@ -2952,6 +2990,7 @@ elif st.session_state.page == "busca":
                     
                     col_btn1, col_btn2 = st.columns(2)
                     with col_btn1:
+                        # BOTÃO FAVORITAR NA BUSCA - CORRIGIDO
                         if st.button("⭐ Adicionar aos Favoritos", use_container_width=True, key=f"fav_search_{vi}_{USERNAME}"):
                             if add_to_favorites(det):
                                 st.toast("Adicionado aos favoritos!", icon="⭐")
@@ -2996,6 +3035,7 @@ elif st.session_state.page == "busca":
 
                     b_col1, b_col2 = st.columns(2)
                     with b_col1:
+                        # BOTÃO FAVORITAR NA LISTA DE RESULTADOS - CORRIGIDO
                         if st.button("⭐ Favoritar", key=f"fav_{idx}_{USERNAME}", use_container_width=True):
                             if add_to_favorites(row.to_dict()):
                                 st.toast("Adicionado aos favoritos!", icon="⭐")
