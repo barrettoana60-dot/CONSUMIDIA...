@@ -208,7 +208,7 @@ class DataAnalyzer:
         
         return text
     
-    def _author_analysis(self):
+ def _author_analysis(self):
     """Análise de autores e colaborações - CORRIGIDA E FUNCIONANDO"""
     text = "### 👥 Análise de Autores\n\n"
     
@@ -256,6 +256,33 @@ class DataAnalyzer:
                     not author_clean.isdigit() and
                     not author_clean.replace('.', '').isdigit()):
                     all_authors.append(author_clean)
+    
+    if all_authors:
+        author_counts = pd.Series(all_authors).value_counts()
+        text += "**Principais autores identificados:**\n"
+        for author, count in author_counts.head(8).items():
+            text += f"- **{author}**: {count} publicação(ões)\n"
+        
+        # Colaborações
+        collaborations = 0
+        for authors_str in self.df[author_col].dropna():
+            if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b|&', authors_str)) > 1:
+                collaborations += 1
+        
+        if collaborations > 0:
+            collaboration_rate = (collaborations / authors_found) * 100
+            text += f"\n**Colaborações**: {collaborations} trabalhos com coautoria ({collaboration_rate:.1f}%)\n"
+        else:
+            text += f"\n**Colaborações**: Nenhuma colaboração identificada\n"
+        
+        text += f"\n**Total de registros com autores**: {authors_found}\n"
+        text += f"**Total de nomes extraídos**: {len(all_authors)}\n\n"
+        
+    else:
+        text += f"⚠️ **Autores**: Coluna '{author_col}' encontrada mas não foi possível extrair autores válidos\n\n"
+        text += f"**Dica**: Verifique o formato dos dados na coluna '{author_col}'\n\n"
+    
+    return text
         
         if not author_data_found:
             # Tentar encontrar dados de autor em qualquer coluna
