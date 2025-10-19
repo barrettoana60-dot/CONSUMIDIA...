@@ -1016,7 +1016,9 @@ def _analyze_complex_questions(df, question):
         elif total < 100:
             resposta += "📊 **Base consolidada** - Permite análises confiáveis\n"
         else:
-            resposta += "🚀 **Base robusta** - Excelente para análises complexa def _provide_suggestions(df, question):
+            resposta += "🚀 **Base robusta** - Excelente para análises complexa
+            
+def _provide_suggestions(df, question):
     """Sugestões inteligentes baseadas nos dados"""
     total = len(df)
     
