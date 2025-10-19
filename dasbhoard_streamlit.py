@@ -1016,29 +1016,7 @@ def _analyze_complex_questions(df, question):
         elif total < 100:
             resposta += "📊 **Base consolidada** - Permite análises confiáveis\n"
         else:
-            resposta += "🚀 **Base robusta** - Excelente para análises complexas\n"
-        
-        # Verificar completude
-        tem_autores = any('autor' in col.lower() for col in df.columns)
-        tem_anos = any('ano' in col.lower() for col in df.columns)
-        tem_paises = any('país' in col.lower() for col in df.columns)
-        
-        resposta += f"\n**Metadados**: "
-        metadados = []
-        if tem_autores: metadados.append("Autores")
-        if tem_anos: metadados.append("Anos") 
-        if tem_paises: metadados.append("Países")
-        
-        resposta += f"{', '.join(metadados) if metadados else 'Básicos'}\n\n"
-        
-        resposta += "**Próximos passos para análise aprofundada**:\n"
-        resposta += "1. Explore visualizações específicas\n"
-        resposta += "2. Use perguntas diretas sobre autores, anos ou temas\n"
-        resposta += "3. Considere expandir dados para análises mais complexas"
-    
-    return resposta
-
-def _provide_suggestions(df, question):
+            resposta += "🚀 **Base robusta** - Excelente para análises complexa def _provide_suggestions(df, question):
     """Sugestões inteligentes baseadas nos dados"""
     total = len(df)
     
@@ -2426,7 +2404,7 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa mental - MELHORADO E CORRIGIDO
+# Page: mapa mental - CORRIGIDO
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -2441,11 +2419,11 @@ elif st.session_state.page == "mapa":
         st.session_state.miro_selected_node = None
         st.session_state.miro_layout = "hierarchical"
     
-    # Sidebar principal - TRADUZIDA
+    # Sidebar principal
     with st.sidebar:
         st.header("🎨 Controles do Mapa")
         
-        # Criar nova ideia - CORRIGIDO: limpa o formulário após criar
+        # Criar nova ideia - CORREÇÃO: posicionamento seguro
         with st.expander("➕ Nova Ideia", expanded=True):
             with st.form("create_miro_node", clear_on_submit=True):
                 node_label = st.text_input("Título da ideia:", placeholder="Ex: Pesquisa Qualitativa", key="new_node_label")
@@ -2456,11 +2434,36 @@ elif st.session_state.page == "mapa":
                     if node_label:
                         node_id = f"node_{int(time.time())}_{random.randint(1000,9999)}"
                         
-                        # POSICIONAMENTO INTELIGENTE - próximo ao nó selecionado ou em área vazia
-                        x, y = st.session_state.miro_map._calculate_smart_position(
-                            st.session_state.miro_nodes, 
-                            st.session_state.miro_selected_node
-                        )
+                        # CORREÇÃO: Posicionamento seguro
+                        x, y = 500, 400  # Posição central padrão
+                        
+                        # Se há nós existentes, posicionar de forma inteligente
+                        if st.session_state.miro_nodes:
+                            if st.session_state.miro_selected_node:
+                                # Encontrar o nó selecionado
+                                selected_node = next((n for n in st.session_state.miro_nodes 
+                                                    if n["id"] == st.session_state.miro_selected_node), None)
+                                if selected_node:
+                                    # Posicionar próximo ao nó selecionado
+                                    angle = random.uniform(0, 2 * math.pi)
+                                    distance = random.uniform(100, 200)
+                                    x = selected_node.get("x", 500) + distance * math.cos(angle)
+                                    y = selected_node.get("y", 400) + distance * math.sin(angle)
+                            else:
+                                # Encontrar posição vazia
+                                occupied_positions = [(n.get("x", 0), n.get("y", 0)) for n in st.session_state.miro_nodes]
+                                for radius in range(200, 801, 100):
+                                    for angle in range(0, 360, 45):
+                                        rad = math.radians(angle)
+                                        test_x = 500 + radius * math.cos(rad)
+                                        test_y = 400 + radius * math.sin(rad)
+                                        too_close = any(math.sqrt((test_x - ox)**2 + (test_y - oy)**2) < 150 for ox, oy in occupied_positions)
+                                        if not too_close:
+                                            x, y = test_x, test_y
+                                            break
+                                    else:
+                                        continue
+                                    break
                         
                         new_node = st.session_state.miro_map.create_node(
                             node_id, node_label, node_type, node_desc, x, y
@@ -2470,12 +2473,11 @@ elif st.session_state.page == "mapa":
                         st.success("Ideia criada!")
                         safe_rerun()
         
-        # Conectar ideias - MELHORADO
+        # Conectar ideias
         with st.expander("🔗 Conectar Ideias", expanded=False):
             if len(st.session_state.miro_nodes) >= 2:
                 nodes_list = [(node["id"], node["label"]) for node in st.session_state.miro_nodes]
                 with st.form("connect_nodes"):
-                    # Usar os títulos reais das ideias em vez dos IDs
                     source_options = {f"{label}": node_id for node_id, label in nodes_list}
                     target_options = {f"{label}": node_id for node_id, label in nodes_list}
                     
@@ -2486,9 +2488,7 @@ elif st.session_state.page == "mapa":
                         source_id = source_options[source_label]
                         target_id = target_options[target_label]
                         
-                        # Verificar se conexão já existe
-                        existing = any(e["source"] == source_id and e["target"] == target_id 
-                                     for e in st.session_state.miro_edges)
+                        existing = any(e["source"] == source_id and e["target"] == target_id for e in st.session_state.miro_edges)
                         if not existing:
                             st.session_state.miro_edges.append({
                                 "source": source_id,
@@ -2502,27 +2502,15 @@ elif st.session_state.page == "mapa":
             else:
                 st.info("Precisa de pelo menos 2 ideias para conectar")
         
-        # Configurações do mapa - ATUALIZADO
+        # Configurações do mapa
         with st.expander("👁️ Visualização", expanded=False):
-            # Modos de visualização
-            visualization_mode = st.selectbox(
-                "Modo de Visualização:",
-                options=["Mapa 2D", "Mapa 3D", "Fluxograma"],
-                index=0,
-                help="Escolha como visualizar seu mapa"
-            )
+            visualization_mode = st.selectbox("Modo de Visualização:", options=["Mapa 2D", "Mapa 3D", "Fluxograma"], index=0)
             
-            st.session_state.miro_layout = st.selectbox(
-                "Organização Automática:",
-                options=["hierarchical", "radial", "force"],
-                help="Como organizar as ideias automaticamente"
-            )
+            st.session_state.miro_layout = st.selectbox("Organização Automática:", options=["hierarchical", "radial", "force"])
             
             if st.button("🔄 Reorganizar Mapa", use_container_width=True):
                 st.session_state.miro_nodes = st.session_state.miro_map.generate_layout(
-                    st.session_state.miro_nodes, 
-                    st.session_state.miro_edges,
-                    st.session_state.miro_layout
+                    st.session_state.miro_nodes, st.session_state.miro_edges, st.session_state.miro_layout
                 )
                 st.success("Mapa reorganizado!")
                 safe_rerun()
@@ -2545,41 +2533,35 @@ elif st.session_state.page == "mapa":
         if st.session_state.miro_nodes:
             # Configurações baseadas no modo de visualização
             if visualization_mode == "Mapa 3D":
-                # Estilo 3D - efeito visual melhorado
                 st.markdown('<div class="three-d-effect">', unsafe_allow_html=True)
-                st.info("🌐 **Modo 3D Ativo**: Efeito visual tridimensional com gradiente!")
-                
+                st.info("🌐 **Modo 3D Ativo**: Efeito visual tridimensional!")
                 node_size = 30
                 font_size = st.session_state.settings.get("node_font_size", 16)
                 physics_enabled = True
                 hierarchical_enabled = False
                 
-                # Aplicar efeitos 3D nos nós
+                # Aplicar efeitos 3D
                 for node in st.session_state.miro_nodes:
-                    # Intensificar cores para efeito 3D
-                    if node["color"] == "#4ECDC4": node["color"] = "#00FFCC"  # Ideia - ciano brilhante
-                    elif node["color"] == "#45B7D1": node["color"] = "#0099FF"  # Tarefa - azul brilhante
-                    elif node["color"] == "#96CEB4": node["color"] = "#66FF99"  # Pergunta - verde brilhante
-                    elif node["color"] == "#FECA57": node["color"] = "#FFCC00"  # Recurso - amarelo brilhante
-                    elif node["color"] == "#FF6B6B": node["color"] = "#FF3333"  # Objetivo - vermelho brilhante
-                    elif node["color"] == "#A29BFE": node["color"] = "#9966FF"  # Nota - roxo brilhante
-                    node["size"] = node_size * 1.5  # Aumentar tamanho no 3D
+                    if node["color"] == "#4ECDC4": node["color"] = "#00FFCC"
+                    elif node["color"] == "#45B7D1": node["color"] = "#0099FF"
+                    elif node["color"] == "#96CEB4": node["color"] = "#66FF99"
+                    elif node["color"] == "#FECA57": node["color"] = "#FFCC00"
+                    elif node["color"] == "#FF6B6B": node["color"] = "#FF3333"
+                    elif node["color"] == "#A29BFE": node["color"] = "#9966FF"
+                    node["size"] = node_size * 1.5
                     node["font"] = {"size": font_size, "color": "#FFFFFF"}
 
             elif visualization_mode == "Fluxograma":
-                # Estilo fluxograma - organizado e estruturado
                 st.markdown('<div class="flowchart-box">', unsafe_allow_html=True)
-                st.info("📋 **Modo Fluxograma**: Visualização estruturada e sequencial!")
-                
+                st.info("📋 **Modo Fluxograma**: Visualização estruturada!")
                 node_size = 25
                 font_size = st.session_state.settings.get("node_font_size", 14)
                 physics_enabled = False
                 hierarchical_enabled = True
                 
-                # Aplicar estilo de fluxograma
                 for node in st.session_state.miro_nodes:
-                    node["shape"] = "square"  # Padronizar formato
-                    node["color"] = "#2E86AB"  # Azul profissional para fluxograma
+                    node["shape"] = "square"
+                    node["color"] = "#2E86AB"
                     node["size"] = node_size
                     node["font"] = {"size": font_size, "color": "#FFFFFF"}
 
@@ -2589,7 +2571,7 @@ elif st.session_state.page == "mapa":
                 physics_enabled = True
                 hierarchical_enabled = False
 
-            # Preparar nós e arestas para visualização
+            # Preparar nós e arestas
             nodes_for_viz = []
             for node in st.session_state.miro_nodes:
                 nodes_for_viz.append(
@@ -2624,7 +2606,6 @@ elif st.session_state.page == "mapa":
                 directed=True,
                 physics=physics_enabled,
                 hierarchical=hierarchical_enabled,
-                # Configurações específicas para cada modo
                 **({
                     "hierarchical": {
                         "enabled": hierarchical_enabled,
@@ -2634,7 +2615,7 @@ elif st.session_state.page == "mapa":
                         "blockShifting": True,
                         "edgeMinimization": True,
                         "parentCentralization": True,
-                        "direction": "UD",  # Up-Down
+                        "direction": "UD",
                         "sortMethod": "hubsize"
                     }
                 } if hierarchical_enabled else {})
@@ -2642,11 +2623,8 @@ elif st.session_state.page == "mapa":
 
             # Renderizar o gráfico
             try:
-                return_value = agraph(nodes=nodes_for_viz, 
-                                    edges=edges_for_viz, 
-                                    config=config)
+                return_value = agraph(nodes=nodes_for_viz, edges=edges_for_viz, config=config)
 
-                # Processar interações com o gráfico
                 if return_value:
                     st.session_state.miro_selected_node = return_value
                     st.write(f"**Ideia selecionada:** {return_value}")
@@ -2680,7 +2658,7 @@ elif st.session_state.page == "mapa":
                     if node.get('description'):
                         st.write(f"**Descrição:** {node['description']}")
                     
-                    # Mostrar conexões desta ideia
+                    # Mostrar conexões
                     connections = []
                     for edge in st.session_state.miro_edges:
                         if edge['source'] == node['id']:
@@ -2694,14 +2672,14 @@ elif st.session_state.page == "mapa":
                     
                     if connections:
                         st.write("**Conexões:**")
-                        for conn in connections[:5]:  # Mostrar até 5 conexões
+                        for conn in connections[:5]:
                             st.write(f"• {conn}")
                         if len(connections) > 5:
                             st.write(f"... e mais {len(connections) - 5} conexões")
                     else:
                         st.write("_Sem conexões ainda_")
                     
-                    # Botões de ação para cada ideia
+                    # Botões de ação
                     col_btn1, col_btn2 = st.columns(2)
                     with col_btn1:
                         if st.button("✏️ Editar", key=f"edit_{node['id']}", use_container_width=True):
@@ -2710,10 +2688,8 @@ elif st.session_state.page == "mapa":
                     
                     with col_btn2:
                         if st.button("🗑️ Excluir", key=f"delete_{node['id']}", use_container_width=True):
-                            # Remover nó e suas conexões
                             st.session_state.miro_nodes = [n for n in st.session_state.miro_nodes if n['id'] != node['id']]
-                            st.session_state.miro_edges = [e for e in st.session_state.miro_edges 
-                                                          if e['source'] != node['id'] and e['target'] != node['id']]
+                            st.session_state.miro_edges = [e for e in st.session_state.miro_edges if e['source'] != node['id'] and e['target'] != node['id']]
                             if st.session_state.miro_selected_node == node['id']:
                                 st.session_state.miro_selected_node = None
                             st.success("Ideia removida!")
@@ -2729,13 +2705,9 @@ elif st.session_state.page == "mapa":
                 st.subheader("✏️ Editando Ideia")
                 
                 with st.form(f"edit_node_{editing_node_id}"):
-                    new_label = st.text_input("Título:", value=editing_node['label'].replace("💡 ", "").replace("✅ ", "").replace("❓ ", "").replace("📚 ", "").replace("🎯 ", "").replace("📝 ", ""), 
-                                            key=f"edit_label_{editing_node_id}")
-                    new_type = st.selectbox("Tipo:", options=list(st.session_state.miro_map.node_types.keys()), 
-                                          index=list(st.session_state.miro_map.node_types.keys()).index(editing_node['type']),
-                                          key=f"edit_type_{editing_node_id}")
-                    new_desc = st.text_area("Descrição:", value=editing_node.get('description', ''), 
-                                          key=f"edit_desc_{editing_node_id}")
+                    new_label = st.text_input("Título:", value=editing_node['label'].replace("💡 ", "").replace("✅ ", "").replace("❓ ", "").replace("📚 ", "").replace("🎯 ", "").replace("📝 ", ""), key=f"edit_label_{editing_node_id}")
+                    new_type = st.selectbox("Tipo:", options=list(st.session_state.miro_map.node_types.keys()), index=list(st.session_state.miro_map.node_types.keys()).index(editing_node['type']), key=f"edit_type_{editing_node_id}")
+                    new_desc = st.text_area("Descrição:", value=editing_node.get('description', ''), key=f"edit_desc_{editing_node_id}")
                     
                     col1, col2 = st.columns(2)
                     with col1:
@@ -2745,7 +2717,6 @@ elif st.session_state.page == "mapa":
                             editing_node['description'] = new_desc
                             editing_node['color'] = st.session_state.miro_map.node_types[new_type]['color']
                             editing_node['shape'] = st.session_state.miro_map.node_types[new_type]['shape']
-                            
                             del st.session_state.editing_node
                             st.success("Ideia atualizada!")
                             safe_rerun()
@@ -2817,7 +2788,7 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos
+# Page: graficos - SIMPLIFICADO (APENAS 3 GRÁFICOS)
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -2847,12 +2818,12 @@ elif st.session_state.page == "graficos":
                 response = get_ai_assistant_response(question, analyzer)
                 st.markdown(response)
         
-        # Visualizações gráficas
+        # Visualizações gráficas SIMPLIFICADAS - APENAS 3 TIPOS
         st.subheader("📈 Visualizações Gráficas")
         
-        # Seleção de tipo de gráfico
+        # Seleção de tipo de gráfico - APENAS OS 3 SOLICITADOS
         chart_type = st.selectbox("Escolha o tipo de gráfico:", 
-                                ["Barras", "Linhas", "Pizza", "Dispersão", "Histograma", "Heatmap"])
+                                ["Barras", "Linhas", "Pizza"])
         
         # Configurações comuns
         col1, col2 = st.columns(2)
@@ -2863,7 +2834,7 @@ elif st.session_state.page == "graficos":
         
         with col2:
             # Eixo Y (para alguns gráficos)
-            if chart_type in ["Barras", "Linhas", "Dispersão"]:
+            if chart_type in ["Barras", "Linhas"]:
                 y_axis = st.selectbox("Eixo Y:", options=df.columns.tolist())
             else:
                 y_axis = None
@@ -2893,30 +2864,6 @@ elif st.session_state.page == "graficos":
                 fig = px.pie(values=value_counts.values, names=value_counts.index, 
                            title=f"Distribuição de {x_axis}")
                 st.plotly_chart(fig, use_container_width=True)
-            
-            elif chart_type == "Dispersão":
-                if y_axis:
-                    fig = px.scatter(df, x=x_axis, y=y_axis, title=f"{y_axis} vs {x_axis}")
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("Selecione um eixo Y para dispersão.")
-            
-            elif chart_type == "Histograma":
-                if df[x_axis].dtype in ['int64', 'float64']:
-                    fig = px.histogram(df, x=x_axis, title=f"Distribuição de {x_axis}")
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("Para histograma, selecione uma coluna numérica.")
-            
-            elif chart_type == "Heatmap":
-                # Matriz de correlação para colunas numéricas
-                numeric_cols = df.select_dtypes(include=[np.number]).columns
-                if len(numeric_cols) >= 2:
-                    corr_matrix = df[numeric_cols].corr()
-                    fig = px.imshow(corr_matrix, title="Matriz de Correlação")
-                    st.plotly_chart(fig, use_container_width=True)
-                else:
-                    st.warning("Heatmap requer pelo menos 2 colunas numéricas.")
         
         except Exception as e:
             st.error(f"Erro ao gerar gráfico: {e}")
@@ -2925,11 +2872,11 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: busca
+# Page: busca - SEM FILTROS AVANÇADOS
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🔍 Busca Avançada")
+    st.subheader("🔍 Busca Simples")
     
     try:
         with st.spinner("Carregando dados..."):
@@ -2941,82 +2888,32 @@ elif st.session_state.page == "busca":
     if df_total.empty:
         st.info("Ainda não há dados disponíveis para busca.")
     else:
-        # Interface de busca
-        col1, col2 = st.columns([3, 1])
-        
-        with col1:
-            search_query = st.text_input("Buscar em todas as planilhas:", 
-                                       placeholder="Digite palavras-chave, autores, temas...",
-                                       key="search_input_main")
-        
-        with col2:
-            search_column = st.selectbox("Buscar em:", 
-                                       options=["Todas as colunas"] + df_total.columns.tolist(),
-                                       key="search_column_select")
+        # Interface de busca SIMPLIFICADA - SEM FILTROS AVANÇADOS
+        search_query = st.text_input("Buscar em todas as planilhas:", 
+                                   placeholder="Digite palavras-chave, autores, temas...",
+                                   key="search_input_main")
 
-        # Filtros avançados
-        with st.expander("🎛️ Filtros Avançados"):
-            col_f1, col_f2, col_f3 = st.columns(3)
-            
-            with col_f1:
-                if 'ano' in df_total.columns:
-                    anos = sorted(df_total['ano'].dropna().unique())
-                    anos_filtro = st.multiselect("Filtrar por ano:", options=anos)
-                else:
-                    anos_filtro = []
-            
-            with col_f2:
-                if 'autor' in df_total.columns:
-                    autores = sorted(df_total['autor'].dropna().unique())[:50]  # Limitar para performance
-                    autores_filtro = st.multiselect("Filtrar por autor:", options=autores)
-                else:
-                    autores_filtro = []
-            
-            with col_f3:
-                if 'país' in df_total.columns:
-                    paises = sorted(df_total['país'].dropna().unique())[:50]
-                    paises_filtro = st.multiselect("Filtrar por país:", options=paises)
-                else:
-                    paises_filtro = []
-
-        # Executar busca
+        # Executar busca - SEM FILTROS AVANÇADOS
         if st.button("🔍 Executar Busca", use_container_width=True):
-            if search_query or anos_filtro or autores_filtro or paises_filtro:
+            if search_query:
                 results = df_total.copy()
                 
-                # Aplicar filtros de texto
-                if search_query:
-                    if search_column == "Todas as colunas":
-                        mask = pd.Series(False, index=results.index)
-                        for col in results.columns:
-                            if results[col].dtype == 'object':
-                                mask = mask | results[col].str.contains(search_query, case=False, na=False)
-                        results = results[mask]
-                    else:
-                        results = results[results[search_column].str.contains(search_query, case=False, na=False)]
-                
-                # Aplicar filtros de ano
-                if anos_filtro:
-                    results = results[results['ano'].isin(anos_filtro)]
-                
-                # Aplicar filtros de autor
-                if autores_filtro:
-                    results = results[results['autor'].isin(autores_filtro)]
-                
-                # Aplicar filtros de país
-                if paises_filtro:
-                    results = results[results['país'].isin(paises_filtro)]
+                # Busca em todas as colunas de texto
+                mask = pd.Series(False, index=results.index)
+                for col in results.columns:
+                    if results[col].dtype == 'object':
+                        mask = mask | results[col].str.contains(search_query, case=False, na=False)
+                results = results[mask]
                 
                 st.session_state.search_results = results
                 st.session_state.search_page = 1
-                st.session_state.search_query_meta = {"col": search_column, "query": search_query}
                 
                 if results.empty:
-                    st.info("Nenhum resultado encontrado com os filtros aplicados.")
+                    st.info("Nenhum resultado encontrado.")
                 else:
                     st.success(f"Encontrados {len(results)} resultados!")
             else:
-                st.warning("Digite um termo de busca ou aplique filtros.")
+                st.warning("Digite um termo de busca.")
 
         # Mostrar resultados
         results_df = st.session_state.get('search_results', pd.DataFrame())
@@ -3119,7 +3016,7 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mensagens
+# Page: mensagens - MOSTRAR NOME EM VEZ DE CPF
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -3139,9 +3036,12 @@ elif st.session_state.page == "mensagens":
                 is_unread = not msg.get('read', False)
                 unread_indicator = "🔵" if is_unread else "⚪"
                 
-                with st.expander(f"{unread_indicator} {msg['subject']} — De: {msg['from']}", expanded=is_unread):
+                # CORREÇÃO: Mostrar nome em vez de CPF
+                sender_name = load_users().get(msg['from'], {}).get('name', msg['from'])
+                
+                with st.expander(f"{unread_indicator} {msg['subject']} — De: {sender_name}", expanded=is_unread):
                     st.write(f"**Assunto:** {msg['subject']}")
-                    st.write(f"**De:** {msg['from']}")
+                    st.write(f"**De:** {sender_name}")
                     st.write(f"**Data:** {datetime.fromisoformat(msg['ts']).strftime('%d/%m/%Y %H:%M')}")
                     st.markdown("---")
                     st.write(msg['body'])
@@ -3182,9 +3082,12 @@ elif st.session_state.page == "mensagens":
             st.info("Nenhuma mensagem enviada.")
         else:
             for msg in sent_msgs:
-                with st.expander(f"📤 {msg['subject']} — Para: {msg['to']}"):
+                # CORREÇÃO: Mostrar nome em vez de CPF
+                recipient_name = load_users().get(msg['to'], {}).get('name', msg['to'])
+                
+                with st.expander(f"📤 {msg['subject']} — Para: {recipient_name}"):
                     st.write(f"**Assunto:** {msg['subject']}")
-                    st.write(f"**Para:** {msg['to']}")
+                    st.write(f"**Para:** {recipient_name}")
                     st.write(f"**Data:** {datetime.fromisoformat(msg['ts']).strftime('%d/%m/%Y %H:%M')}")
                     st.markdown("---")
                     st.write(msg['body'])
@@ -3205,15 +3108,18 @@ elif st.session_state.page == "mensagens":
             reply_to_msg = next((m for m in all_msgs if m['id'] == st.session_state.reply_message_id), None)
         
         with st.form("compose_message", clear_on_submit=True):
-            # Lista de usuários disponíveis
+            # Lista de usuários disponíveis - MOSTRAR NOMES
             users = load_users()
-            user_list = [username for username in users.keys() if username != USERNAME]
+            user_options = {}
+            for username, user_data in users.items():
+                if username != USERNAME:
+                    user_options[f"{user_data.get('name', username)} ({username})"] = username
             
-            recipients = st.multiselect("Para:", options=user_list)
+            recipients = st.multiselect("Para:", options=list(user_options.keys()))
             subject = st.text_input("Assunto:", 
                                   value=f"Re: {reply_to_msg['subject']}" if reply_to_msg else "")
             body = st.text_area("Mensagem:", height=200,
-                              value=f"\n\n---\nEm resposta à mensagem de {reply_to_msg['from']}:\n{reply_to_msg['body'][:500]}..." if reply_to_msg else "")
+                              value=f"\n\n---\nEm resposta à mensagem de {load_users().get(reply_to_msg['from'], {}).get('name', reply_to_msg['from'])}:\n{reply_to_msg['body'][:500]}..." if reply_to_msg else "")
             
             attachment = st.file_uploader("Anexar arquivo", type=['pdf', 'docx', 'txt', 'jpg', 'png'])
             
@@ -3227,9 +3133,10 @@ elif st.session_state.page == "mensagens":
                     elif not body:
                         st.error("Digite uma mensagem.")
                     else:
-                        for recipient in recipients:
-                            sent_msg = send_message(USERNAME, recipient, subject, body, attachment)
-                            st.success(f"Mensagem enviada para {recipient}!")
+                        for recipient_display in recipients:
+                            recipient_username = user_options[recipient_display]
+                            sent_msg = send_message(USERNAME, recipient_username, subject, body, attachment)
+                            st.success(f"Mensagem enviada para {recipient_display.split('(')[0].strip()}!")
                         
                         # Limpar estado de resposta se existir
                         if st.session_state.get('reply_message_id'):
