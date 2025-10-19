@@ -1,6 +1,3 @@
-o seu filho de uma puta seu verme com todas 3330 linhas crl # app_nugep_pqr_full_final.py
-
-# NUGEP-PQR — versão final com mapa mental estilo Miro e análise inteligente com IA
 
 import os
 import re
