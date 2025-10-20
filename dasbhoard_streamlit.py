@@ -1845,6 +1845,7 @@ class ModernMindMap:
                     node["y"] = 300 + (i // 5) * 120
         
         return nodes
+
 # -------------------------
 # Utilities: CPF / hashing / formatting
 # -------------------------
@@ -2897,11 +2898,11 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# NOVA PÁGINA: FAVORITOS
+# PÁGINA: FAVORITOS - IMPLEMENTAÇÃO COMPLETA
 # -------------------------
 elif st.session_state.page == "favoritos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("⭐ Seus Favoritos")
+    st.subheader("⭐ Seus Favoritos Salvos")
     
     favorites = get_session_favorites()
     
@@ -2916,9 +2917,21 @@ elif st.session_state.page == "favoritos":
         
         Seus favoritos aparecerão aqui para acesso rápido!
         """)
+        
+        # Botões de ação rápida
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("🔍 Ir para Busca", use_container_width=True):
+                st.session_state.page = "busca"
+                safe_rerun()
+        with col2:
+            if st.button("💡 Ver Recomendações", use_container_width=True):
+                st.session_state.page = "recomendacoes"
+                safe_rerun()
+                
     else:
-        # Estatísticas
-        col1, col2, col3 = st.columns(3)
+        # Estatísticas rápidas
+        col1, col2, col3, col4 = st.columns(4)
         with col1:
             st.metric("Total de Favoritos", len(favorites))
         with col2:
@@ -2926,7 +2939,12 @@ elif st.session_state.page == "favoritos":
             unique_sources = len(set(sources))
             st.metric("Fontes Diferentes", unique_sources)
         with col3:
-            if st.button("🗑️ Limpar Todos", use_container_width=True):
+            # Contar por tipo de fonte
+            local_sources = len([s for s in sources if s != 'web'])
+            web_sources = len([s for s in sources if s == 'web'])
+            st.metric("Locais/Web", f"{local_sources}/{web_sources}")
+        with col4:
+            if st.button("🗑️ Limpar Todos", use_container_width=True, type="secondary"):
                 if st.checkbox("Confirmar limpeza de TODOS os favoritos?"):
                     clear_all_favorites()
                     st.success("Todos os favoritos foram removidos!")
@@ -2935,98 +2953,190 @@ elif st.session_state.page == "favoritos":
         st.markdown("---")
         
         # Filtros e organização
-        col_search, col_sort = st.columns([2, 1])
+        col_search, col_sort, col_filter = st.columns([2, 1, 1])
         with col_search:
-            search_fav = st.text_input("🔍 Buscar nos favoritos:", placeholder="Digite título, autor ou tema...")
+            search_fav = st.text_input("🔍 Buscar nos favoritos:", 
+                                     placeholder="Digite título, autor, tema...",
+                                     key="search_favorites")
         with col_sort:
-            sort_option = st.selectbox("Ordenar por:", ["Data de adição", "Título", "Fonte"])
+            sort_option = st.selectbox("Ordenar por:", 
+                                     ["Data de adição", "Título A-Z", "Título Z-A", "Fonte"],
+                                     key="sort_favorites")
+        with col_filter:
+            filter_source = st.selectbox("Filtrar por fonte:", 
+                                       ["Todas", "Local", "Web"],
+                                       key="filter_favorites")
         
         # Aplicar filtros
-        filtered_favorites = favorites
+        filtered_favorites = favorites.copy()
+        
+        # Filtro de busca
         if search_fav:
             filtered_favorites = [
-                fav for fav in favorites 
+                fav for fav in filtered_favorites 
                 if search_fav.lower() in str(fav['data'].get('título', '')).lower() or
                    search_fav.lower() in str(fav['data'].get('autor', '')).lower() or
                    search_fav.lower() in str(fav['data'].get('_artemis_username', '')).lower()
             ]
         
-        # Aplicar ordenação
+        # Filtro por fonte
+        if filter_source == "Local":
+            filtered_favorites = [fav for fav in filtered_favorites if fav['data'].get('_artemis_username') != 'web']
+        elif filter_source == "Web":
+            filtered_favorites = [fav for fav in filtered_favorites if fav['data'].get('_artemis_username') == 'web']
+        
+        # Ordenação
         if sort_option == "Data de adição":
             filtered_favorites.sort(key=lambda x: x['added_at'], reverse=True)
-        elif sort_option == "Título":
+        elif sort_option == "Título A-Z":
             filtered_favorites.sort(key=lambda x: str(x['data'].get('título', '')).lower())
+        elif sort_option == "Título Z-A":
+            filtered_favorites.sort(key=lambda x: str(x['data'].get('título', '')).lower(), reverse=True)
         elif sort_option == "Fonte":
             filtered_favorites.sort(key=lambda x: str(x['data'].get('_artemis_username', '')).lower())
         
-        # Exibir favoritos
-        for fav in filtered_favorites:
-            fav_data = fav['data']
-            user_src = fav_data.get('_artemis_username', 'N/A')
-            added_date = datetime.fromisoformat(fav['added_at']).strftime('%d/%m/%Y %H:%M')
+        # Visualização detalhada
+        if 'fav_detail_view' in st.session_state and st.session_state.fav_detail_view:
+            fav_id = st.session_state.fav_detail_view
+            favorite = next((fav for fav in filtered_favorites if fav['id'] == fav_id), None)
             
-            with st.container():
-                col1, col2 = st.columns([4, 1])
+            if favorite:
+                fav_data = favorite['data']
+                fav_data = enrich_article_metadata(fav_data)
                 
+                st.markdown("## 📄 Detalhes do Favorito")
+                
+                if st.button("⬅️ Voltar para lista", key="back_from_detail"):
+                    st.session_state.fav_detail_view = None
+                    safe_rerun()
+                
+                col1, col2 = st.columns([3, 1])
                 with col1:
-                    st.markdown(f"""
-                    <div class="card">
-                        <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
-                        <div class="small-muted">
-                            <strong>Autor(es):</strong> {escape_html(fav_data.get('autor', 'Não informado'))} • 
-                            <strong>Fonte:</strong> {escape_html(user_src)} • 
-                            <strong>Adicionado:</strong> {added_date}
-                        </div>
-                    </div>
-                    """, unsafe_allow_html=True)
+                    st.markdown(f"### {escape_html(fav_data.get('título','— Sem título —'))}")
+                    st.markdown(f"**Autor(es):** {escape_html(fav_data.get('autor','— Não informado —'))}")
+                    st.markdown(f"**Ano:** {escape_html(str(fav_data.get('ano', fav_data.get('year','— —'))))}")
+                    
+                    if fav_data.get('doi'):
+                        doi_link = f"https://doi.org/{fav_data.get('doi')}"
+                        st.markdown(f"**DOI:** [{fav_data.get('doi')}]({doi_link})")
+                    elif fav_data.get('url'):
+                        st.markdown(f"**Link:** [{fav_data.get('url')}]({fav_data.get('url')})")
+                    
+                    if fav_data.get('similarity'):
+                        st.markdown(f"**Similaridade:** {fav_data['similarity']:.3f}")
+                    
+                    st.markdown("---")
+                    st.markdown("**Resumo**")
+                    st.markdown(escape_html(fav_data.get('resumo', 'Resumo não disponível.')))
                 
                 with col2:
-                    btn_col1, btn_col2 = st.columns(2)
-                    with btn_col1:
-                        if st.button("👁️", key=f"view_fav_{fav['id']}", help="Ver detalhes", use_container_width=True):
-                            st.session_state.fav_detail = fav_data
-                    with btn_col2:
-                        if st.button("🗑️", key=f"del_fav_{fav['id']}", help="Remover", use_container_width=True):
+                    st.markdown("**Ações**")
+                    if st.button("📝 Ir para Anotações", use_container_width=True, key="fav_to_notes"):
+                        st.session_state.page = "anotacoes"
+                        safe_rerun()
+                    
+                    if st.button("🔍 Buscar Similares", use_container_width=True, key="fav_similar"):
+                        st.session_state.page = "busca"
+                        st.session_state.search_input_main = fav_data.get('título', '').split()[0] if fav_data.get('título') else ''
+                        safe_rerun()
+                    
+                    if st.button("🗑️ Remover Favorito", use_container_width=True, type="secondary", key="remove_fav_detail"):
+                        remove_from_favorites(fav_id)
+                        st.session_state.fav_detail_view = None
+                        st.success("Favorito removido!")
+                        safe_rerun()
+            
+            else:
+                st.error("Favorito não encontrado.")
+                if st.button("⬅️ Voltar para lista"):
+                    st.session_state.fav_detail_view = None
+                    safe_rerun()
+        
+        else:
+            # Lista de favoritos
+            st.markdown(f"**📊 Mostrando {len(filtered_favorites)} de {len(favorites)} favoritos**")
+            
+            if not filtered_favorites:
+                st.info("Nenhum favorito encontrado com os filtros atuais.")
+            
+            for fav in filtered_favorites:
+                fav_data = fav['data']
+                user_src = fav_data.get('_artemis_username', 'N/A')
+                added_date = datetime.fromisoformat(fav['added_at']).strftime('%d/%m/%Y %H:%M')
+                
+                # Obter nome do usuário se for local
+                all_users = load_users()
+                user_name = all_users.get(user_src, {}).get('name', user_src) if user_src != 'web' else 'Web (Crossref)'
+                
+                with st.container():
+                    col1, col2, col3 = st.columns([4, 1, 1])
+                    
+                    with col1:
+                        st.markdown(f"""
+                        <div class="card">
+                            <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
+                            <div class="small-muted">
+                                <strong>Autor(es):</strong> {escape_html(fav_data.get('autor', 'Não informado'))}<br>
+                                <strong>Fonte:</strong> {escape_html(user_name)} • 
+                                <strong>Adicionado:</strong> {added_date}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                    
+                    with col2:
+                        if st.button("👁️", key=f"view_{fav['id']}", help="Ver detalhes", use_container_width=True):
+                            st.session_state.fav_detail_view = fav['id']
+                            safe_rerun()
+                    
+                    with col3:
+                        if st.button("🗑️", key=f"del_{fav['id']}", help="Remover", use_container_width=True):
                             remove_from_favorites(fav['id'])
                             st.success("Favorito removido!")
                             safe_rerun()
-                
-                st.markdown("---")
-        
-        # Visualização detalhada
-        if 'fav_detail' in st.session_state and st.session_state.fav_detail:
-            det_fav = st.session_state.pop("fav_detail")
-            det_fav = enrich_article_metadata(det_fav)
+                    
+                    st.markdown("---")
             
-            st.markdown("## 📄 Detalhes do Favorito")
-            if st.button("⬅️ Voltar para lista", key="back_from_fav_detail"):
-                safe_rerun()
-            
-            col1, col2 = st.columns([3, 1])
-            with col1:
-                st.markdown(f"### {escape_html(det_fav.get('título','— Sem título —'))}")
-                st.markdown(f"**Autor(es):** {escape_html(det_fav.get('autor','— Não informado —'))}")
-                st.markdown(f"**Ano:** {escape_html(str(det_fav.get('ano', det_fav.get('year','— —'))))}")
+            # Opções de exportação
+            if filtered_favorites:
+                st.markdown("### 💾 Exportar Favoritos")
+                col_exp1, col_exp2 = st.columns(2)
                 
-                if det_fav.get('doi'):
-                    doi_link = f"https://doi.org/{det_fav.get('doi')}"
-                    st.markdown(f"**DOI:** [{det_fav.get('doi')}]({doi_link})")
-                elif det_fav.get('url'):
-                    st.markdown(f"**Link:** [{det_fav.get('url')}]({det_fav.get('url')})")
+                with col_exp1:
+                    # Exportar como CSV
+                    export_data = []
+                    for fav in filtered_favorites:
+                        fav_data = fav['data']
+                        export_data.append({
+                            'Título': fav_data.get('título', ''),
+                            'Autores': fav_data.get('autor', ''),
+                            'Ano': fav_data.get('ano', ''),
+                            'DOI': fav_data.get('doi', ''),
+                            'URL': fav_data.get('url', ''),
+                            'Fonte': fav_data.get('_artemis_username', ''),
+                            'Data_Adicao': fav['added_at']
+                        })
+                    
+                    if export_data:
+                        df_export = pd.DataFrame(export_data)
+                        csv_data = df_export.to_csv(index=False, encoding='utf-8')
+                        st.download_button(
+                            "📊 Exportar CSV",
+                            data=csv_data,
+                            file_name=f"favoritos_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
+                            mime="text/csv",
+                            use_container_width=True
+                        )
                 
-                st.markdown("---")
-                st.markdown("**Resumo**")
-                st.markdown(escape_html(det_fav.get('resumo', 'Resumo não disponível.')))
-            
-            with col2:
-                st.markdown("**Ações**")
-                if st.button("📝 Ir para Anotações", use_container_width=True):
-                    st.session_state.page = "anotacoes"
-                    safe_rerun()
-                if st.button("🔍 Buscar Similares", use_container_width=True):
-                    st.session_state.page = "busca"
-                    st.session_state.search_input_main = det_fav.get('título', '').split()[0] if det_fav.get('título') else ''
-                    safe_rerun()
+                with col_exp2:
+                    # Exportar como JSON
+                    json_data = json.dumps(filtered_favorites, indent=2, ensure_ascii=False)
+                    st.download_button(
+                        "📋 Exportar JSON",
+                        data=json_data,
+                        file_name=f"favoritos_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                        mime="application/json",
+                        use_container_width=True
+                    )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -3065,6 +3175,7 @@ elif st.session_state.page == "mapa":
                 node_desc = st.text_area("Descrição:", placeholder="Detalhes, insights ou ações relacionadas...", 
                                        height=100, key="new_node_desc")
                 
+                # BOTÃO DE ENVIO CORRETO - usando st.form_submit_button
                 submit_btn = st.form_submit_button("🎯 Criar Ideia", use_container_width=True)
                 
                 if submit_btn and node_label:
