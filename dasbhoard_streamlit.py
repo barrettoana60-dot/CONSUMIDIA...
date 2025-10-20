@@ -71,112 +71,82 @@ def safe_rerun():
         raise RuntimeError("safe_rerun falhou e não foi possível chamar st.stop()")
 
 # -------------------------
-# Base CSS MODERNIZADO
+# Base CSS
 # -------------------------
 BASE_CSS = r"""
-:root{ 
-    --glass-bg-dark: rgba(255,255,255,0.03); 
-    --muted-text-dark:#bfc6cc;
-    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-    --modern-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
-}
+:root{ --glass-bg-dark: rgba(255,255,255,0.03); --muted-text-dark:#bfc6cc; }
 body { transition: background-color .25s ease, color .25s ease; }
-.glass-box{ border-radius:16px; padding:20px; box-shadow: var(--modern-shadow); backdrop-filter: blur(10px); }
-.card, .msg-card { border-radius:12px; padding:16px; margin-bottom:12px; transition: transform 0.2s ease, box-shadow 0.2s ease; }
-.card:hover, .msg-card:hover { transform: translateY(-2px); box-shadow: 0 12px 40px rgba(31, 38, 135, 0.5); }
-.avatar{width:48px;height:48px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;margin-right:12px}
-.small-muted{font-size:13px;}
-.card-title{font-weight:700;font-size:16px}
-.card-mark{ background: linear-gradient(135deg, #FFD166 0%, #FFA62E 100%); padding: 2px 6px; border-radius:6px; color: #000; font-weight:600; }
+.glass-box{ border-radius:12px; padding:16px; box-shadow:0 8px 32px rgba(4,9,20,0.15); }
+.card, .msg-card { border-radius:10px; padding:12px; margin-bottom:10px; }
+.avatar{width:40px;height:40px;border-radius:8px;display:inline-flex;align-items:center;justify-content:center;font-weight:700;margin-right:8px}
+.small-muted{font-size:12px;}
+.card-title{font-weight:700;font-size:15px}
+.card-mark{ background: rgba(255,255,0,0.12); padding: 0 2px; border-radius:2px; }
 /* Estilos para botões interativos */
 .stButton>button, .stDownloadButton>button {
     transition: transform 0.1s ease, opacity 0.1s ease, background-color 0.15s ease !important;
-    border-radius: 12px !important;
-    font-weight: 600 !important;
 }
 .stButton>button:active, .stDownloadButton>button:active {
     transform: scale(0.97);
     opacity: 0.8;
 }
-/* Estilos para o mapa mental MODERNIZADO */
+/* Estilos para o mapa mental */
 .node-editor { 
     background: rgba(255,255,255,0.05); 
-    border-radius: 16px; 
-    padding: 20px; 
-    margin: 12px 0; 
+    border-radius: 10px; 
+    padding: 15px; 
+    margin: 10px 0; 
     border: 1px solid rgba(255,255,255,0.1);
-    backdrop-filter: blur(10px);
 }
 .node-preview {
     background: rgba(255,255,255,0.02);
-    border-radius: 12px;
-    padding: 16px;
-    margin: 8px 0;
-    border-left: 6px solid #6c5ce7;
+    border-radius: 8px;
+    padding: 10px;
+    margin: 5px 0;
+    border-left: 4px solid #6c5ce7;
 }
 .mindmap-3d {
     background: linear-gradient(145deg, #1a2a6c, #b21f1f, #fdbb2d);
-    border-radius: 20px;
-    padding: 20px;
-    margin: 12px 0;
-    border: 3px solid #4ECDC4;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.4);
+    border-radius: 15px;
+    padding: 15px;
+    margin: 10px 0;
+    border: 2px solid #4ECDC4;
 }
 .flowchart-box {
     background: rgba(255,255,255,0.1);
-    border: 3px solid #FF6B6B;
-    border-radius: 12px;
-    padding: 16px;
-    margin: 12px 0;
-    backdrop-filter: blur(10px);
+    border: 2px solid #FF6B6B;
+    border-radius: 8px;
+    padding: 12px;
+    margin: 8px 0;
 }
 .three-d-effect {
     background: linear-gradient(145deg, #1a2a6c, #b21f1f);
-    border-radius: 20px;
-    padding: 25px;
-    margin: 15px 0;
-    border: 3px solid #FECA57;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.5);
-    backdrop-filter: blur(15px);
-}
-.modern-node {
-    border-radius: 16px !important;
-    border: 2px solid rgba(255,255,255,0.3) !important;
-    box-shadow: 0 8px 32px rgba(0,0,0,0.3) !important;
-    backdrop-filter: blur(10px) !important;
+    border-radius: 15px;
+    padding: 20px;
+    margin: 10px 0;
+    border: 2px solid #FECA57;
+    box-shadow: 0 8px 32px rgba(0,0,0,0.3);
 }
 /* Configurações de fonte */
 .font-config {
     background: rgba(255,255,255,0.05);
-    border-radius: 16px;
-    padding: 20px;
-    margin: 12px 0;
+    border-radius: 10px;
+    padding: 15px;
+    margin: 10px 0;
     border: 1px solid rgba(255,255,255,0.1);
-    backdrop-filter: blur(10px);
-}
-/* Animações suaves */
-@keyframes fadeIn {
-    from { opacity: 0; transform: translateY(10px); }
-    to { opacity: 1; transform: translateY(0); }
-}
-.fade-in {
-    animation: fadeIn 0.5s ease-in-out;
 }
 """
 
 DEFAULT_CSS = r"""
 .css-1d391kg { background: linear-gradient(180deg,#071428 0%, #031926 100%) !important; }
-.glass-box{ background: rgba(14, 25, 42, 0.8); border:1px solid rgba(42, 59, 82, 0.6); box-shadow:var(--modern-shadow); }
-.stButton>button, .stDownloadButton>button{ background: var(--primary-gradient) !important; color:#ffffff !important; border:none !important; padding:12px 20px !important; border-radius:12px !important; font-weight:600 !important; }
+.glass-box{ background: #0E192A; border:1px solid #2A3B52; box-shadow:0 4px 12px rgba(0,0,0,0.3); }
+.stButton>button, .stDownloadButton>button{ background:#1C2D4A !important; color:#bfc6cc !important; border:1px solid #2A3B52 !important; padding:8px 12px !important; border-radius:10px !important; }
 .stButton>button:hover, .stDownloadButton>button:hover {
-    background: var(--secondary-gradient) !important;
-    transform: translateY(-2px);
-    box-shadow: 0 12px 40px rgba(31, 38, 135, 0.5);
+    background: #2A3B52 !important;
+    border-color: #3C5070 !important;
 }
-.card, .msg-card { background: rgba(14, 25, 42, 0.8); border-radius:16px; padding:16px; margin-bottom:12px; border:1px solid rgba(42, 59, 82, 0.6); backdrop-filter: blur(10px); }
-.avatar{color:#fff;background:var(--primary-gradient)}
+.card, .msg-card { background: #0E192A; border-radius:12px; padding:12px; margin-bottom:10px; border:1px solid #2A3B52; }
+.avatar{color:#fff;background:#6c5ce7}
 .small-muted{color:#bfc6cc;}
 .card-title{color:#fff}
 """
@@ -185,7 +155,7 @@ st.markdown(f"<style>{BASE_CSS}</style>", unsafe_allow_html=True)
 st.markdown(f"<style>{DEFAULT_CSS}</style>", unsafe_allow_html=True)
 
 # TÍTULO - centralizado (geral) e estilo padronizado
-st.markdown("<div style='text-align:center; padding-top:8px; padding-bottom:6px;'><h1 style='margin:0;color:#ffffff;background:var(--primary-gradient);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
+st.markdown("<div style='text-align:center; padding-top:8px; padding-bottom:6px;'><h1 style='margin:0;color:#ffffff;'>NUGEP-PQR</h1></div>", unsafe_allow_html=True)
 st.markdown("<hr style='margin-top:6px;margin-bottom:16px;border-color:#233447'/>", unsafe_allow_html=True)
 
 # -------------------------
@@ -199,37 +169,12 @@ BACKUPS_DIR.mkdir(exist_ok=True)
 ATTACHMENTS_DIR.mkdir(exist_ok=True)
 
 # -------------------------
-# AI Helper Functions - SUPER MELHORADA
+# AI Helper Functions - MELHORADA
 # -------------------------
 class DataAnalyzer:
     def __init__(self, df):
         self.df = df.copy()
         self.insights = []
-        self.user_profile = self._analyze_user_profile()
-    
-    def _analyze_user_profile(self):
-        """Analisa o perfil do usuário baseado nos dados"""
-        profile = {
-            "research_focus": [],
-            "collaboration_level": "baixo",
-            "geographic_scope": "local",
-            "temporal_pattern": "estável",
-            "data_quality": "boa"
-        }
-        
-        # Análise de foco de pesquisa
-        text_columns = [col for col in self.df.columns if self.df[col].dtype == 'object']
-        all_text = ""
-        for col in text_columns[:3]:
-            all_text += " " + self.df[col].fillna('').astype(str).str.cat(sep=' ')
-        
-        if len(all_text) > 100:
-            words = re.findall(r'\b[a-zà-ú]{5,}\b', all_text.lower())
-            from collections import Counter
-            word_freq = Counter([w for w in words if w not in PORTUGUESE_STOP_WORDS])
-            profile["research_focus"] = [word for word, count in word_freq.most_common(5)]
-        
-        return profile
     
     def generate_comprehensive_analysis(self):
         """Gera uma análise completa e inteligente dos dados"""
@@ -243,69 +188,28 @@ class DataAnalyzer:
         analysis += self._collaboration_analysis()
         analysis += self._geographic_analysis()
         analysis += self._trend_analysis()
-        analysis += self._personalized_recommendations()
         
         return analysis
     
     def _basic_analysis(self):
         """Análise básica dos dados"""
-        text = "### 📊 Visão Geral Inteligente\n\n"
-        text += f"- **Total de registros**: {len(self.df)} "
-        if len(self.df) < 20:
-            text += "🔬 (Base em desenvolvimento - ideal para explorar direções iniciais)\n"
-        elif len(self.df) < 50:
-            text += "📈 (Base consolidada - permite análises confiáveis)\n"
-        else:
-            text += "🚀 (Base robusta - excelente para análises complexas)\n"
-        
+        text = "### 📊 Visão Geral\n\n"
+        text += f"- **Total de registros**: {len(self.df)}\n"
         text += f"- **Colunas disponíveis**: {', '.join(self.df.columns.tolist())}\n"
         
         # Estatísticas por tipo de dado
         numeric_cols = self.df.select_dtypes(include=[np.number]).columns.tolist()
         text_cols = self.df.select_dtypes(include=['object']).columns.tolist()
-        text += f"- **Colunas numéricas**: {len(numeric_cols)} "
-        if len(numeric_cols) > 3:
-            text += "📐 (Boa diversidade numérica)\n"
-        else:
-            text += "📝 (Foco em dados textuais)\n"
-        
+        text += f"- **Colunas numéricas**: {len(numeric_cols)}\n"
         text += f"- **Colunas de texto**: {len(text_cols)}\n\n"
-        
-        # Análise de completude
-        completeness = self._calculate_completeness()
-        text += f"- **Qualidade dos dados**: {completeness['score']}/10 "
-        if completeness['score'] >= 8:
-            text += "🎯 (Excelente qualidade)\n"
-        elif completeness['score'] >= 6:
-            text += "✅ (Boa qualidade)\n"
-        else:
-            text += "⚠️ (Recomendo melhorar a completude)\n"
-        
-        text += f"- **Dados ausentes**: {completeness['missing_percent']:.1f}%\n\n"
         
         return text
     
-    def _calculate_completeness(self):
-        """Calcula a qualidade e completude dos dados"""
-        total_cells = self.df.size
-        missing_cells = self.df.isna().sum().sum()
-        missing_percent = (missing_cells / total_cells) * 100
-        
-        # Pontuação baseada na completude
-        score = max(0, 10 - (missing_percent / 10))
-        
-        return {
-            "score": round(score, 1),
-            "missing_percent": missing_percent,
-            "total_cells": total_cells,
-            "missing_cells": missing_cells
-        }
-    
     def _author_analysis(self):
-        """Análise de autores e colaborações - SUPER MELHORADA"""
-        text = "### 👥 Análise de Rede de Autores\n\n"
+        """Análise de autores e colaborações - CORRIGIDA E FUNCIONANDO"""
+        text = "### 👥 Análise de Autores\n\n"
         
-        # BUSCA INTELIGENTE POR COLUNAS DE AUTORES
+        # BUSCA MAIS AGRESSIVA POR COLUNA DE AUTORES
         author_col = None
         possible_author_cols = []
         
@@ -319,7 +223,7 @@ class DataAnalyzer:
                 sample_data = self.df[col].dropna().head(5)
                 if len(sample_data) > 0:
                     # Verificar se contém vírgulas, pontos e vírgulas (indicando múltiplos autores)
-                    has_multiple_authors = any(';' in str(val) or ',' in str(val) or ' e ' in str(val).lower() for val in sample_data)
+                    has_multiple_authors = any(';' in str(val) or ',' in str(val) for val in sample_data)
                     if has_multiple_authors or any(len(str(val).split()) >= 2 for val in sample_data):
                         author_col = col
                         break
@@ -329,108 +233,57 @@ class DataAnalyzer:
             author_col = possible_author_cols[0]
         
         if not author_col:
-            return "❌ **Análise de Autores**: Nenhuma coluna de autores identificada. **Sugestão**: Adicione uma coluna 'autores' para análise de colaborações.\n\n"
+            return "❌ **Autores**: Nenhuma coluna de autores identificada. Verifique se há colunas como 'autor', 'autores', 'author' na sua planilha.\n\n"
         
-        text += f"**Coluna analisada**: '{author_col}'\n\n"
+        text += f"**Coluna utilizada**: '{author_col}'\n\n"
         
-        # PROCESSAMENTO AVANÇADO DOS AUTORES
+        # PROCESSAMENTO MELHORADO DOS AUTORES
         all_authors = []
         authors_found = 0
-        collaboration_network = []
         
         for authors_str in self.df[author_col].dropna():
             if isinstance(authors_str, str) and authors_str.strip():
                 authors_found += 1
                 # Múltiplas estratégias de parsing
                 authors = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
-                author_list = []
                 for author in authors:
                     author_clean = author.strip()
                     if (author_clean and len(author_clean) > 2 and 
                         author_clean.lower() not in ['', 'e', 'and', 'et', 'de', 'da', 'do', 'dos', 'das'] and
                         not author_clean.isdigit() and
                         not author_clean.replace('.', '').isdigit()):
-                        author_list.append(author_clean)
                         all_authors.append(author_clean)
-                
-                # Adicionar à rede de colaboração
-                if len(author_list) > 1:
-                    collaboration_network.append(author_list)
         
         if all_authors:
             author_counts = pd.Series(all_authors).value_counts()
-            total_unique_authors = len(author_counts)
+            text += "**Principais autores identificados:**\n"
+            for author, count in author_counts.head(8).items():
+                text += f"- **{author}**: {count} publicação(ões)\n"
             
-            text += "**🔍 Perfil de Colaboração**:\n"
-            text += f"- **Autores únicos**: {total_unique_authors}\n"
-            text += f"- **Trabalhos com autores**: {authors_found}\n"
-            
-            # Análise de colaboração avançada
-            solo_works = 0
-            team_works = 0
-            
+            # Colaborações
+            collaborations = 0
             for authors_str in self.df[author_col].dropna():
-                if isinstance(authors_str, str):
-                    authors = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
-                    num_authors = len([a for a in authors if a.strip() and len(a.strip()) > 2])
-                    if num_authors == 1:
-                        solo_works += 1
-                    elif num_authors > 1:
-                        team_works += 1
+                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b|&', authors_str)) > 1:
+                    collaborations += 1
             
-            collaboration_rate = (team_works / authors_found) * 100 if authors_found > 0 else 0
+            if collaborations > 0:
+                collaboration_rate = (collaborations / authors_found) * 100
+                text += f"\n**Colaborações**: {collaborations} trabalhos com coautoria ({collaboration_rate:.1f}%)\n"
+            else:
+                text += f"\n**Colaborações**: Nenhuma colaboração identificada\n"
             
-            text += f"- **Trabalhos individuais**: {solo_works}\n"
-            text += f"- **Trabalhos em equipe**: {team_works}\n"
-            text += f"- **Taxa de colaboração**: {collaboration_rate:.1f}%\n\n"
-            
-            # Análise de rede
-            if collaboration_network:
-                text += "**🤝 Rede de Colaboração**:\n"
-                # Encontrar colaborações frequentes
-                from collections import Counter
-                collaboration_pairs = []
-                for team in collaboration_network:
-                    if len(team) >= 2:
-                        for i in range(len(team)):
-                            for j in range(i+1, len(team)):
-                                collaboration_pairs.append(tuple(sorted([team[i], team[j]])))
-                
-                if collaboration_pairs:
-                    pair_counts = Counter(collaboration_pairs)
-                    top_pairs = pair_counts.most_common(3)
-                    text += "Parcerias mais frequentes:\n"
-                    for (author1, author2), count in top_pairs:
-                        text += f"  • **{author1}** + **{author2}**: {count} colaboração(ões)\n"
-                    text += "\n"
-            
-            # Autores mais produtivos
-            text += "**🏆 Top Autores Mais Produtivos**:\n"
-            for i, (author, count) in enumerate(author_counts.head(6).items(), 1):
-                productivity = "🔴" if count >= 10 else "🟡" if count >= 5 else "🟢"
-                text += f"{i}. {productivity} **{author}**: {count} publicação(ões)\n"
-            
-            # Recomendações baseadas na análise
-            text += "\n**💡 Insights e Sugestões**:\n"
-            if collaboration_rate < 30:
-                text += "• **Oportunidade**: Considere aumentar colaborações para ampliar impacto\n"
-            elif collaboration_rate > 70:
-                text += "• **Força**: Excelente rede colaborativa estabelecida\n"
-            
-            if total_unique_authors < 5:
-                text += "• **Diversidade**: Busque colaborar com novos pesquisadores\n"
-            
-            text += f"\n**Total de nomes extraídos**: {len(all_authors)}\n\n"
+            text += f"\n**Total de registros com autores**: {authors_found}\n"
+            text += f"**Total de nomes extraídos**: {len(all_authors)}\n\n"
             
         else:
             text += f"⚠️ **Autores**: Coluna '{author_col}' encontrada mas não foi possível extrair autores válidos\n\n"
-            text += f"**💡 Dica**: Verifique o formato: 'Autor1; Autor2; Autor3' ou 'Autor1, Autor2, Autor3'\n\n"
+            text += f"**Dica**: Verifique o formato dos dados na coluna '{author_col}'\n\n"
         
         return text
     
     def _temporal_analysis(self):
-        """Análise temporal dos dados - SUPER MELHORADA"""
-        text = "### 📈 Análise Temporal e Evolução\n\n"
+        """Análise temporal dos dados - CORRIGIDA E MELHORADA"""
+        text = "### 📈 Análise Temporal\n\n"
         
         # Buscar coluna de ano de forma mais abrangente
         year_col = None
@@ -438,7 +291,7 @@ class DataAnalyzer:
         
         for col in self.df.columns:
             col_lower = col.lower()
-            if any(keyword in col_lower for keyword in ['ano', 'year', 'data', 'date', 'publication', 'publicado']):
+            if any(keyword in col_lower for keyword in ['ano', 'year', 'data', 'date', 'publication']):
                 year_col = col
                 year_data_found = True
                 break
@@ -457,7 +310,7 @@ class DataAnalyzer:
                         break
         
         if not year_col:
-            return "❌ **Análise Temporal**: Nenhuma coluna de anos identificada. **Sugestão**: Adicione uma coluna 'ano' para análise de tendências temporais.\n\n"
+            return "❌ **Anos**: Nenhuma coluna de anos identificada na planilha\n\n"
             
         try:
             years = pd.to_numeric(self.df[year_col], errors='coerce').dropna()
@@ -468,143 +321,82 @@ class DataAnalyzer:
             min_year = int(years.min())
             max_year = int(years.max())
             year_range = max_year - min_year
-            current_year = datetime.now().year
             
             text += f"- **Período analisado**: {min_year} - {max_year} ({year_range} anos)\n"
             
-            # Análise de distribuição
-            year_counts = years.value_counts().sort_index()
-            
             # Ano mais frequente
+            year_counts = years.value_counts()
             if not year_counts.empty:
                 most_frequent_year = int(year_counts.index[0])
                 most_frequent_count = int(year_counts.iloc[0])
                 text += f"- **Ano com mais publicações**: {most_frequent_year} ({most_frequent_count} publicações)\n"
             
-            # Análise de tendência
-            if len(year_counts) > 3:
-                recent_5_years = [y for y in year_counts.index if y >= current_year - 5]
-                older_years = [y for y in year_counts.index if y < current_year - 5]
-                
-                recent_production = sum(year_counts[y] for y in recent_5_years)
-                older_production = sum(year_counts[y] for y in older_years)
-                
-                text += f"- **Produção recente (últimos 5 anos)**: {recent_production} trabalhos\n"
-                text += f"- **Produção anterior**: {older_production} trabalhos\n"
-                
-                # Tendência
-                if recent_production > older_production and len(recent_5_years) > 0:
-                    growth_rate = ((recent_production / len(recent_5_years)) / (older_production / max(1, len(older_years))) - 1) * 100
-                    if growth_rate > 20:
-                        text += "- **📈 Tendência**: Crescimento significativo na produção recente\n"
-                    elif growth_rate > 0:
-                        text += "- **↗️ Tendência**: Leve crescimento na produção\n"
-                    else:
-                        text += "- **➡️ Tendência**: Produção estável\n"
-                else:
-                    text += "- **🔍 Tendência**: Produção mais concentrada no passado\n"
-            
-            # Distribuição por década para períodos longos
+            # Distribuição por década
             if year_range > 20:
                 decades = (years // 10) * 10
                 decade_counts = decades.value_counts().sort_index()
                 if len(decade_counts) > 1:
-                    text += "\n**🕰️ Distribuição por Década**:\n"
-                    for decade, count in decade_counts.head(6).items():
-                        percentage = (count / len(years)) * 100
-                        text += f"- **{int(decade)}s**: {int(count)} publicação(ões) ({percentage:.1f}%)\n"
+                    text += "\n**Distribuição por década:**\n"
+                    for decade, count in decade_counts.head(5).items():
+                        text += f"- {int(decade)}s: {int(count)} publicação(ões)\n"
+            
+            # Tendência
+            if len(years) > 5:
+                recent_threshold = max_year - 5
+                recent_years = years[years >= recent_threshold]
+                older_years = years[years < recent_threshold]
+                
+                if len(recent_years) > 0 and len(older_years) > 0:
+                    recent_avg = len(recent_years) / 5  # média por ano nos últimos 5 anos
+                    older_avg = len(older_years) / max(1, (recent_threshold - min_year))  # média por ano no período anterior
+                    
+                    if recent_avg > older_avg * 1.2:
+                        text += "- **Tendência**: 📈 Crescimento na produção recente\n"
+                    elif recent_avg < older_avg * 0.8:
+                        text += "- **Tendência**: 📉 Produção mais concentrada no passado\n"
+                    else:
+                        text += "- **Tendência**: ➡️ Produção constante ao longo do tempo\n"
             
             text += f"\n**Total de registros com anos**: {len(years)}\n\n"
-            
-            # Sugestões baseadas na análise temporal
-            text += "**💡 Insights Temporais**:\n"
-            if max_year >= current_year - 2:
-                text += "• **Atualidade**: Sua pesquisa inclui trabalhos recentes - excelente!\n"
-            elif max_year <= current_year - 5:
-                text += "• **Atualização**: Considere incluir trabalhos mais recentes\n"
-            
-            if year_range < 5:
-                text += "• **Ampliação**: Explore períodos temporais mais extensos\n"
-                
         else:
             text += f"⚠️ **Anos**: Coluna '{year_col}' encontrada mas sem dados numéricos válidos\n\n"
         
         return text
     
     def _thematic_analysis(self):
-        """Análise temática dos dados - SUPER MELHORADA"""
-        text = "### 🔍 Análise Temática e Conceitual\n\n"
+        """Análise temática dos dados"""
+        text = "### 🔍 Análise Temática\n\n"
         
         # Combinar texto de todas as colunas relevantes
         texto_completo = ""
         text_cols = [col for col in self.df.columns if self.df[col].dtype == 'object']
-        
-        for col in text_cols[:5]:  # Analisar até 5 colunas de texto
+        for col in text_cols[:4]:  # Aumentei para 4 colunas
             col_text = self.df[col].fillna('').astype(str).str.cat(sep=' ')
             if len(col_text) > 100:  # Só adiciona se tiver conteúdo significativo
                 texto_completo += " " + col_text
         
         if not texto_completo.strip():
-            return "❌ **Análise Temática**: Não há texto suficiente para análise. **Sugestão**: Inclua colunas com títulos, resumos ou palavras-chave.\n\n"
+            return "❌ **Temas**: Não há texto suficiente para análise temática\n\n"
         
-        # Extrair temas com análise avançada
+        # Extrair temas
         palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
         stop_words = set(PORTUGUESE_STOP_WORDS)
         palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
         
         if palavras_filtradas:
-            from collections import Counter
-            contador = Counter(palavras_filtradas)
-            temas_comuns = contador.most_common(15)
-            
-            text += f"**📊 Estatísticas Textuais**:\n"
-            text += f"- **Total de palavras analisadas**: {len(palavras):,}\n"
-            text += f"- **Palavras únicas significativas**: {len(contador)}\n"
-            text += f"- **Texto analisado**: {len(texto_completo):,} caracteres\n\n"
-            
-            text += "**🎯 Tópicos Mais Frequentes**:\n"
-            for i, (tema, count) in enumerate(temas_comuns[:10], 1):
-                importancia = "🔥" if count >= 10 else "⭐" if count >= 5 else "🔹"
-                text += f"{i}. {importancia} **{tema}**: {count} ocorrências\n"
-            
-            # Análise de bigramas (conceitos compostos)
-            if len(palavras_filtradas) > 20:
-                bigramas = []
-                for i in range(len(palavras_filtradas)-1):
-                    bigrama = f"{palavras_filtradas[i]} {palavras_filtradas[i+1]}"
-                    bigramas.append(bigrama)
-                
-                contador_bigramas = Counter(bigramas)
-                bigramas_comuns = contador_bigramas.most_common(8)
-                
-                if bigramas_comuns:
-                    text += "\n**🔗 Conceitos Relacionados (Bigramas)**:\n"
-                    for bigrama, count in bigramas_comuns[:6]:
-                        text += f"• **{bigrama}** ({count} vezes)\n"
-            
-            # Temas emergentes (menos frequentes mas significativos)
-            temas_emergentes = [tema for tema, count in temas_comuns[5:12] if count >= 3]
-            if temas_emergentes:
-                text += f"\n**💡 Temas Emergentes**: {', '.join(temas_emergentes[:4])}\n"
-            
-            # Análise de diversidade temática
-            diversidade = len(contador) / len(palavras) * 1000  # Índice de diversidade
-            text += f"\n**🌐 Diversidade Temática**: {diversidade:.1f} "
-            if diversidade > 50:
-                text += "(Alta diversidade de tópicos)\n"
-            elif diversidade > 30:
-                text += "(Boa variedade temática)\n"
-            else:
-                text += "(Foco temático concentrado)\n"
-                
+            temas = pd.Series(palavras_filtradas).value_counts().head(12)
+            text += "**Palavras-chave mais frequentes:**\n"
+            for i, (tema, count) in enumerate(temas.items(), 1):
+                text += f"{i}. **{tema}**: {count} palavras repetidas\n"
+            text += "\n"
         else:
             text += "⚠️ **Temas**: Não foi possível identificar palavras-chave frequentes\n\n"
         
         return text
     
     def _collaboration_analysis(self):
-        """Análise de colaborações e redes - SUPER MELHORADA"""
-        text = "### 🤝 Análise Avançada de Colaborações\n\n"
+        """Análise de colaborações e redes"""
+        text = "### 🤝 Análise de Colaborações\n\n"
         
         author_col = None
         for col in self.df.columns:
@@ -616,56 +408,35 @@ class DataAnalyzer:
         if author_col:
             coautorias = 0
             total_trabalhos = len(self.df[author_col].dropna())
-            autores_por_trabalho = []
             
             for authors_str in self.df[author_col].dropna():
-                if isinstance(authors_str, str):
-                    authors = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
-                    num_autores = len([a for a in authors if a.strip() and len(a.strip()) > 2])
-                    autores_por_trabalho.append(num_autores)
-                    
-                    if num_autores > 1:
-                        coautorias += 1
+                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b|&', authors_str)) > 1:
+                    coautorias += 1
             
             if total_trabalhos > 0:
                 taxa_colaboracao = (coautorias/total_trabalhos)*100
-                media_autores = np.mean(autores_por_trabalho) if autores_por_trabalho else 0
-                
-                text += f"**📈 Métricas de Colaboração**:\n"
                 text += f"- **Trabalhos em colaboração**: {coautorias}\n"
                 text += f"- **Taxa de colaboração**: {taxa_colaboracao:.1f}%\n"
-                text += f"- **Média de autores por trabalho**: {media_autores:.1f}\n"
-                text += f"- **Total de trabalhos analisados**: {total_trabalhos}\n\n"
                 
-                # Análise de perfil colaborativo
-                text += "**🔍 Perfil de Colaboração**:\n"
-                if taxa_colaboracao > 60:
-                    text += "- **🏆 Colaborador Intenso**: Alta taxa de trabalhos em equipe\n"
-                    text += "- **💡 Força**: Excelente rede de colaboração estabelecida\n"
-                elif taxa_colaboracao > 30:
-                    text += "- **🤝 Colaborador Moderado**: Bom equilíbrio entre trabalho individual e em grupo\n"
-                    text += "- **🚀 Oportunidade**: Pode expandir ainda mais as colaborações\n"
+                if coautorias > 0:
+                    if taxa_colaboracao > 60:
+                        text += "- **Padrão**: Alta colaboração entre pesquisadores\n"
+                    elif taxa_colaboracao > 30:
+                        text += "- **Padrão**: Boa colaboração acadêmica\n"
+                    else:
+                        text += "- **Padrão**: Oportunidade para aumentar colaborações\n"
                 else:
-                    text += "- **🔬 Pesquisador Independente**: Predominância de trabalho individual\n"
-                    text += "- **💡 Sugestão**: Considere oportunidades de colaboração\n"
-                
-                # Análise do tamanho das equipes
-                team_sizes = Counter(autores_por_trabalho)
-                text += f"\n**👥 Distribuição de Tamanho de Equipes**:\n"
-                for size, count in team_sizes.most_common():
-                    text += f"- **{size} autor(es)**: {count} trabalho(s)\n"
-                    
+                    text += "- **Padrão**: Produção individual predominante\n"
             else:
                 text += "⚠️ **Colaboração**: Sem dados de autores para análise\n"
-        else:
-            text += "❌ **Colaboração**: Nenhuma coluna de autores identificada\n"
+            
+            text += "\n"
         
-        text += "\n"
         return text
     
     def _geographic_analysis(self):
-        """Análise geográfica dos dados - SUPER MELHORADA"""
-        text = "### 🌎 Análise Geográfica e de Distribuição\n\n"
+        """Análise geográfica dos dados - CORRIGIDA E MELHORADA"""
+        text = "### 🌎 Análise Geográfica\n\n"
         
         # Buscar coluna de país de forma mais abrangente
         country_col = None
@@ -673,7 +444,7 @@ class DataAnalyzer:
         
         for col in self.df.columns:
             col_lower = col.lower()
-            if any(keyword in col_lower for keyword in ['país', 'pais', 'country', 'local', 'location', 'nacionalidade', 'região', 'cidade', 'city']):
+            if any(keyword in col_lower for keyword in ['país', 'pais', 'country', 'local', 'location', 'nacionalidade', 'região']):
                 country_col = col
                 country_data_found = True
                 break
@@ -684,7 +455,7 @@ class DataAnalyzer:
                 sample_data = self.df[col].dropna().head(10)
                 if len(sample_data) > 0:
                     # Verificar se contém nomes de países conhecidos
-                    common_countries = ['brasil', 'brazil', 'eua', 'usa', 'portugal', 'espanha', 'frança', 'argentina', 'méxico', 'colômbia']
+                    common_countries = ['brasil', 'brazil', 'eua', 'usa', 'portugal', 'espanha', 'frança']
                     has_countries = any(any(country in str(val).lower() for country in common_countries) for val in sample_data)
                     if has_countries:
                         country_col = col
@@ -693,45 +464,34 @@ class DataAnalyzer:
                         break
         
         if not country_col:
-            return "❌ **Análise Geográfica**: Nenhuma coluna de países identificada. **Sugestão**: Adicione uma coluna 'país' para análise de distribuição geográfica.\n\n"
+            return "❌ **Países**: Nenhuma coluna de países identificada na planilha\n\n"
             
         countries = self.df[country_col].dropna()
         
         if len(countries) > 0:
             country_counts = countries.value_counts()
-            total_countries = len(countries)
-            unique_countries = len(country_counts)
-            
-            text += f"**🌐 Alcance Geográfico**:\n"
-            text += f"- **Regiões/países únicos**: {unique_countries}\n"
-            text += f"- **Total de registros com localização**: {total_countries}\n"
-            text += f"- **Cobertura geográfica**: {(total_countries/len(self.df))*100:.1f}% dos registros\n\n"
-            
-            text += "**🗺️ Distribuição Geográfica**:\n"
+            text += "**Países/regiões mais frequentes:**\n"
             for country, count in country_counts.head(8).items():
-                percentual = (count / total_countries) * 100
-                emoji = "🇧🇷" if 'brasil' in str(country).lower() or 'brazil' in str(country).lower() else "🌍"
-                text += f"{emoji} **{country}**: {count} ({percentual:.1f}%)\n"
+                text += f"- **{country}**: {count} publicação(ões)\n"
             
-            # Análise de diversidade geográfica
+            # Diversidade geográfica
+            unique_countries = len(country_counts)
+            total_countries = len(countries)
             diversity_index = (unique_countries / total_countries) * 100
             
-            text += f"\n**📊 Diversidade Geográfica**: {diversity_index:.1f}%\n"
+            text += f"\n- **Diversidade geográfica**: {diversity_index:.1f}%\n"
+            text += f"- **Países/regiões únicos**: {unique_countries}\n"
             
-            # Classificação do escopo geográfico
             if unique_countries == 1:
-                text += "- **🎯 Foco**: Pesquisa concentrada em uma única região\n"
-                text += "- **💡 Sugestão**: Considere expandir para estudos comparativos internacionais\n"
+                text += "- **Foco**: Pesquisa concentrada em uma única região\n"
             elif unique_countries <= 3:
-                text += "- **📍 Escopo Regional**: Pesquisa com foco em poucas regiões\n"
-                text += "- **🚀 Oportunidade**: Boa base para expansão geográfica\n"
+                text += "- **Foco**: Pesquisa com foco regional\n"
             elif unique_countries <= 8:
-                text += "- **🌎 Escopo Multinacional**: Pesquisa com boa diversidade geográfica\n"
-                text += "- **🏆 Força**: Abrangência internacional consolidada\n"
+                text += "- **Foco**: Pesquisa com boa diversidade geográfica\n"
             else:
-                text += "- **🚀 Escopo Global**: Pesquisa com excelente abrangência internacional\n"
-                text += "- **🎯 Destaque**: Diversidade geográfica como diferencial\n"
+                text += "- **Foco**: Pesquisa com excelente abrangência internacional\n"
             
+            text += f"\n**Total de registros com localização**: {total_countries}\n\n"
         else:
             text += f"⚠️ **Países**: Coluna '{country_col}' encontrada mas sem dados válidos\n\n"
         
@@ -739,7 +499,7 @@ class DataAnalyzer:
     
     def _trend_analysis(self):
         """Análise de tendências e insights - SUGESTÕES INTELIGENTES REAIS"""
-        text = "### 💡 Análise Estratégica e Recomendações\n\n"
+        text = "### 💡 Análise e Sugestões Inteligentes\n\n"
         
         insights = []
         sugestoes_inteligentes = []
@@ -747,20 +507,20 @@ class DataAnalyzer:
         # ANÁLISE INTELIGENTE BASEADA NOS DADOS REAIS
         total_registros = len(self.df)
         
-        # 1. Análise de completude estratégica
-        colunas_essenciais = ['autor', 'ano', 'título', 'resumo', 'palavras_chave']
-        colunas_presentes = [col for col in colunas_essenciais 
+        # 1. Análise de completude
+        colunas_principais = ['autor', 'ano', 'título', 'resumo']
+        colunas_presentes = [col for col in colunas_principais 
                             if any(col in col_name.lower() for col_name in self.df.columns)]
-        completude = len(colunas_presentes) / len(colunas_essenciais) * 100
+        completude = len(colunas_presentes) / len(colunas_principais) * 100
         
         if completude < 50:
-            sugestoes_inteligentes.append("📋 **Estrutura de Dados**: Adicione colunas básicas (autor, ano, título) para análises mais ricas")
+            sugestoes_inteligentes.append("📋 **Melhore a estrutura da planilha** - Adicione colunas básicas como autor, ano, título")
         elif completude < 80:
-            sugestoes_inteligentes.append("📊 **Estrutura Boa**: Considere adicionar resumos e palavras-chave para análises avançadas")
+            sugestoes_inteligentes.append("📊 **Estrutura boa** - Considere adicionar mais metadados para análises avançadas")
         else:
-            sugestoes_inteligentes.append("🎯 **Estrutura Excelente**: Todos os elementos essenciais estão presentes - ótimo para análises complexas")
+            sugestoes_inteligentes.append("🎯 **Estrutura excelente** - Todos os elementos essenciais estão presentes")
         
-        # 2. Análise temporal estratégica
+        # 2. Análise temporal (se houver anos)
         year_col = next((col for col in self.df.columns if 'ano' in col.lower() or 'year' in col.lower()), None)
         if year_col:
             try:
@@ -768,42 +528,29 @@ class DataAnalyzer:
                 if len(anos) > 0:
                     range_anos = int(anos.max()) - int(anos.min())
                     if range_anos < 3:
-                        sugestoes_inteligentes.append("⏳ **Perspectiva Temporal**: Dados concentrados em poucos anos - busque maior variedade temporal para análise de tendências")
+                        sugestoes_inteligentes.append("⏳ **Expanda o período** - Dados concentrados em poucos anos, busque maior variedade temporal")
                     elif range_anos > 10:
-                        sugestoes_inteligentes.append("📈 **Força Temporal**: Período extenso permite análise robusta de evolução - explore tendências de longo prazo")
-                    elif range_anos > 5:
-                        sugestoes_inteligentes.append("🕰️ **Boa Janela Temporal**: Período adequado para análise de médio prazo")
+                        sugestoes_inteligentes.append("📈 **Analise tendências** - Período extenso permite análise de evolução temporal")
             except:
                 pass
         
-        # 3. Análise de rede de autores estratégica
+        # 3. Análise de diversidade de autores
         author_col = next((col for col in self.df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
         if author_col:
             autores_unicos = set()
-            colaboracoes = 0
-            
             for authors_str in self.df[author_col].dropna():
                 if isinstance(authors_str, str):
                     authors = re.split(r'[;,]', authors_str)
-                    autores_validos = [a.strip() for a in authors if a.strip() and len(a.strip()) > 2]
-                    autores_unicos.update(autores_validos)
-                    
-                    if len(autores_validos) > 1:
-                        colaboracoes += 1
+                    for author in authors:
+                        if author.strip():
+                            autores_unicos.add(author.strip())
             
             if len(autores_unicos) < 5:
-                sugestoes_inteligentes.append("👥 **Rede de Pesquisa**: Pouca diversidade de pesquisadores - considere expandir colaborações")
+                sugestoes_inteligentes.append("👥 **Amplie rede de autores** - Pouca diversidade de pesquisadores")
             elif len(autores_unicos) > 20:
-                sugestoes_inteligentes.append("🤝 **Rede Colaborativa Forte**: Excelente diversidade de autores - explore análises de rede")
-            elif len(autores_unicos) > 10:
-                sugestoes_inteligentes.append("🔗 **Boa Rede**: Diversidade adequada de colaboradores")
-            
-            if colaboracoes > 0:
-                taxa_colab = (colaboracoes / len(self.df[author_col].dropna())) * 100
-                if taxa_colab < 30:
-                    sugestoes_inteligentes.append("💡 **Oportunidade de Colaboração**: Baixa taxa de coautoria - busque parcerias para ampliar impacto")
+                sugestoes_inteligentes.append("🤝 **Rede colaborativa forte** - Excelente diversidade de autores")
         
-        # 4. Análise de temas e lacunas
+        # 4. Análise de temas emergentes
         texto_completo = ""
         for col in self.df.select_dtypes(include=['object']).columns[:3]:
             texto_completo += " " + self.df[col].fillna('').astype(str).str.cat(sep=' ')
@@ -816,202 +563,103 @@ class DataAnalyzer:
                            if pal not in PORTUGUESE_STOP_WORDS and cnt > 2]
             
             if temas_comuns:
-                sugestoes_inteligentes.append(f"🔍 **Foco Temático Principal**: {', '.join(temas_comuns[:3])}")
-                
-                # Identificar possíveis lacunas
-                temas_emergentes = ['blockchain', 'sustentabilidade', 'inteligência artificial', 'transformação digital', 'inovação aberta']
-                lacunas_identificadas = [tema for tema in temas_emergentes if tema not in ' '.join(temas_comuns).lower()]
-                if lacunas_identificadas:
-                    sugestoes_inteligentes.append(f"🌱 **Temas Emergentes para Explorar**: {', '.join(lacunas_identificadas[:2])}")
+                sugestoes_inteligentes.append(f"🔍 **Foque em**: {', '.join(temas_comuns[:3])}")
         
-        # 5. Estratégias baseadas no tamanho da base
+        # 5. Sugestões baseadas no tamanho
         if total_registros < 15:
             sugestoes_inteligentes.extend([
-                "📥 **Expansão de Dados**: Mínimo 20-30 registros para análises estatísticas confiáveis",
-                "🔎 **Busca Estratégica**: Use a busca integrada para encontrar trabalhos relacionados",
-                "🎯 **Foco Qualitativo**: Ideal para estudos de caso e análises qualitativas profundas"
+                "📥 **Colete mais dados** - Mínimo 20 registros para análises confiáveis",
+                "🔎 **Use busca integrada** - Encontre trabalhos relacionados na plataforma"
             ])
         elif total_registros < 50:
             sugestoes_inteligentes.extend([
-                "📊 **Análises Quantitativas Básicas**: Explore correlações e distribuições",
-                "🗺️ **Organização Conceitual**: Use o mapa mental para estruturar relações entre conceits",
-                "🤖 **Análise de IA**: Consulte o assistente para insights específicos"
+                "📊 **Análises básicas possíveis** - Explore gráficos e estatísticas",
+                "🗺️ **Organize conceitos** - Use o mapa mental para estruturar ideias"
             ])
         else:
             sugestoes_inteligentes.extend([
-                "📈 **Análises Avançadas**: Dados suficientes para machine learning e redes complexas",
-                "🌐 **Exploração de Redes**: Identifique clusters e padrões de colaboração",
-                "📋 **Metanálise**: Considere análise comparativa entre diferentes períodos/regiões"
+                "📈 **Análises avançadas** - Dados suficientes para ML e redes complexas",
+                "🌐 **Explore colaborações** - Identifique redes de coautoria"
             ])
         
-        # 6. Análise de qualidade dos dados
-        missing_data = self.df.isna().sum().sum()
-        missing_percent = (missing_data / self.df.size) * 100
-        
-        if missing_percent > 20:
-            sugestoes_inteligentes.append("🔄 **Qualidade de Dados**: Alta taxa de dados ausentes - considere completar informações faltantes")
-        elif missing_percent > 10:
-            sugestoes_inteligentes.append("✅ **Qualidade Adequada**: Boa completude dos dados")
-        else:
-            sugestoes_inteligentes.append("🏆 **Excelente Qualidade**: Dados muito completos - ideal para análises complexas")
-        
         # Formatar resposta
-        text += "**🎯 Recomendações Estratégicas Baseadas na Sua Pesquisa:**\n\n"
+        text += "**Sugestões Inteligentes Baseadas na Sua Planilha:**\n\n"
         for i, sugestao in enumerate(sugestoes_inteligentes, 1):
             text += f"{i}. {sugestao}\n"
         
-        text += f"\n**📋 Resumo da Base de Dados:**\n"
-        text += f"• **Registros**: {total_registros} "
-        if total_registros < 20:
-            text += "(Base em desenvolvimento)\n"
-        elif total_registros < 50:
-            text += "(Base consolidada)\n"
-        else:
-            text += "(Base robusta)\n"
-            
-        text += f"• **Completude**: {completude:.1f}%\n"
+        text += f"\n**Resumo da Base:**\n"
+        text += f"• Registros: {total_registros}\n"
+        text += f"• Completude: {completude:.1f}%\n"
         if author_col:
-            text += f"• **Coluna autores**: '{author_col}'\n"
+            text += f"• Coluna autores: '{author_col}'\n"
         if year_col:
-            text += f"• **Coluna anos**: '{year_col}'\n"
-        text += f"• **Dados ausentes**: {missing_percent:.1f}%\n"
-        
-        return text
-
-    def _personalized_recommendations(self):
-        """Recomendações personalizadas baseadas no perfil do usuário"""
-        text = "### 🎯 Plano de Ação Personalizado\n\n"
-        
-        recommendations = []
-        
-        # Análise do perfil de pesquisa
-        if len(self.df) < 20:
-            recommendations.extend([
-                "**Fase Inicial**: Comece expandindo sua base para 30+ registros para análises mais confiáveis",
-                "**Busca Estratégica**: Use a aba de recomendações para encontrar trabalhos fundamentais na sua área",
-                "**Mapeamento Conceitual**: Utilize o mapa mental para organizar os conceitos centrais da sua pesquisa"
-            ])
-        
-        # Análise de colaboração
-        author_col = next((col for col in self.df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
-        if author_col:
-            autores_unicos = set()
-            for authors_str in self.df[author_col].dropna():
-                if isinstance(authors_str, str):
-                    authors = re.split(r'[;,]', authors_str)
-                    for author in authors:
-                        if author.strip():
-                            autores_unicos.add(author.strip())
-            
-            if len(autores_unicos) < 5:
-                recommendations.append("**Rede de Colaboração**: Busque colaborar com 2-3 novos pesquisadores na sua próxima pesquisa")
-        
-        # Análise temporal
-        year_col = next((col for col in self.df.columns if 'ano' in col.lower() or 'year' in col.lower()), None)
-        if year_col:
-            try:
-                anos = pd.to_numeric(self.df[year_col], errors='coerce').dropna()
-                if len(anos) > 0:
-                    max_year = anos.max()
-                    current_year = datetime.now().year
-                    if max_year < current_year - 3:
-                        recommendations.append("**Atualização Temporal**: Inclua trabalhos dos últimos 2-3 anos para manter a relevância")
-            except:
-                pass
-        
-        # Recomendações gerais baseadas no tamanho
-        if len(self.df) >= 30:
-            recommendations.extend([
-                "**Análise Avançada**: Use a análise de IA para explorar correlações e padrões complexos",
-                "**Visualização**: Crie gráficos de rede para visualizar colaborações entre autores",
-                "**Metodologia**: Considere aplicar análise de conteúdo aos resumos dos trabalhos"
-            ])
-        
-        if recommendations:
-            for i, rec in enumerate(recommendations, 1):
-                text += f"{i}. {rec}\n"
-        else:
-            text += "✅ Sua pesquisa está bem estruturada! Continue explorando as funcionalidades da plataforma para insights adicionais.\n"
-        
-        text += "\n**🚀 Próximos Passos Imediatos**:\n"
-        text += "• Use o assistente de IA para perguntas específicas sobre sua planilha\n"
-        text += "• Explore a aba de recomendações para trabalhos relacionados\n"
-        text += "• Organize seus insights no mapa mental interativo\n"
-        text += "• Consulte a análise gráfica para visualizações dos dados\n"
+            text += f"• Coluna anos: '{year_col}'\n"
         
         return text
 
 # -------------------------
-# SISTEMA DE IA SUPER INTELIGENTE E PERSONALIZADO
+# SISTEMA DE IA INTELIGENTE MELHORADO
 # -------------------------
-def get_ai_assistant_response(question, context, user_data=None):
-    """Assistente de IA SUPER INTELIGENTE - Respostas precisas e personalizadas"""
+def get_ai_assistant_response(question, context):
+    """Assistente de IA SUPER INTELIGENTE - Responde qualquer tipo de pergunta"""
     
     question_lower = question.lower().strip()
     df = context.df
     
-    # Análise do contexto da pergunta
-    question_type = _classify_question(question_lower)
-    user_profile = context.user_profile if hasattr(context, 'user_profile') else {}
+    # PERGUNTAS SOBRE AUTORES
+    if any(word in question_lower for word in ['autor', 'autores', 'pesquisador', 'escritor', 'quem escreveu', 'quem publicou']):
+        return _analyze_authors(df, question_lower)
     
-    # Resposta baseada no tipo de pergunta e perfil do usuário
-    if question_type == "authors":
-        return _analyze_authors_advanced(df, question_lower, user_profile)
-    elif question_type == "geography":
-        return _analyze_geography_advanced(df, question_lower, user_profile)
-    elif question_type == "temporal":
-        return _analyze_temporal_advanced(df, question_lower, user_profile)
-    elif question_type == "thematic":
-        return _analyze_themes_advanced(df, question_lower, user_profile)
-    elif question_type == "collaboration":
-        return _analyze_collaborations_advanced(df, question_lower, user_profile)
-    elif question_type == "statistics":
-        return _analyze_statistics_advanced(df, question_lower, user_profile)
-    elif question_type == "trends":
-        return _analyze_trends_advanced(df, question_lower, user_profile)
-    elif question_type == "suggestions":
-        return _provide_personalized_suggestions(df, question_lower, user_profile)
-    elif question_type == "quality":
-        return _analyze_data_quality_advanced(df, question_lower, user_profile)
-    else:
-        return _comprehensive_analysis_response(df, question, user_profile)
-
-def _classify_question(question):
-    """Classifica o tipo de pergunta para resposta mais precisa"""
-    question = question.lower()
+    # PERGUNTAS SOBRE PAÍSES/GEOGRAFIA
+    elif any(word in question_lower for word in ['país', 'países', 'geográfica', 'geografia', 'distribuição', 'local', 'região', 'onde']):
+        return _analyze_geography(df, question_lower)
     
-    if any(word in question for word in ['autor', 'autores', 'pesquisador', 'quem escreveu', 'quem publicou']):
-        return "authors"
-    elif any(word in question for word in ['país', 'países', 'geográfica', 'geografia', 'local', 'região', 'onde']):
-        return "geography"
-    elif any(word in question for word in ['ano', 'anos', 'temporal', 'evolução', 'cronologia', 'quando', 'período']):
-        return "temporal"
-    elif any(word in question for word in ['tema', 'temas', 'conceito', 'palavras', 'frequentes', 'termos', 'assuntos']):
-        return "thematic"
-    elif any(word in question for word in ['colaboração', 'colaborações', 'coautoria', 'parceria', 'trabalho conjunto']):
-        return "collaboration"
-    elif any(word in question for word in ['estatística', 'estatísticas', 'números', 'quantidade', 'total', 'quantos']):
-        return "statistics"
-    elif any(word in question for word in ['tendência', 'tendências', 'futuro', 'emergente', 'novo', 'recente']):
-        return "trends"
-    elif any(word in question for word in ['sugestão', 'sugestões', 'recomendação', 'recomendações', 'o que fazer', 'próximo passo']):
-        return "suggestions"
-    elif any(word in question for word in ['qualidade', 'completude', 'dados faltantes', 'melhorar']):
-        return "quality"
+    # PERGUNTAS SOBRE TEMPO/EVOLUÇÃO
+    elif any(word in question_lower for word in ['ano', 'anos', 'temporal', 'evolução', 'cronologia', 'linha do tempo', 'como evoluiu', 'quando', 'período']):
+        return _analyze_temporal(df, question_lower)
+    
+    # PERGUNTAS SOBRE TEMAS/CONCEITOS
+    elif any(word in question_lower for word in ['tema', 'temas', 'conceito', 'conceitos', 'palavras', 'frequentes', 'termos', 'assuntos', 'palavras-chave', 'keywords']):
+        return _analyze_themes(df, question_lower)
+    
+    # PERGUNTAS SOBRE COLABORAÇÕES
+    elif any(word in question_lower for word in ['colaboração', 'colaborações', 'coautoria', 'parceria', 'trabalho conjunto', 'rede']):
+        return _analyze_collaborations(df, question_lower)
+    
+    # PERGUNTAS SOBRE ESTATÍSTICAS GERAIS
+    elif any(word in question_lower for word in ['estatística', 'estatísticas', 'números', 'quantidade', 'total', 'quantos', 'resumo', 'visão geral']):
+        return _analyze_statistics(df, question_lower)
+    
+    # PERGUNTAS SOBRE TENDÊNCIAS
+    elif any(word in question_lower for word in ['tendência', 'tendências', 'futuro', 'emergente', 'novo', 'recente']):
+        return _analyze_trends(df, question_lower)
+    
+    # PERGUNTAS COMPLEXAS/ANÁLISE
+    elif any(word in question_lower for word in ['análise', 'analisar', 'insight', 'interpretação', 'o que significa', 'significado']):
+        return _analyze_complex_questions(df, question_lower)
+    
+    # SUGESTÕES
+    elif any(word in question_lower for word in ['sugestão', 'sugestões', 'recomendação', 'recomendações', 'o que fazer', 'próximo passo', 'como melhorar']):
+        return _provide_suggestions(df, question_lower)
+    
+    # PERGUNTAS SOBRE A BASE DE DADOS
+    elif any(word in question_lower for word in ['dados', 'base de dados', 'planilha', 'dataset', 'qualidade']):
+        return _analyze_data_quality(df, question_lower)
+    
+    # RESPOSTA PADRÃO PARA PERGUNTAS NÃO IDENTIFICADAS
     else:
-        return "comprehensive"
+        return _general_analysis_response(df, question)
 
-def _analyze_authors_advanced(df, question, user_profile):
-    """Análise avançada de autores com recomendações personalizadas"""
+def _analyze_authors(df, question):
+    """Análise avançada de autores"""
     author_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
     
     if not author_col:
-        return "**❌ Análise de Autores**: Não encontrei coluna de autores na sua planilha.\n\n**💡 Sugestão Prática**: Adicione uma coluna 'autores' no formato 'Nome1; Nome2; Nome3' para habilitar análises de colaboração."
-
+        return "**❌ Autores**: Não encontrei coluna de autores na planilha."
+    
     autores_contagem = {}
     colaboracoes = 0
     autores_por_trabalho = []
-    network_connections = []
     
     for authors_str in df[author_col].dropna():
         if isinstance(authors_str, str):
@@ -1022,264 +670,172 @@ def _analyze_authors_advanced(df, question, user_profile):
             
             if len(autores_lista) > 1:
                 colaboracoes += 1
-                # Registrar conexões para análise de rede
-                for i in range(len(autores_lista)):
-                    for j in range(i+1, len(autores_lista)):
-                        network_connections.append((autores_lista[i], autores_lista[j]))
             
             for autor in autores_lista:
                 autores_contagem[autor] = autores_contagem.get(autor, 0) + 1
     
     if not autores_contagem:
-        return "**⚠️ Autores**: Coluna encontrada mas não consegui extrair nomes válidos.\n\n**🔧 Correção Rápida**: Verifique se os nomes estão no formato 'Sobrenome, Nome' ou 'Nome Sobrenome' separados por ponto e vírgula."
-
+        return "**⚠️ Autores**: Coluna encontrada mas não consegui extrair nomes válidos."
+    
     autores_ordenados = sorted(autores_contagem.items(), key=lambda x: x[1], reverse=True)
     total_autores = len(autores_contagem)
     total_trabalhos = len(df[author_col].dropna())
     media_autores = np.mean(autores_por_trabalho) if autores_por_trabalho else 0
-    taxa_colaboracao = (colaboracoes / total_trabalhos) * 100 if total_trabalhos > 0 else 0
-
-    resposta = "**👥 ANÁLISE AVANÇADA DE AUTORES**\n\n"
     
-    # Métricas principais
-    resposta += f"**📊 Métricas Principais**:\n"
-    resposta += f"• **Autores únicos**: {total_autores}\n"
-    resposta += f"• **Trabalhos analisados**: {total_trabalhos}\n"
-    resposta += f"• **Média de autores/trabalho**: {media_autores:.1f}\n"
-    resposta += f"• **Taxa de colaboração**: {taxa_colaboracao:.1f}%\n\n"
-
-    # Top autores
-    resposta += "**🏆 Top 8 Autores Mais Produtivos**:\n"
-    for i, (autor, count) in enumerate(autores_ordenados[:8], 1):
-        produtividade = "🔥" if count >= 10 else "⭐" if count >= 5 else "🔹"
-        resposta += f"{i}. {produtividade} **{autor}** - {count} publicação(ões)\n"
+    resposta = "**👥 ANÁLISE DE AUTORES**\n\n"
+    resposta += f"**Total de autores únicos**: {total_autores}\n"
+    resposta += f"**Total de trabalhos com autores**: {total_trabalhos}\n"
+    resposta += f"**Média de autores por trabalho**: {media_autores:.1f}\n"
+    resposta += f"**Taxa de colaboração**: {(colaboracoes/total_trabalhos)*100:.1f}%\n\n"
     
-    # Análise de rede se houver colaborações
-    if network_connections:
-        from collections import Counter
-        pair_counts = Counter(network_connections)
-        top_pairs = pair_counts.most_common(3)
-        
-        resposta += "\n**🤝 Parcerias Mais Fortes**:\n"
-        for (autor1, autor2), count in top_pairs:
-            resposta += f"• **{autor1}** + **{autor2}**: {count} colaboração(ões)\n"
-
-    # Análise personalizada baseada no perfil
-    resposta += "\n**💡 ANÁLISE ESTRATÉGICA**:\n"
+    resposta += "**Top 10 autores mais produtivos:**\n"
+    for i, (autor, count) in enumerate(autores_ordenados[:10], 1):
+        resposta += f"{i}. **{autor}** - {count} publicação(ões)\n"
     
-    if taxa_colaboracao < 25:
-        resposta += "• **🎯 Oportunidade**: Baixa colaboração - considere parcerias para ampliar impacto\n"
-        resposta += "• **🚀 Ação Sugerida**: Busque 2-3 colaboradores para próximos projetos\n"
-    elif taxa_colaboracao > 60:
-        resposta += "• **🏆 Força**: Alta colaboração - excelente rede estabelecida\n"
-        resposta += "• **📈 Próximo Passo**: Aproveite para análises de rede avançadas\n"
-    else:
-        resposta += "• **✅ Situação**: Colaboração equilibrada - mantenha a diversidade\n"
-
-    if media_autores < 1.5:
-        resposta += "• **🔍 Padrão**: Predominância de trabalhos individuais\n"
-    elif media_autores > 3:
-        resposta += "• **👥 Característica**: Equipes grandes - ideal para projetos complexos\n"
-
-    # Recomendações específicas baseadas na pergunta
-    if 'produt' in question:
-        resposta += f"\n**📈 Autor Mais Produtivo**: {autores_ordenados[0][0]} com {autores_ordenados[0][1]} publicações\n"
+    # Análises específicas baseadas na pergunta
+    if 'relevante' in question:
+        resposta += f"\n**💡 Autores mais relevantes**: {', '.join([autor for autor, _ in autores_ordenados[:5]])}"
     
-    if 'colabor' in question and network_connections:
-        resposta += f"\n**🔗 Rede de Colaboração**: {len(network_connections)} conexões identificadas\n"
-
+    if 'colaboração' in question:
+        resposta += f"\n**🤝 Colaborações**: {colaboracoes} trabalhos em coautoria"
+    
+    if 'produtivo' in question:
+        resposta += f"\n**🏆 Autor mais produtivo**: {autores_ordenados[0][0]} com {autores_ordenados[0][1]} publicações"
+    
     return resposta
 
-def _analyze_geography_advanced(df, question, user_profile):
-    """Análise geográfica avançada com insights estratégicos"""
+def _analyze_geography(df, question):
+    """Análise geográfica avançada"""
     country_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['país', 'pais', 'country', 'local'])), None)
     
     if not country_col:
-        return "**❌ Análise Geográfica**: Não encontrei coluna de países/regiões.\n\n**💡 Sugestão**: Adicione uma coluna 'país' ou 'localização' para análises de distribuição geográfica."
-
+        return "**❌ Geografia**: Não encontrei coluna de países/regiões."
+    
     paises = df[country_col].dropna()
     if paises.empty:
-        return "**⚠️ Geografia**: Coluna encontrada mas sem dados válidos.\n\n**🔧 Ação**: Verifique se a coluna contém nomes de países ou regiões."
-
+        return "**⚠️ Geografia**: Coluna encontrada mas sem dados válidos."
+    
     contagem_paises = paises.value_counts()
     total_paises = len(contagem_paises)
     total_registros = len(paises)
-    cobertura = (total_registros / len(df)) * 100
-
-    resposta = "**🌎 ANÁLISE GEOGRÁFICA AVANÇADA**\n\n"
     
-    resposta += f"**📈 Métricas de Distribuição**:\n"
-    resposta += f"• **Países/regiões únicos**: {total_paises}\n"
-    resposta += f"• **Registros com localização**: {total_registros}\n"
-    resposta += f"• **Cobertura geográfica**: {cobertura:.1f}% dos dados\n\n"
-
-    resposta += "**🗺️ Distribuição por Região**:\n"
-    for pais, count in contagem_paises.head(8).items():
+    resposta = "**🌎 ANÁLISE GEOGRÁFICA**\n\n"
+    resposta += f"**Total de países/regiões**: {total_paises}\n"
+    resposta += f"**Total de registros com localização**: {total_registros}\n"
+    resposta += f"**Diversidade geográfica**: {(total_paises/total_registros)*100:.1f}%\n\n"
+    
+    resposta += "**Distribuição geográfica:**\n"
+    for pais, count in contagem_paises.head(10).items():
         percentual = (count / total_registros) * 100
-        emoji = _get_country_emoji(pais)
-        resposta += f"{emoji} **{pais}**: {count} registro(s) ({percentual:.1f}%)\n"
-
-    # Análise de diversidade
-    diversidade = (total_paises / total_registros) * 100
+        resposta += f"• **{pais}**: {count} ({percentual:.1f}%)\n"
     
-    resposta += f"\n**🌐 Diversidade Geográfica**: {diversidade:.1f}%\n"
-
-    # Análise estratégica
-    resposta += "\n**💡 ANÁLISE ESTRATÉGICA**:\n"
+    # Análises específicas
+    if 'distribuição' in question:
+        pais_principal = contagem_paises.index[0]
+        percentual_principal = (contagem_paises.iloc[0] / total_registros) * 100
+        resposta += f"\n**🎯 Foco principal**: {pais_principal} concentra {percentual_principal:.1f}% da produção"
     
-    if total_paises == 1:
-        resposta += "• **🎯 Foco Geográfico**: Pesquisa concentrada em uma única região\n"
-        resposta += "• **🚀 Oportunidade**: Considere estudos comparativos internacionais\n"
-    elif total_paises <= 3:
-        resposta += "• **📍 Escopo Regional**: Foco em poucas regiões específicas\n"
-        resposta += "• **📈 Sugestão**: Expanda para 2-3 novas regiões geográficas\n"
-    elif total_paises <= 8:
-        resposta += "• **🌎 Escopo Multinacional**: Boa diversidade geográfica\n"
-        resposta += "• **🏆 Força**: Abrangência como diferencial competitivo\n"
-    else:
-        resposta += "• **🚀 Escopo Global**: Excelente cobertura internacional\n"
-        resposta += "• **🎯 Destaque**: Diversidade geográfica como vantagem estratégica\n"
-
-    if cobertura < 70:
-        resposta += f"• **⚠️ Atenção**: {100-cobertura:.1f}% dos registros sem localização\n"
-
-    # Insights específicos baseados na pergunta
-    if 'brasil' in question or 'brazil' in question:
-        brasil_count = contagem_paises.get('Brasil', contagem_paises.get('Brazil', 0))
-        if brasil_count > 0:
-            resposta += f"\n**🇧🇷 Foco no Brasil**: {brasil_count} trabalhos ({brasil_count/total_registros*100:.1f}% do total)"
-
+    if 'diversidade' in question:
+        if total_paises > 10:
+            resposta += f"\n**🌐 Alta diversidade**: Pesquisa com abrangência internacional ({total_paises} regiões)"
+        elif total_paises > 3:
+            resposta += f"\n**🎯 Diversidade moderada**: {total_paises} regiões principais"
+        else:
+            resposta += f"\n**📍 Foco concentrado**: Pesquisa concentrada em {total_paises} região(ões)"
+    
     return resposta
 
-def _get_country_emoji(country_name):
-    """Retorna emoji baseado no nome do país"""
-    country_str = str(country_name).lower()
-    emoji_map = {
-        'brasil': '🇧🇷', 'brazil': '🇧🇷',
-        'eua': '🇺🇸', 'usa': '🇺🇸', 'estados unidos': '🇺🇸',
-        'portugal': '🇵🇹', 'espanha': '🇪🇸', 'spanha': '🇪🇸',
-        'frança': '🇫🇷', 'franca': '🇫🇷', 'france': '🇫🇷',
-        'alemanha': '🇩🇪', 'germany': '🇩🇪',
-        'itália': '🇮🇹', 'italia': '🇮🇹', 'italy': '🇮🇹',
-        'china': '🇨🇳', 'japão': '🇯🇵', 'japao': '🇯🇵', 'japan': '🇯🇵'
-    }
-    
-    for key, emoji in emoji_map.items():
-        if key in country_str:
-            return emoji
-    
-    return '🌍'
-
-def _analyze_temporal_advanced(df, question, user_profile):
-    """Análise temporal avançada com tendências"""
+def _analyze_temporal(df, question):
+    """Análise temporal avançada"""
     year_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['ano', 'year', 'data'])), None)
     
     if not year_col:
-        return "**❌ Análise Temporal**: Não encontrei coluna temporal.\n\n**💡 Sugestão**: Adicione uma coluna 'ano' para análise de evolução e tendências."
-
+        return "**❌ Anos**: Não encontrei coluna temporal."
+    
     try:
         anos = pd.to_numeric(df[year_col], errors='coerce').dropna()
         if anos.empty:
-            return "**⚠️ Anos**: Coluna encontrada mas sem valores numéricos válidos.\n\n**🔧 Correção**: Certifique-se de que a coluna contém apenas anos (ex: 2020, 2021, 2022)."
+            return "**⚠️ Anos**: Coluna encontrada mas sem valores numéricos válidos."
         
         min_ano = int(anos.min())
         max_ano = int(anos.max())
         periodo = max_ano - min_ano
         anos_unicos = len(anos.unique())
-        current_year = datetime.now().year
         
-        resposta = "**📈 ANÁLISE TEMPORAL AVANÇADA**\n\n"
+        resposta = "**📈 ANÁLISE TEMPORAL**\n\n"
+        resposta += f"**Período analisado**: {min_ano} - {max_ano} ({periodo} anos)\n"
+        resposta += f"**Anos com registros**: {anos_unicos}\n"
+        resposta += f"**Total de registros temporais**: {len(anos)}\n\n"
         
-        resposta += f"**📊 Período Analisado**:\n"
-        resposta += f"• **Período**: {min_ano} - {max_ano} ({periodo} anos)\n"
-        resposta += f"• **Anos com registros**: {anos_unicos}\n"
-        resposta += f"• **Total de registros**: {len(anos)}\n\n"
-
-        contagem_por_ano = anos.value_counts().sort_index()
+        # Análise por década
+        if periodo > 10:
+            decadas = (anos // 10) * 10
+            contagem_decadas = decadas.value_counts().sort_index()
+            resposta += "**Distribuição por década:**\n"
+            for decada, count in contagem_decadas.items():
+                resposta += f"• **{int(decada)}s**: {int(count)} publicações\n"
         
         # Análise de tendência
+        contagem_por_ano = anos.value_counts().sort_index()
         if len(contagem_por_ano) > 3:
-            recent_threshold = current_year - 3
-            anos_recentes = contagem_por_ano[contagem_por_ano.index >= recent_threshold]
-            anos_anteriores = contagem_por_ano[contagem_por_ano.index < recent_threshold]
+            # Últimos 3 anos vs anteriores
+            anos_recentes = contagem_por_ano.tail(3)
+            anos_anteriores = contagem_por_ano.head(len(contagem_por_ano)-3)
             
-            if len(anos_recentes) > 0 and len(anos_anteriores) > 0:
-                media_recente = anos_recentes.mean()
-                media_anterior = anos_anteriores.mean()
-                
-                if media_anterior > 0:
-                    crescimento = ((media_recente - media_anterior) / media_anterior) * 100
-                    
-                    resposta += "**📈 Análise de Tendência**:\n"
-                    resposta += f"• **Média recente (últimos 3 anos)**: {media_recente:.1f} trabalhos/ano\n"
-                    resposta += f"• **Média anterior**: {media_anterior:.1f} trabalhos/ano\n"
-                    resposta += f"• **Taxa de crescimento**: {crescimento:+.1f}%\n\n"
-                    
-                    if crescimento > 20:
-                        resposta += "• **🚀 Tendência**: Crescimento significativo na produção recente\n"
-                    elif crescimento > 5:
-                        resposta += "• **↗️ Tendência**: Leve crescimento na produção\n"
-                    elif crescimento > -5:
-                        resposta += "• **➡️ Tendência**: Produção estável\n"
-                    else:
-                        resposta += "• **📉 Tendência**: Redução na produção recente\n"
-
+            media_recente = anos_recentes.mean()
+            media_anterior = anos_anteriores.mean() if len(anos_anteriores) > 0 else 0
+            
+            if media_recente > media_anterior * 1.3:
+                tendencia = "📈 **CRESCENTE** - Produção em crescimento"
+            elif media_recente < media_anterior * 0.7:
+                tendencia = "📉 **DECRESCENTE** - Produção reduzindo"
+            else:
+                tendencia = "➡️ **ESTÁVEL** - Produção constante"
+            
+            resposta += f"\n**Tendência**: {tendencia}"
+        
         # Ano mais produtivo
         if not contagem_por_ano.empty:
             ano_mais_produtivo = contagem_por_ano.idxmax()
             producao_pico = contagem_por_ano.max()
-            resposta += f"**🏆 Ano Mais Produtivo**: {int(ano_mais_produtivo)} ({producao_pico} publicações)\n\n"
-
-        # Análise estratégica
-        resposta += "**💡 INSIGHTS TEMPORAIS**:\n"
+            resposta += f"\n**🏆 Ano mais produtivo**: {int(ano_mais_produtivo)} ({producao_pico} publicações)"
         
-        if max_ano >= current_year - 1:
-            resposta += "• **✅ Atualidade**: Inclui trabalhos muito recentes - excelente!\n"
-        elif max_ano <= current_year - 5:
-            resposta += "• **⚠️ Atenção**: Últimos trabalhos têm mais de 5 anos - busque atualizar\n"
-        
-        if periodo < 3:
-            resposta += "• **🔍 Janela Temporal**: Período curto - ideal para análise pontual\n"
-        elif periodo > 10:
-            resposta += "• **📊 Força Temporal**: Período extenso - permite análise de longo prazo\n"
-
         return resposta
         
     except Exception as e:
-        return f"**❌ Erro na análise temporal**: {str(e)}\n\n**💡 Dica**: Verifique se a coluna de anos contém apenas números (ex: 2023, 2024)."
+        return f"**❌ Erro na análise temporal**: {str(e)}"
 
-def _analyze_themes_advanced(df, question, user_profile):
+def _analyze_themes(df, question):
     """Análise temática avançada"""
     texto_analise = ""
     colunas_texto = [col for col in df.columns if df[col].dtype == 'object']
     
-    for col in colunas_texto[:5]:
+    for col in colunas_texto[:5]:  # Analisar até 5 colunas de texto
         texto_analise += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
     
     if len(texto_analise.strip()) < 100:
-        return "**❌ Análise Temática**: Não há texto suficiente para análise temática.\n\n**💡 Sugestão**: Inclua colunas com títulos, resumos ou descrições."
-
+        return "**❌ Temas**: Não há texto suficiente para análise temática."
+    
+    # Análise avançada de palavras-chave
     palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_analise.lower())
     palavras_filtradas = [p for p in palavras if p not in PORTUGUESE_STOP_WORDS and len(p) > 3]
     
     if not palavras_filtradas:
         return "**🔍 Temas**: Texto analisado mas não identifiquei palavras-chave significativas."
-
+    
     from collections import Counter
     contador = Counter(palavras_filtradas)
     temas_comuns = contador.most_common(15)
     
-    resposta = "**🔤 ANÁLISE TEMÁTICA AVANÇADA**\n\n"
-    resposta += f"**📊 Estatísticas Textuais**:\n"
-    resposta += f"• **Total de palavras únicas**: {len(contador)}\n"
-    resposta += f"• **Texto analisado**: {len(texto_analise):,} caracteres\n\n"
+    resposta = "**🔤 ANÁLISE TEMÁTICA**\n\n"
+    resposta += f"**Total de palavras únicas**: {len(contador)}\n"
+    resposta += f"**Texto analisado**: {len(texto_analise):,} caracteres\n\n"
     
-    resposta += "**🎯 Palavras-chave Mais Frequentes:**\n"
+    resposta += "**Palavras-chave mais frequentes:**\n"
     for i, (tema, count) in enumerate(temas_comuns[:12], 1):
-        importancia = "🔥" if count >= 10 else "⭐" if count >= 5 else "🔹"
-        resposta += f"{i}. {importancia} **{tema}** - {count} ocorrências\n"
+        resposta += f"{i}. **{tema}** - {count} palavras repetidas\n"
     
-    # Análise de conceitos relacionados
+    # Análise de bigramas (palavras que aparecem juntas)
     if len(palavras_filtradas) > 10:
         bigramas = []
         for i in range(len(palavras_filtradas)-1):
@@ -1290,37 +846,27 @@ def _analyze_themes_advanced(df, question, user_profile):
         bigramas_comuns = contador_bigramas.most_common(8)
         
         if bigramas_comuns:
-            resposta += "\n**🔗 Conceitos Relacionados (Bigramas):**\n"
+            resposta += "\n**Conceitos relacionados (bigramas):**\n"
             for bigrama, count in bigramas_comuns[:6]:
                 resposta += f"• **{bigrama}** ({count})\n"
     
-    # Temas emergentes
+    # Temas emergentes (palavras menos frequentes mas significativas)
     temas_emergentes = [tema for tema, count in temas_comuns[8:15] if count >= 2]
     if temas_emergentes:
-        resposta += f"\n**💡 Temas Emergentes**: {', '.join(temas_emergentes[:5])}"
+        resposta += f"\n**💡 Temas emergentes**: {', '.join(temas_emergentes[:5])}"
     
-    # Análise estratégica
-    resposta += "\n\n**💡 INSIGHTS TEMÁTICOS**:\n"
-    if len(contador) > 50:
-        resposta += "• **🌐 Diversidade**: Amplo espectro temático - boa variedade de tópicos\n"
-    elif len(contador) > 20:
-        resposta += "• **🎯 Foco**: Temas bem definidos - pesquisa concentrada\n"
-    else:
-        resposta += "• **🔍 Especialização**: Foco muito específico - considere ampliar horizontes\n"
-
     return resposta
 
-def _analyze_collaborations_advanced(df, question, user_profile):
-    """Análise de colaborações avançada"""
+def _analyze_collaborations(df, question):
+    """Análise de colaborações"""
     author_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
     
     if not author_col:
-        return "**❌ Colaborações**: Não encontrei dados de autores para análise.\n\n**💡 Sugestão**: Adicione uma coluna 'autores' para habilitar análises de colaboração."
-
+        return "**❌ Colaborações**: Não encontrei dados de autores para análise."
+    
     colaboracoes = 0
     total_trabalhos = 0
     autores_por_trabalho = []
-    network_data = []
     
     for authors_str in df[author_col].dropna():
         if isinstance(authors_str, str):
@@ -1331,63 +877,44 @@ def _analyze_collaborations_advanced(df, question, user_profile):
             
             if num_autores > 1:
                 colaboracoes += 1
-                # Coletar dados para análise de rede
-                autores_validos = [a.strip() for a in autores if a.strip()]
-                network_data.append(autores_validos)
     
     if total_trabalhos == 0:
         return "**⚠️ Colaborações**: Sem dados válidos para análise."
-
+    
     taxa_colaboracao = (colaboracoes / total_trabalhos) * 100
     media_autores = np.mean(autores_por_trabalho)
     
-    resposta = "**🤝 ANÁLISE DE COLABORAÇÕES AVANÇADA**\n\n"
-    resposta += f"**📊 Métricas de Colaboração**:\n"
-    resposta += f"• **Total de trabalhos analisados**: {total_trabalhos}\n"
-    resposta += f"• **Trabalhos em colaboração**: {colaboracoes}\n"
-    resposta += f"• **Taxa de colaboração**: {taxa_colaboracao:.1f}%\n"
-    resposta += f"• **Média de autores por trabalho**: {media_autores:.1f}\n\n"
+    resposta = "**🤝 ANÁLISE DE COLABORAÇÕES**\n\n"
+    resposta += f"**Total de trabalhos analisados**: {total_trabalhos}\n"
+    resposta += f"**Trabalhos em colaboração**: {colaboracoes}\n"
+    resposta += f"**Taxa de colaboração**: {taxa_colaboracao:.1f}%\n"
+    resposta += f"**Média de autores por trabalho**: {media_autores:.1f}\n\n"
     
-    # Análise de perfil colaborativo
-    resposta += "**🔍 Perfil de Colaboração**:\n"
+    # Classificação do nível de colaboração
     if taxa_colaboracao > 60:
-        resposta += "• **🏆 Colaborador Intenso**: Alta taxa de trabalhos em equipe\n"
-        resposta += "• **💡 Força**: Excelente rede de colaboração estabelecida\n"
-        resposta += "• **🚀 Próximo Passo**: Explore análises de rede complexas\n"
+        resposta += "**🎯 Alto nível de colaboração** - Pesquisa fortemente colaborativa"
     elif taxa_colaboracao > 30:
-        resposta += "• **🤝 Colaborador Moderado**: Bom equilíbrio entre trabalho individual e em grupo\n"
-        resposta += "• **📈 Oportunidade**: Pode expandir ainda mais as colaborações\n"
-        resposta += "• **💡 Sugestão**: Identifique pesquisadores complementares\n"
+        resposta += "**🤝 Bom nível de colaboração** - Equilíbrio entre trabalho individual e em grupo"
     else:
-        resposta += "• **🔬 Pesquisador Independente**: Predominância de trabalho individual\n"
-        resposta += "• **🎯 Oportunidade**: Considere oportunidades de colaboração\n"
-        resposta += "• **🚀 Ação**: Busque 1-2 colaborações para próximos projetos\n"
-
-    # Análise de tamanho de equipes
-    team_sizes = Counter(autores_por_trabalho)
-    resposta += f"\n**👥 Distribuição de Tamanho de Equipes**:\n"
-    for size, count in team_sizes.most_common():
-        percentage = (count / total_trabalhos) * 100
-        resposta += f"- **{size} autor(es)**: {count} trabalho(s) ({percentage:.1f}%)\n"
-
+        resposta += "**💡 Oportunidade para colaboração** - Predominância de trabalho individual"
+    
     return resposta
 
-def _analyze_statistics_advanced(df, question, user_profile):
-    """Análise estatística avançada"""
+def _analyze_statistics(df, question):
+    """Análise estatística geral"""
     total_registros = len(df)
     total_colunas = len(df.columns)
     
     colunas_numericas = df.select_dtypes(include=[np.number]).columns.tolist()
     colunas_texto = df.select_dtypes(include=['object']).columns.tolist()
     
-    resposta = "**📊 ESTATÍSTICAS AVANÇADAS**\n\n"
-    resposta += f"**📈 Visão Geral**:\n"
-    resposta += f"• **Total de registros**: {total_registros}\n"
-    resposta += f"• **Total de colunas**: {total_colunas}\n"
-    resposta += f"• **Colunas numéricas**: {len(colunas_numericas)}\n"
-    resposta += f"• **Colunas de texto**: {len(colunas_texto)}\n\n"
+    resposta = "**📊 ESTATÍSTICAS GERAIS**\n\n"
+    resposta += f"**Total de registros**: {total_registros}\n"
+    resposta += f"**Total de colunas**: {total_colunas}\n"
+    resposta += f"**Colunas numéricas**: {len(colunas_numericas)}\n"
+    resposta += f"**Colunas de texto**: {len(colunas_texto)}\n\n"
     
-    # Análise de completude
+    # Completude dos dados
     colunas_principais = ['autor', 'ano', 'título', 'resumo']
     colunas_presentes = []
     
@@ -1396,40 +923,26 @@ def _analyze_statistics_advanced(df, question, user_profile):
             colunas_presentes.append(col)
     
     completude = (len(colunas_presentes) / len(colunas_principais)) * 100
-    resposta += f"**📋 Completude dos Metadados**:\n"
-    resposta += f"• **Pontuação**: {completude:.1f}%\n"
-    resposta += f"• **Metadados presentes**: {', '.join(colunas_presentes) if colunas_presentes else 'Nenhum'}\n\n"
-    
-    # Análise de qualidade
-    missing_percent = (df.isna().sum().sum() / df.size) * 100
-    resposta += f"**✅ Qualidade dos Dados**:\n"
-    resposta += f"• **Dados ausentes**: {missing_percent:.1f}%\n"
-    
-    if missing_percent < 10:
-        resposta += "• **🏆 Excelente**: Dados muito completos\n"
-    elif missing_percent < 20:
-        resposta += "• **✅ Bom**: Boa qualidade geral\n"
-    else:
-        resposta += "• **⚠️ Atenção**: Considere completar dados faltantes\n"
+    resposta += f"**Completude dos metadados**: {completude:.1f}%\n"
+    resposta += f"**Metadados presentes**: {', '.join(colunas_presentes) if colunas_presentes else 'Nenhum'}\n\n"
     
     # Tamanho da base
-    resposta += f"\n**🚀 Capacidade Analítica**:\n"
     if total_registros < 20:
-        resposta += "• **🔬 Fase Inicial**: Ideal para análises qualitativas e exploratórias\n"
+        resposta += "**📈 Tamanho**: Base pequena - considere expandir para análises mais robustas"
     elif total_registros < 50:
-        resposta += "• **📈 Fase Intermediária**: Boa para análises estatísticas básicas\n"
+        resposta += "**📈 Tamanho**: Base média - adequada para análises básicas"
     elif total_registros < 100:
-        resposta += "• **📊 Fase Avançada**: Adequada para análises complexas\n"
+        resposta += "**📈 Tamanho**: Base boa - permite análises detalhadas"
     else:
-        resposta += "• **🚀 Fase Expert**: Excelente para machine learning e análises preditivas\n"
-
+        resposta += "**📈 Tamanho**: Base excelente - ideal para análises complexas"
+    
     return resposta
 
-def _analyze_trends_advanced(df, question, user_profile):
-    """Análise de tendências avançada"""
+def _analyze_trends(df, question):
+    """Análise de tendências"""
     year_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['ano', 'year'])), None)
     
-    resposta = "**🚀 ANÁLISE DE TENDÊNCIAS E OPORTUNIDADES**\n\n"
+    resposta = "**🚀 ANÁLISE DE TENDÊNCIAS**\n\n"
     
     if year_col:
         try:
@@ -1437,14 +950,12 @@ def _analyze_trends_advanced(df, question, user_profile):
             if len(anos) > 5:
                 anos_recentes = anos[anos >= anos.max() - 5]
                 if len(anos_recentes) > 0:
-                    resposta += f"**📊 Foco Temporal Recente**:\n"
-                    resposta += f"• **Produção nos últimos 5 anos**: {len(anos_recentes)} trabalhos\n"
-                    resposta += f"• **Percentual da produção total**: {(len(anos_recentes)/len(anos))*100:.1f}%\n\n"
+                    resposta += f"**Foco recente**: {len(anos_recentes)} publicações nos últimos 5 anos\n\n"
         
         except:
             pass
     
-    # Análise de temas emergentes
+    # Análise de temas emergentes (simplificada)
     texto_analise = ""
     for col in df.select_dtypes(include=['object']).columns[:3]:
         texto_analise += " " + df[col].fillna('').astype(str).str.cat(sep=' ')
@@ -1455,198 +966,183 @@ def _analyze_trends_advanced(df, question, user_profile):
         
         from collections import Counter
         contador = Counter(palavras_filtradas)
-        temas_tendencia = [pal for pal, cnt in contador.most_common(15) if cnt >= 2]
+        temas_tendencia = [pal for pal, cnt in contador.most_common(10) if cnt >= 3]
         
         if temas_tendencia:
-            resposta += "**🔍 Temas em Destaque:**\n"
-            for i, tema in enumerate(temas_tendencia[:8], 1):
-                resposta += f"{i}. {tema}\n"
+            resposta += "**Temas em destaque:**\n"
+            for tema in temas_tendencia[:5]:
+                resposta += f"• {tema}\n"
     
-    # Identificação de oportunidades
-    resposta += "\n**💡 OPORTUNIDADES IDENTIFICADAS**:\n"
+    resposta += "\n**💡 Para análises mais profundas:**\n"
+    resposta += "- Use a aba 'Análise' para gráficos detalhados\n"
+    resposta += "- Explore o mapa mental para conexões entre conceitos\n"
+    resposta += "- Consulte as recomendações para trabalhos relacionados"
     
-    # Verificar se há dados de colaboração internacional
-    country_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['país', 'pais', 'country'])), None)
-    if country_col:
-        paises = df[country_col].dropna()
-        if len(paises) > 0:
-            unique_countries = len(paises.value_counts())
-            if unique_countries <= 2:
-                resposta += "• **🌎 Expansão Internacional**: Oportunidade para colaborações internacionais\n"
-    
-    # Verificar diversidade temática
-    if len(texto_analise) > 1000:
-        palavras_unicas = len(set(re.findall(r'\b[a-zà-ú]{5,}\b', texto_analise.lower())))
-        if palavras_unicas < 30:
-            resposta += "• **🔍 Ampliação Temática**: Considere explorar novos tópicos relacionados\n"
-    
-    resposta += "\n**🎯 PRÓXIMOS PASSOS SUGERIDOS**:\n"
-    resposta += "- Use a aba 'Análise' para gráficos detalhados das tendências\n"
-    resposta += "- Explore o mapa mental para conectar conceitos emergentes\n"
-    resposta += "- Consulte as recomendações para trabalhos relacionados\n"
-    resposta += "- Use o assistente de IA para análises específicas\n"
-
     return resposta
 
-def _provide_personalized_suggestions(df, question, user_profile):
-    """Sugestões personalizadas baseadas na análise completa"""
-    total = len(df)
+def _analyze_complex_questions(df, question):
+    """Resposta para perguntas complexas de análise"""
+    resposta = "**🔍 ANÁLISE COMPLEXA**\n\n"
     
-    resposta = "**💡 RECOMENDAÇÕES PERSONALIZADAS**\n\n"
+    # Análise multidimensional baseada na pergunta
+    if any(word in question for word in ['correlação', 'relação', 'associação']):
+        resposta += "Para análise de correlações entre variáveis, sugiro:\n"
+        resposta += "1. Verifique se há colunas numéricas na sua planilha\n"
+        resposta += "2. Use a aba 'Análise' para visualizar correlações\n"
+        resposta += "3. Considere adicionar mais dados para análises estatísticas\n"
     
-    # Análise da base
-    if total < 20:
-        resposta += "**🎯 FASE INICIAL - Estratégias Recomendadas:**\n"
-        resposta += "• **Expansão de Dados**: Alcance 30+ registros para análises estatísticas confiáveis\n"
-        resposta += "• **Busca Direcionada**: Use termos específicos na aba de recomendações\n"
-        resposta += "• **Mapeamento Conceitual**: Organize ideias no mapa mental para clareza\n"
-        resposta += "• **Foco Qualitativo**: Aprofunde em estudos de caso com os dados atuais\n\n"
-    
-    elif total < 50:
-        resposta += "**📈 FASE DE CONSOLIDAÇÃO - Próximos Passos:**\n"
-        resposta += "• **Análise de Correlação**: Explore relações entre variáveis na aba de gráficos\n"
-        resposta += "• **Refinamento Temático**: Use a análise de IA para identificar subtemas\n"
-        resposta += "• **Expansão Colaborativa**: Busque parcerias com base no perfil de autores\n"
-        resposta += "• **Visualização Avançada**: Crie gráficos de rede para colaborações\n\n"
+    elif any(word in question for word in ['padrão', 'padrões', 'comportamento']):
+        resposta += "**Identificação de Padrões**:\n"
+        resposta += "- Padrões temporais: Evolução ao longo dos anos\n"
+        resposta += "- Padrões geográficos: Distribuição por regiões\n"
+        resposta += "- Padrões de colaboração: Redes entre autores\n"
+        resposta += "- Padrões temáticos: Frequência de conceitos\n\n"
+        resposta += "**Use as ferramentas disponíveis**:\n"
+        resposta += "• Gráficos na aba 'Análise'\n"
+        resposta += "• Mapa mental para conexões conceituais\n"
+        resposta += "• Busca inteligente para comparações"
     
     else:
-        resposta += "**🚀 FASE AVANÇADA - Oportunidades:**\n"
-        resposta += "• **Análise Preditiva**: Explore padrões com machine learning\n"
-        resposta += "• **Metanálise**: Compare diferentes períodos/regiões\n"
-        resposta += "• **Análise de Rede Completa**: Mapeie toda a rede de colaboração\n"
-        resposta += "• **Identificação de Lacunas**: Use IA para sugerir novas direções\n\n"
-
-    # Análise de qualidade
-    missing_percent = (df.isna().sum().sum() / df.size) * 100
-    if missing_percent > 15:
-        resposta += f"**🔄 MELHORIA DE QUALIDADE**:\n"
-        resposta += f"• **Dados Ausentes**: {missing_percent:.1f}% - complete informações faltantes\n"
-        resposta += "• **Padronização**: Verifique formatos de datas e nomes\n"
-        resposta += "• **Metadados**: Adicione resumos e palavras-chave quando possível\n\n"
-
-    # Sugestões baseadas no perfil
-    if 'próximo' in question or 'futuro' in question:
-        resposta += "**🔮 DIREÇÕES FUTURAS SUGERIDAS:**\n"
-        resposta += "• **Exploração de Novos Temas**: Use a análise temática para identificar áreas emergentes\n"
-        resposta += "• **Colaborações Estratégicas**: Identifique pesquisadores complementares\n"
-        resposta += "• **Análise Comparativa**: Compare sua pesquisa com tendências globais\n"
-        resposta += "• **Síntese de Conhecimento**: Use o mapa mental para integrar descobertas\n"
-
-    resposta += "\n**🛠️ FERRAMENTAS RECOMENDADAS AGORA:**\n"
-    resposta += "• **Assistente de IA**: Para perguntas específicas sobre seus dados\n"
-    resposta += "• **Mapa Mental**: Para organizar e conectar conceitos\n"
-    resposta += "• **Análise Gráfica**: Para visualizações e correlações\n"
-    resposta += "• **Sistema de Busca**: Para encontrar referências relacionadas\n"
-
+        resposta += "**Análise Inteligente dos Seus Dados**:\n\n"
+        
+        # Análise rápida da base
+        total = len(df)
+        if total < 30:
+            resposta += "📋 **Base em desenvolvimento** - Ideal para explorar direções iniciais\n"
+        elif total < 100:
+            resposta += "📊 **Base consolidada** - Permite análises confiáveis\n"
+        else:
+            resposta += "🚀 **Base robusta** - Excelente para análises complexas e dados estruturados\n"
+        
+        resposta += "\n**💡 Para análises específicas, pergunte sobre**:\n"
+        resposta += "- Autores e colaborações\n"
+        resposta += "- Distribuição temporal\n"
+        resposta += "- Padrões geográficos\n"
+        resposta += "- Temas e conceitos frequentes\n"
+        resposta += "- Sugestões para expandir sua pesquisa"
+    
     return resposta
 
-def _analyze_data_quality_advanced(df, question, user_profile):
-    """Análise da qualidade dos dados avançada"""
+def _provide_suggestions(df, question):
+    """Sugestões inteligentes baseadas nos dados"""
+    total = len(df)
+    
+    resposta = "**💡 SUGESTÕES INTELIGENTES**\n\n"
+    
+    # Sugestões baseadas no tamanho da base
+    if total < 20:
+        resposta += "**🎯 PRIORIDADE: Expansão de Dados**\n"
+        resposta += "• Colete mais 20-30 registros para análises confiáveis\n"
+        resposta += "• Use a busca integrada para encontrar trabalhos similares\n"
+        resposta += "• Complete metadados essenciais (autores, anos, países)\n\n"
+    
+    elif total < 50:
+        resposta += "**📊 Análises Recomendadas**:\n"
+        resposta += "• Explore distribuição temporal e geográfica\n"
+        resposta += "• Identifique autores e colaborações principais\n"
+        resposta += "• Use o mapa mental para organizar conceitos\n\n"
+    
+    else:
+        resposta += "**🚀 Análises Avançadas Possíveis**:\n"
+        resposta += "• Redes de colaboração entre autores\n"
+        resposta += "• Análise de tendências temporais\n"
+        resposta += "• Mapeamento de temas emergentes\n"
+        resposta += "• Correlações entre diferentes variáveis\n\n"
+    
+    # Sugestões específicas baseadas na pergunta
+    if 'melhorar' in question or 'qualidade' in question:
+        resposta += "**🔧 Melhoria da Qualidade**:\n"
+        resposta += "• Verifique completude dos metadados\n"
+        resposta += "• Padronize formatos (datas, autores)\n"
+        resposta += "• Adicione resumos e palavras-chave\n"
+    
+    elif 'próximo' in question or 'futuro' in question:
+        resposta += "**🔮 Direções Futuras**:\n"
+        resposta += "• Identifique lacunas na literatura\n"
+        resposta += "• Explore colaborações potenciais\n"
+        resposta += "• Considere novas fontes de dados\n"
+    
+    resposta += "\n**🛠️ Ferramentas Recomendadas**:\n"
+    resposta += "• Mapa Mental: Para organizar ideias\n"
+    resposta += "• Análise IA: Para insights automáticos\n"
+    resposta += "• Busca: Para encontrar referências\n"
+    resposta += "• Recomendações: Para descoberta de conteúdo"
+    
+    return resposta
+
+def _analyze_data_quality(df, question):
+    """Análise da qualidade dos dados"""
     total = len(df)
     colunas = df.columns.tolist()
     
-    resposta = "**📋 ANÁLISE DE QUALIDADE DE DADOS**\n\n"
-    resposta += f"**📊 Visão Geral**:\n"
-    resposta += f"• **Total de registros**: {total}\n"
-    resposta += f"• **Colunas disponíveis**: {len(colunas)}\n\n"
+    resposta = "**📋 QUALIDADE DOS DADOS**\n\n"
+    resposta += f"**Total de registros**: {total}\n"
+    resposta += f"**Colunas disponíveis**: {len(colunas)}\n\n"
     
     # Análise de completude
-    resposta += "**✅ Completude por Coluna**:\n"
+    resposta += "**Completude por coluna**:\n"
     for col in df.columns[:8]:  # Mostrar até 8 colunas
         na_count = df[col].isna().sum()
         preenchimento = ((total - na_count) / total) * 100
-        status = "🟢" if preenchimento > 90 else "🟡" if preenchimento > 70 else "🔴"
-        resposta += f"• {status} **{col}**: {preenchimento:.1f}% preenchido\n"
+        resposta += f"• **{col}**: {preenchimento:.1f}% preenchido\n"
     
     # Metadados essenciais
     essenciais = ['autor', 'ano', 'título']
     presentes = [col for col in essenciais if any(col in col_name.lower() for col_name in df.columns)]
     
-    resposta += f"\n**🎯 Metadados Essenciais**: {len(presentes)} de {len(essenciais)} presentes\n"
+    resposta += f"\n**Metadados essenciais**: {len(presentes)} de {len(essenciais)} presentes\n"
     
     if len(presentes) < len(essenciais):
-        resposta += "**💡 Sugestão**: Considere adicionar colunas para:\n"
-        for essencial in essenciais:
-            if essencial not in presentes:
-                resposta += f"  - **{essencial}**: Informações básicas da pesquisa\n"
+        resposta += "**💡 Sugestão**: Considere adicionar colunas para autores, anos e títulos"
     
-    # Análise de qualidade geral
-    missing_total = df.isna().sum().sum()
-    missing_percent = (missing_total / df.size) * 100
-    
-    resposta += f"\n**📈 Qualidade Geral dos Dados**:\n"
-    resposta += f"• **Dados ausentes**: {missing_percent:.1f}%\n"
-    
-    if missing_percent < 10:
-        resposta += "• **🏆 Excelente**: Dados muito completos\n"
-    elif missing_percent < 20:
-        resposta += "• **✅ Bom**: Qualidade adequada para análises\n"
-    elif missing_percent < 40:
-        resposta += "• **⚠️ Atenção**: Considere completar dados faltantes\n"
-    else:
-        resposta += "• **🔴 Crítico**: Muitos dados ausentes - priorize completude\n"
-
     return resposta
 
-def _comprehensive_analysis_response(df, original_question, user_profile):
-    """Resposta abrangente para perguntas complexas"""
-    total = len(df)
-    
-    return f"""**🤖 ASSISTENTE DE IA NUGEP-PQR - ANÁLISE INTELIGENTE**
+def _general_analysis_response(df, original_question):
+    """Resposta geral para perguntas não categorizadas"""
+    return f"""**🤖 ASSISTENTE INTELIGENTE NUGEP-PQR**
 
-**Sua pergunta**: "{original_question}"
+Não entendi completamente: "*{original_question}*"
 
-**📊 Contexto da Sua Pesquisa**:
-• **Base de dados**: {total} registros
-• **Perfil identificado**: {', '.join(user_profile.get('research_focus', ['Em análise']))[:50]}
-• **Prontidão para análise**: {'🔴 Básica' if total < 20 else '🟡 Intermediária' if total < 50 else '🟢 Avançada'}
+**Posso ajudar com estas análises:**
 
-**🎯 TIPOS DE ANÁLISE DISPONÍVEIS**:
+📊 **PERGUNTAS ESPECÍFICAS:**
+• "Quais são os autores mais relevantes?"
+• "Qual a distribuição geográfica?"  
+• "Como evoluiu a pesquisa ao longo do tempo?"
+• "Quais são os conceitos mais frequentes?"
+• "Quantas colaborações existem?"
 
-**🔍 ANÁLISES ESPECÍFICAS**:
-• "Quais são os autores mais relevantes e suas colaborações?"
-• "Como está distribuída minha pesquisa geograficamente?"  
-• "Qual a evolução temporal dos meus trabalhos?"
-• "Quais os conceitos e temas mais frequentes?"
-• "Como melhorar minhas colaborações?"
+🔍 **ANÁLISES COMPLEXAS:**
+• "Analise os padrões de colaboração"
+• "Mostre tendências temporais" 
+• "Identifique temas emergentes"
+• "Avalie a qualidade dos dados"
 
-**📈 ANÁLISES ESTRATÉGICAS**:
-• "Analise os padrões e tendências na minha pesquisa"
-• "Identifique oportunidades de desenvolvimento" 
-• "Sugira próximos passos baseados nos meus dados"
-• "Como posso ampliar o impacto da minha pesquisa?"
+💡 **SUGESTÕES:**
+• "O que devo fazer em seguida?"
+• "Como posso melhorar minha pesquisa?"
+• "Quais são as próximas etapas?"
 
-**💡 RECOMENDAÇÕES PERSONALIZADAS**:
-• "Quais são minhas principais lacunas e oportunidades?"
-• "Como posso melhorar a qualidade dos meus dados?"
-• "Quais ferramentas devo usar agora?"
+**Sua base atual:** {len(df)} registros, {len(df.columns)} colunas
 
-**🚀 PARA UMA RESPOSTA MAIS PRECISA**:
-Faça perguntas mais específicas sobre sua planilha! Por exemplo:
-• "Analise minha rede de colaboração"
-• "Quais temas emergentes identificar?"
-• "Sugira melhorias na estrutura dos dados"
-
-**💬 Estou aqui para ajudar a extrair insights valiosos da sua pesquisa!**"""
+Faça uma pergunta mais específica sobre sua planilha!"""
 
 # -------------------------
-# Miro-like Mind Map Components - SUPER MODERNIZADO
+# Miro-like Mind Map Components - ATUALIZADO E TRADUZIDO
 # -------------------------
-class ModernMindMap:
+class MiroStyleMindMap:
     def __init__(self):
         self.node_types = {
-            "ideia": {"color": "#4ECDC4", "icon": "💡", "shape": "dot", "gradient": "linear-gradient(135deg, #4ECDC4 0%, #44A08D 100%)"},
-            "tarefa": {"color": "#45B7D1", "icon": "✅", "shape": "square", "gradient": "linear-gradient(135deg, #45B7D1 0%, #3A92A8 100%)"},
-            "pergunta": {"color": "#96CEB4", "icon": "❓", "shape": "diamond", "gradient": "linear-gradient(135deg, #96CEB4 0%, #7DA895 100%)"},
-            "recurso": {"color": "#FECA57", "icon": "📚", "shape": "triangle", "gradient": "linear-gradient(135deg, #FECA57 0%, #D4A847 100%)"},
-            "objetivo": {"color": "#FF6B6B", "icon": "🎯", "shape": "star", "gradient": "linear-gradient(135deg, #FF6B6B 0%, #D45959 100%)"},
-            "nota": {"color": "#A29BFE", "icon": "📝", "shape": "circle", "gradient": "linear-gradient(135deg, #A29BFE 0%, #857FD4 100%)"},
-            "destaque": {"color": "#FF9FF3", "icon": "⭐", "shape": "hexagon", "gradient": "linear-gradient(135deg, #FF9FF3 0%, #D485CF 100%)"},
-            "problema": {"color": "#54A0FF", "icon": "🔍", "shape": "triangle", "gradient": "linear-gradient(135deg, #54A0FF 0%, #4585D4 100%)"}
+            "ideia": {"color": "#4ECDC4", "icon": "💡", "shape": "dot"},
+            "tarefa": {"color": "#45B7D1", "icon": "✅", "shape": "square"},
+            "pergunta": {"color": "#96CEB4", "icon": "❓", "shape": "diamond"},
+            "recurso": {"color": "#FECA57", "icon": "📚", "shape": "triangle"},
+            "objetivo": {"color": "#FF6B6B", "icon": "🎯", "shape": "star"},
+            "nota": {"color": "#A29BFE", "icon": "📝", "shape": "circle"}
         }
     
     def create_node(self, node_id, label, node_type="ideia", description="", x=0, y=0):
-        """Cria uma ideia no estilo moderno"""
+        """Cria uma ideia no estilo Miro"""
         node_data = self.node_types.get(node_type, self.node_types["ideia"])
         return {
             "id": node_id,
@@ -1654,79 +1150,63 @@ class ModernMindMap:
             "type": node_type,
             "description": description,
             "color": node_data["color"],
-            "gradient": node_data["gradient"],
             "shape": node_data["shape"],
             "x": x,
             "y": y,
-            "font": {"color": "#FFFFFF", "size": 16, "face": "Arial", "strokeWidth": 2, "strokeColor": "#000000"},
-            "size": 25,
-            "borderWidth": 2,
-            "borderColor": "#FFFFFF",
-            "shadow": True,
-            "mass": 1.5
+            "font": {"color": "#FFFFFF", "size": 14, "face": "Arial"},
+            "size": 20
         }
     
     def _calculate_smart_position(self, existing_nodes, selected_node_id):
-        """Calcula posição inteligente para novo nó com distribuição otimizada"""
+        """Calcula posição inteligente para novo nó"""
         if not existing_nodes:
             return 500, 400  # Posição central se não há nós
         
-        # Se há nó selecionado, posicionar em anel ao redor
+        # Se há nó selecionado, posicionar próximo a ele
         if selected_node_id:
             selected_node = next((n for n in existing_nodes if n["id"] == selected_node_id), None)
             if selected_node:
-                # Posicionar em um raio de 200px do nó selecionado
+                # Posicionar em um raio de 150px do nó selecionado
                 angle = random.uniform(0, 2 * math.pi)
-                distance = random.uniform(150, 250)
+                distance = random.uniform(100, 200)
                 x = selected_node.get("x", 500) + distance * math.cos(angle)
                 y = selected_node.get("y", 400) + distance * math.sin(angle)
                 return x, y
         
-        # Distribuição em espiral para melhor visualização
-        center_x, center_y = 500, 400
+        # Se não há nó selecionado, encontrar área menos congestionada
         occupied_positions = [(n.get("x", 0), n.get("y", 0)) for n in existing_nodes]
         
-        for radius in range(200, 1001, 120):  # De 200 a 1000 pixels
-            for angle in range(0, 360, 30):  # A cada 30 graus
+        # Tentar posições em espiral a partir do centro
+        center_x, center_y = 500, 400
+        for radius in range(200, 801, 100):  # De 200 a 800 pixels
+            for angle in range(0, 360, 45):  # A cada 45 graus
                 rad = math.radians(angle)
                 x = center_x + radius * math.cos(rad)
                 y = center_y + radius * math.sin(rad)
                 
-                # Verificar se está suficientemente longe de outros nós
+                # Verificar se está longe o suficiente de outros nós
                 too_close = any(
-                    math.sqrt((x - ox)**2 + (y - oy)**2) < 180 
+                    math.sqrt((x - ox)**2 + (y - oy)**2) < 150 
                     for ox, oy in occupied_positions
                 )
                 
                 if not too_close:
                     return x, y
         
-        # Fallback: posição aleatória com verificação
-        for _ in range(20):
-            x = random.randint(100, 900)
-            y = random.randint(100, 700)
-            too_close = any(math.sqrt((x - ox)**2 + (y - oy)**2) < 150 for ox, oy in occupied_positions)
-            if not too_close:
-                return x, y
-        
+        # Fallback: posição aleatória
         return random.randint(200, 800), random.randint(150, 650)
     
     def generate_layout(self, nodes, edges, layout_type="hierarchical"):
-        """Gera layout automático moderno para as ideias"""
+        """Gera layout automático para as ideias"""
         if layout_type == "hierarchical":
             return self._hierarchical_layout(nodes, edges)
         elif layout_type == "radial":
             return self._radial_layout(nodes, edges)
-        elif layout_type == "circular":
-            return self._circular_layout(nodes, edges)
         else:
             return self._force_directed_layout(nodes, edges)
     
     def _hierarchical_layout(self, nodes, edges):
-        """Layout hierárquico moderno"""
-        if not nodes:
-            return nodes
-            
+        """Layout hierárquico (árvore)"""
         G = nx.DiGraph()
         for node in nodes:
             G.add_node(node["id"])
@@ -1734,51 +1214,21 @@ class ModernMindMap:
             G.add_edge(edge["source"], edge["target"])
         
         try:
-            # Layout mais estável e visualmente agradável
-            pos = nx.spring_layout(G, k=3, iterations=100, scale=2, seed=42)
-            
-            # Aplicar posições com suavização
+            pos = nx.spring_layout(G, k=2, iterations=50)
             for node in nodes:
                 if node["id"] in pos:
-                    new_x = pos[node["id"]][0] * 800 + 400
-                    new_y = pos[node["id"]][1] * 600 + 300
-                    
-                    # Transição suave se já tinha posição
-                    if "x" in node and "y" in node:
-                        node["x"] = (node["x"] + new_x) / 2
-                        node["y"] = (node["y"] + new_y) / 2
-                    else:
-                        node["x"] = new_x
-                        node["y"] = new_y
+                    node["x"] = pos[node["id"]][0] * 1000
+                    node["y"] = pos[node["id"]][1] * 1000
         except:
-            # Fallback organizado
+            # Fallback layout
             for i, node in enumerate(nodes):
-                if "x" not in node or "y" not in node:
-                    node["x"] = 400 + (i % 4) * 200
-                    node["y"] = 300 + (i // 4) * 150
+                node["x"] = (i % 3) * 300
+                node["y"] = (i // 3) * 200
         
         return nodes
 
     def _radial_layout(self, nodes, edges):
-        """Layout radial moderno"""
-        center_x, center_y = 500, 400
-        
-        if len(nodes) == 1:
-            nodes[0]["x"] = center_x
-            nodes[0]["y"] = center_y
-            return nodes
-        
-        radius = min(400, 200 + len(nodes) * 30)  # Raio adaptável
-        
-        for i, node in enumerate(nodes):
-            angle = 2 * np.pi * i / len(nodes)
-            node["x"] = center_x + radius * np.cos(angle)
-            node["y"] = center_y + radius * np.sin(angle)
-        
-        return nodes
-
-    def _circular_layout(self, nodes, edges):
-        """Layout circular para visualização limpa"""
+        """Layout radial"""
         center_x, center_y = 500, 400
         radius = 300
         
@@ -1790,7 +1240,7 @@ class ModernMindMap:
         return nodes
 
     def _force_directed_layout(self, nodes, edges):
-        """Layout de força direcionada moderno e estável"""
+        """Layout de força direcionada - CORRIGIDO: estabilidade REAL melhorada"""
         if not nodes:
             return nodes
         
@@ -1800,49 +1250,52 @@ class ModernMindMap:
         for node in nodes:
             G.add_node(node["id"])
         
-        # Adicionar arestas com pesos
+        # Adicionar arestas
         for edge in edges:
-            G.add_edge(edge["source"], edge["target"], weight=2)
+            G.add_edge(edge["source"], edge["target"])
         
         try:
-            # CONFIGURAÇÃO OTIMIZADA PARA ESTABILIDADE E VISUAL
+            # CONFIGURAÇÃO OTIMIZADA PARA ESTABILIDADE
+            # Usar posições existentes como ponto de partida
             pos_existente = {}
             for node in nodes:
                 if "x" in node and "y" in node:
                     pos_existente[node["id"]] = [node["x"], node["y"]]
             
-            # Parâmetros para layout moderno
-            k = 4  # Distância ideal entre nós
-            iterations = 100  # Mais iterações para melhor estabilidade
-            scale = 2.5  # Escala adequada
+            # Parâmetros para layout suave
+            k = 3  # Distância ideal entre nós
+            iterations = 50  # Menos iterações para mais velocidade
+            scale = 2  # Escala moderada
             
             if pos_existente:
+                # Se temos posições existentes, usar como seed
                 pos = nx.spring_layout(G, pos=pos_existente, k=k, iterations=iterations, 
                                      scale=scale, seed=42)
             else:
+                # Se não, começar do zero
                 pos = nx.spring_layout(G, k=k, iterations=iterations, scale=scale, seed=42)
             
-            # Aplicar novas posições
+            # Aplicar novas posições suavemente
             for node in nodes:
                 if node["id"] in pos:
-                    new_x = pos[node["id"]][0] * 800 + 400
-                    new_y = pos[node["id"]][1] * 600 + 300
-                    
-                    # Manter alguma estabilidade para nós existentes
+                    # Se o nó já tinha posição, fazer transição suave
                     if "x" in node and "y" in node:
-                        node["x"] = (node["x"] * 0.3 + new_x * 0.7)
-                        node["y"] = (node["y"] * 0.3 + new_y * 0.7)
+                        # Transição de 50% para manter estabilidade
+                        node["x"] = (node["x"] + pos[node["id"]][0] * 800) / 2
+                        node["y"] = (node["y"] + pos[node["id"]][1] * 600) / 2
                     else:
-                        node["x"] = new_x
-                        node["y"] = new_y
+                        # Novo nó, posicionar normalmente
+                        node["x"] = pos[node["id"]][0] * 800 + 400
+                        node["y"] = pos[node["id"]][1] * 600 + 300
                         
         except Exception as e:
             print(f"Layout automático falhou: {e}")
-            # Fallback: grid organizado
+            # Fallback: grid organizado que mantém a estabilidade
             for i, node in enumerate(nodes):
                 if "x" not in node or "y" not in node:
-                    node["x"] = 400 + (i % 5) * 180
-                    node["y"] = 300 + (i // 5) * 120
+                    # Só reposicionar nós sem posição
+                    node["x"] = 400 + (i % 4) * 200
+                    node["y"] = 300 + (i // 4) * 150
         
         return nodes
 
@@ -2394,13 +1847,11 @@ _defaults = {
     "tutorial_completed": False, 
     "recommendations": pd.DataFrame(), "recommendation_page": 1, "recommendation_view_index": None,
     "recommendation_onboarding_complete": False,
-    "ia_response": None,
-    "modern_mind_map": None,
+    "ia_response": None, # NOVO: para guardar a resposta da IA
     "settings": {
         "plot_height": 720, "font_scale": 1.0, "node_opacity": 1.0,
         "font_size": 14,
         "node_font_size": 14,
-        "modern_ui": True,
     }
 }
 for k, v in _defaults.items():
@@ -2584,25 +2035,56 @@ if "last_unread_count" not in st.session_state: st.session_state.last_unread_cou
 if UNREAD_COUNT > st.session_state.last_unread_count:
     st.toast(f"Você tem {UNREAD_COUNT} nova(s) mensagem(n) não lida(s).", icon="✉️")
 st.session_state.last_unread_count = UNREAD_COUNT
+mens_label = f"✉️ Mensagens ({UNREAD_COUNT})" if UNREAD_COUNT > 0 else "✉️ Mensagens"
 
 # -------------------------
-# Navigation atualizada com favoritos
+# Onboarding (first contact)
 # -------------------------
-nav_buttons = {
-    "planilha": "📄 Planilha", 
-    "recomendacoes": "💡 Recomendações", 
-    "mapa": "🗺️ Mapa Mental",
-    "anotacoes": "📝 Anotações", 
-    "graficos": "📊 Análise", 
-    "busca": "🔍 Busca",
-    "favoritos": "⭐ Favoritos",
-    "mensagens": f"✉️ Mensagens ({UNREAD_COUNT})" if UNREAD_COUNT > 0 else "✉️ Mensagens",
-    "config": "⚙️ Configurações"
-}
+if st.session_state.authenticated and not st.session_state.recommendation_onboarding_complete:
+    st.markdown("<div class='glass-box' style='position:relative;margin-bottom:12px;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.subheader("✨ Primeiro contato — escolha seus interesses")
+    default_themes = [
+        "documentação",
+        "documentação participativa",
+        "cultura de inovação",
+        "nft",
+        "inovação social",
+        "inovação tecnológica"
+    ]
+    sel = st.multiselect("Selecione temas de interesse (pelo menos 1):", options=default_themes, key="onb_themes")
+    only_pt = st.checkbox("Priorizar resultados em português (quando possível)", value=True, key="onb_only_pt")
+    max_per_theme = st.slider("Resultados por tema", 1, 8, 4, key="onb_rows")
 
+    if st.button("🔍 Buscar artigos sugeridos", key="onb_search"):
+        if not sel:
+            st.error("Escolha pelo menos um tema.")
+        else:
+            all_hits = []
+            with st.spinner("Buscando artigos..."):
+                for theme in sel:
+                    hits = search_crossref(theme, rows=max_per_theme)
+                    for h in hits:
+                        h["_artemis_username"] = "web"
+                        h["_tema_origem"] = theme
+                    all_hits.extend(hits)
+            if all_hits:
+                rec_df = pd.DataFrame(all_hits)
+                st.session_state.recommendations = rec_df
+                st.session_state.recommendation_onboarding_complete = True
+                st.session_state.recommendation_page = 1
+                st.toast(f"{len(rec_df)} recomendação(ões) carregada(s).")
+                safe_rerun()
+            else:
+                st.info("Nenhum artigo encontrado automaticamente. Tente outros termos.")
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# -------------------------
+# Top navigation and pages
+# -------------------------
 st.markdown("<div class='glass-box' style='padding-top:10px; padding-bottom:10px;'><div class='specular'></div>", unsafe_allow_html=True)
 top1, top2 = st.columns([0.6, 0.4])
 with top1:
+    # Exibição do nome centralizada e em branco (solicitado)
     st.markdown(f"<div style='text-align:center;color:#ffffff;font-weight:700;padding-top:4px;padding-bottom:4px'>{escape_html(USER_OBJ.get('name',''))} — {escape_html(USER_OBJ.get('scholarship',''))}</div>", unsafe_allow_html=True)
 with top2:
     nav_right1, nav_right2, nav_right3 = st.columns([1,1,1])
@@ -2617,6 +2099,9 @@ with top2:
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
+nav_buttons = {"planilha": "📄 Planilha", "recomendacoes": "💡 Recomendações", "mapa": "🗺️ Mapa Mental",
+               "anotacoes": "📝 Anotações", "graficos": "📊 Análise", "busca": "🔍 Busca",
+               "mensagens": mens_label, "config": "⚙️ Configurações"}
 nav_cols = st.columns(len(nav_buttons))
 for i, (page_key, page_label) in enumerate(nav_buttons.items()):
     with nav_cols[i]:
@@ -2636,7 +2121,6 @@ if not st.session_state.get("tutorial_completed"):
         * **📝 Anotações**: Um bloco de notas para destacar texto com `==sinais de igual==` e exportar como PDF.
         * **📊 Análise**: Gere gráficos e análises inteligentes a partir da sua planilha.
         * **🔍 Busca**: Pesquise em todas as planilhas carregadas na plataforma.
-        * **⭐ Favoritos**: Acesse rapidamente seus artigos favoritos salvos.
         * **✉️ Mensagens**: Comunique-se com outros pesquisadores.
         * **⚙️ Configurações**: Personalize a aparência do aplicativo.
         """)
@@ -2695,7 +2179,7 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: recomendacoes
+# Page: recomendacoes (mantém Favoritos aqui)
 # -------------------------
 elif st.session_state.page == "recomendacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -2710,10 +2194,41 @@ elif st.session_state.page == "recomendacoes":
 
     temas_populares = extract_popular_themes_from_data(df_total) if not df_total.empty else []
 
+    # favorites panel (moved here)
+    with st.expander(f"⭐ Favoritos ({len(get_session_favorites())})", expanded=False):
+        favorites = get_session_favorites()
+        if not favorites:
+            st.info("Nenhum favorito salvo.")
+        else:
+            if st.button("🗑️ Limpar Todos os Favoritos", key=f"clear_favs_rec_{USERNAME}"):
+                clear_all_favorites(); st.session_state.recommendation_page = 1; safe_rerun()
+            for fav in sorted(favorites, key=lambda x: x['added_at'], reverse=True):
+                fav_data = fav['data']
+                st.markdown(f"""
+                <div class="card">
+                    <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
+                    <div class="small-muted">De <strong>{escape_html(fav_data.get('_artemis_username', 'N/A'))}</strong></div>
+                </div>""", unsafe_allow_html=True)
+                c1, c2 = st.columns([0.75, 0.25])
+                with c1:
+                    if st.button("Ver", key=f"fav_view_rec_{fav['id']}_{USERNAME}", use_container_width=True):
+                        st.session_state.fav_detail = fav['data']
+                with c2:
+                    if st.button("Remover", key=f"fav_del_rec_{fav['id']}_{USERNAME}", use_container_width=True):
+                        remove_from_favorites(fav['id']); safe_rerun()
+            if 'fav_detail' in st.session_state and st.session_state.fav_detail:
+                det_fav = st.session_state.pop("fav_detail")
+                det_fav = enrich_article_metadata(det_fav)
+                st.markdown("## Detalhes do Favorito")
+                st.markdown(f"**{escape_html(det_fav.get('título','— Sem título —'))}**")
+                st.markdown(f"_Autor(es):_ {escape_html(det_fav.get('autor','— —'))}")
+                st.markdown("---")
+                st.markdown(escape_html(det_fav.get('resumo','Resumo não disponível.')))
+
     # recommendation onboarding or refine
     if not st.session_state.recommendation_onboarding_complete:
         if df_total.empty:
-            st.warning("Ainda não há dados suficientes para gerar recomendações automaticamente.")
+            st.warning("Ainda não há dados suficientes para gerar recomendações automaticamente. Use o onboarding no topo para obter recomendações iniciais.")
         elif not temas_populares:
             st.warning("Não foi possível identificar temas populares.")
         else:
@@ -2798,6 +2313,7 @@ elif st.session_state.page == "recomendacoes":
                     st.session_state.recommendation_view_index = None
                     safe_rerun()
 
+                # MELHORIA: Exibição mais organizada dos dados
                 col1, col2 = st.columns([3, 1])
                 with col1:
                     st.markdown(f"**{escape_html(det.get('título','— Sem título —'))}**")
@@ -2816,13 +2332,15 @@ elif st.session_state.page == "recomendacoes":
                     st.markdown(escape_html(det.get('resumo', 'Resumo não disponível.')))
                 
                 with col2:
+                    # Informações adicionais
+                    st.markdown("**Informações Adicionais**")
                     if det.get('similarity'):
                         st.metric("Similaridade", f"{det['similarity']:.2f}")
                     
                     if det.get('_artemis_username'):
                         st.write(f"Fonte: {det['_artemis_username']}")
 
-                col_btn1, col_btn2, col_btn3 = st.columns(3)
+                col_btn1, col_btn2 = st.columns(2)
                 with col_btn1:
                     if st.button("⭐ Adicionar aos Favoritos", use_container_width=True, key=f"fav_detail_rec_{vi}_{USERNAME}"):
                         if add_to_favorites(det): st.toast("Adicionado aos favoritos!", icon="⭐")
@@ -2830,11 +2348,6 @@ elif st.session_state.page == "recomendacoes":
                 with col_btn2:
                     if st.button("📝 Ver Anotações", use_container_width=True, key=f"notes_rec_{vi}_{USERNAME}"):
                         st.session_state.page = "anotacoes"
-                        safe_rerun()
-                with col_btn3:
-                    if st.button("🔍 Buscar Similares", use_container_width=True, key=f"similar_rec_{vi}_{USERNAME}"):
-                        st.session_state.page = "busca"
-                        st.session_state.search_input_main = det.get('título', '').split()[0] if det.get('título') else ''
                         safe_rerun()
 
         else:
@@ -2857,6 +2370,7 @@ elif st.session_state.page == "recomendacoes":
                 country = row.get('país') or row.get('pais') or row.get('country') or ""
                 link = row.get('url') or row.get('link') or row.get('doi') or ""
                 
+                # MELHORIA: Card mais informativo
                 st.markdown(f"""
                 <div class="card">
                     <div style="display:flex; gap:12px; align-items:flex-start;">
@@ -2898,302 +2412,74 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# PÁGINA: FAVORITOS - IMPLEMENTAÇÃO COMPLETA
-# -------------------------
-elif st.session_state.page == "favoritos":
-    st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("⭐ Seus Favoritos Salvos")
-    
-    favorites = get_session_favorites()
-    
-    if not favorites:
-        st.info("""
-        ## 🌟 Nenhum favorito ainda!
-        
-        **Como adicionar favoritos:**
-        - Use a aba **🔍 Busca** para encontrar artigos interessantes
-        - Clique em **⭐ Favoritar** nos resultados
-        - Ou adicione das **💡 Recomendações**
-        
-        Seus favoritos aparecerão aqui para acesso rápido!
-        """)
-        
-        # Botões de ação rápida
-        col1, col2 = st.columns(2)
-        with col1:
-            if st.button("🔍 Ir para Busca", use_container_width=True):
-                st.session_state.page = "busca"
-                safe_rerun()
-        with col2:
-            if st.button("💡 Ver Recomendações", use_container_width=True):
-                st.session_state.page = "recomendacoes"
-                safe_rerun()
-                
-    else:
-        # Estatísticas rápidas
-        col1, col2, col3, col4 = st.columns(4)
-        with col1:
-            st.metric("Total de Favoritos", len(favorites))
-        with col2:
-            sources = [fav['data'].get('_artemis_username', 'Desconhecido') for fav in favorites]
-            unique_sources = len(set(sources))
-            st.metric("Fontes Diferentes", unique_sources)
-        with col3:
-            # Contar por tipo de fonte
-            local_sources = len([s for s in sources if s != 'web'])
-            web_sources = len([s for s in sources if s == 'web'])
-            st.metric("Locais/Web", f"{local_sources}/{web_sources}")
-        with col4:
-            if st.button("🗑️ Limpar Todos", use_container_width=True, type="secondary"):
-                if st.checkbox("Confirmar limpeza de TODOS os favoritos?"):
-                    clear_all_favorites()
-                    st.success("Todos os favoritos foram removidos!")
-                    safe_rerun()
-        
-        st.markdown("---")
-        
-        # Filtros e organização
-        col_search, col_sort, col_filter = st.columns([2, 1, 1])
-        with col_search:
-            search_fav = st.text_input("🔍 Buscar nos favoritos:", 
-                                     placeholder="Digite título, autor, tema...",
-                                     key="search_favorites")
-        with col_sort:
-            sort_option = st.selectbox("Ordenar por:", 
-                                     ["Data de adição", "Título A-Z", "Título Z-A", "Fonte"],
-                                     key="sort_favorites")
-        with col_filter:
-            filter_source = st.selectbox("Filtrar por fonte:", 
-                                       ["Todas", "Local", "Web"],
-                                       key="filter_favorites")
-        
-        # Aplicar filtros
-        filtered_favorites = favorites.copy()
-        
-        # Filtro de busca
-        if search_fav:
-            filtered_favorites = [
-                fav for fav in filtered_favorites 
-                if search_fav.lower() in str(fav['data'].get('título', '')).lower() or
-                   search_fav.lower() in str(fav['data'].get('autor', '')).lower() or
-                   search_fav.lower() in str(fav['data'].get('_artemis_username', '')).lower()
-            ]
-        
-        # Filtro por fonte
-        if filter_source == "Local":
-            filtered_favorites = [fav for fav in filtered_favorites if fav['data'].get('_artemis_username') != 'web']
-        elif filter_source == "Web":
-            filtered_favorites = [fav for fav in filtered_favorites if fav['data'].get('_artemis_username') == 'web']
-        
-        # Ordenação
-        if sort_option == "Data de adição":
-            filtered_favorites.sort(key=lambda x: x['added_at'], reverse=True)
-        elif sort_option == "Título A-Z":
-            filtered_favorites.sort(key=lambda x: str(x['data'].get('título', '')).lower())
-        elif sort_option == "Título Z-A":
-            filtered_favorites.sort(key=lambda x: str(x['data'].get('título', '')).lower(), reverse=True)
-        elif sort_option == "Fonte":
-            filtered_favorites.sort(key=lambda x: str(x['data'].get('_artemis_username', '')).lower())
-        
-        # Visualização detalhada
-        if 'fav_detail_view' in st.session_state and st.session_state.fav_detail_view:
-            fav_id = st.session_state.fav_detail_view
-            favorite = next((fav for fav in filtered_favorites if fav['id'] == fav_id), None)
-            
-            if favorite:
-                fav_data = favorite['data']
-                fav_data = enrich_article_metadata(fav_data)
-                
-                st.markdown("## 📄 Detalhes do Favorito")
-                
-                if st.button("⬅️ Voltar para lista", key="back_from_detail"):
-                    st.session_state.fav_detail_view = None
-                    safe_rerun()
-                
-                col1, col2 = st.columns([3, 1])
-                with col1:
-                    st.markdown(f"### {escape_html(fav_data.get('título','— Sem título —'))}")
-                    st.markdown(f"**Autor(es):** {escape_html(fav_data.get('autor','— Não informado —'))}")
-                    st.markdown(f"**Ano:** {escape_html(str(fav_data.get('ano', fav_data.get('year','— —'))))}")
-                    
-                    if fav_data.get('doi'):
-                        doi_link = f"https://doi.org/{fav_data.get('doi')}"
-                        st.markdown(f"**DOI:** [{fav_data.get('doi')}]({doi_link})")
-                    elif fav_data.get('url'):
-                        st.markdown(f"**Link:** [{fav_data.get('url')}]({fav_data.get('url')})")
-                    
-                    if fav_data.get('similarity'):
-                        st.markdown(f"**Similaridade:** {fav_data['similarity']:.3f}")
-                    
-                    st.markdown("---")
-                    st.markdown("**Resumo**")
-                    st.markdown(escape_html(fav_data.get('resumo', 'Resumo não disponível.')))
-                
-                with col2:
-                    st.markdown("**Ações**")
-                    if st.button("📝 Ir para Anotações", use_container_width=True, key="fav_to_notes"):
-                        st.session_state.page = "anotacoes"
-                        safe_rerun()
-                    
-                    if st.button("🔍 Buscar Similares", use_container_width=True, key="fav_similar"):
-                        st.session_state.page = "busca"
-                        st.session_state.search_input_main = fav_data.get('título', '').split()[0] if fav_data.get('título') else ''
-                        safe_rerun()
-                    
-                    if st.button("🗑️ Remover Favorito", use_container_width=True, type="secondary", key="remove_fav_detail"):
-                        remove_from_favorites(fav_id)
-                        st.session_state.fav_detail_view = None
-                        st.success("Favorito removido!")
-                        safe_rerun()
-            
-            else:
-                st.error("Favorito não encontrado.")
-                if st.button("⬅️ Voltar para lista"):
-                    st.session_state.fav_detail_view = None
-                    safe_rerun()
-        
-        else:
-            # Lista de favoritos
-            st.markdown(f"**📊 Mostrando {len(filtered_favorites)} de {len(favorites)} favoritos**")
-            
-            if not filtered_favorites:
-                st.info("Nenhum favorito encontrado com os filtros atuais.")
-            
-            for fav in filtered_favorites:
-                fav_data = fav['data']
-                user_src = fav_data.get('_artemis_username', 'N/A')
-                added_date = datetime.fromisoformat(fav['added_at']).strftime('%d/%m/%Y %H:%M')
-                
-                # Obter nome do usuário se for local
-                all_users = load_users()
-                user_name = all_users.get(user_src, {}).get('name', user_src) if user_src != 'web' else 'Web (Crossref)'
-                
-                with st.container():
-                    col1, col2, col3 = st.columns([4, 1, 1])
-                    
-                    with col1:
-                        st.markdown(f"""
-                        <div class="card">
-                            <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
-                            <div class="small-muted">
-                                <strong>Autor(es):</strong> {escape_html(fav_data.get('autor', 'Não informado'))}<br>
-                                <strong>Fonte:</strong> {escape_html(user_name)} • 
-                                <strong>Adicionado:</strong> {added_date}
-                            </div>
-                        </div>
-                        """, unsafe_allow_html=True)
-                    
-                    with col2:
-                        if st.button("👁️", key=f"view_{fav['id']}", help="Ver detalhes", use_container_width=True):
-                            st.session_state.fav_detail_view = fav['id']
-                            safe_rerun()
-                    
-                    with col3:
-                        if st.button("🗑️", key=f"del_{fav['id']}", help="Remover", use_container_width=True):
-                            remove_from_favorites(fav['id'])
-                            st.success("Favorito removido!")
-                            safe_rerun()
-                    
-                    st.markdown("---")
-            
-            # Opções de exportação
-            if filtered_favorites:
-                st.markdown("### 💾 Exportar Favoritos")
-                col_exp1, col_exp2 = st.columns(2)
-                
-                with col_exp1:
-                    # Exportar como CSV
-                    export_data = []
-                    for fav in filtered_favorites:
-                        fav_data = fav['data']
-                        export_data.append({
-                            'Título': fav_data.get('título', ''),
-                            'Autores': fav_data.get('autor', ''),
-                            'Ano': fav_data.get('ano', ''),
-                            'DOI': fav_data.get('doi', ''),
-                            'URL': fav_data.get('url', ''),
-                            'Fonte': fav_data.get('_artemis_username', ''),
-                            'Data_Adicao': fav['added_at']
-                        })
-                    
-                    if export_data:
-                        df_export = pd.DataFrame(export_data)
-                        csv_data = df_export.to_csv(index=False, encoding='utf-8')
-                        st.download_button(
-                            "📊 Exportar CSV",
-                            data=csv_data,
-                            file_name=f"favoritos_{datetime.now().strftime('%Y%m%d_%H%M')}.csv",
-                            mime="text/csv",
-                            use_container_width=True
-                        )
-                
-                with col_exp2:
-                    # Exportar como JSON
-                    json_data = json.dumps(filtered_favorites, indent=2, ensure_ascii=False)
-                    st.download_button(
-                        "📋 Exportar JSON",
-                        data=json_data,
-                        file_name=f"favoritos_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                        mime="application/json",
-                        use_container_width=True
-                    )
-
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# -------------------------
-# PÁGINA MAPA MENTAL ATUALIZADA
+# Page: mapa mental - CORRIGIDO
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🗺️ Mapa Mental Interativo Moderno")
-    st.info("💡 **Crie, conecte e visualize suas ideias** - Interface moderna com visualização 3D avançada!")
+    st.subheader("🗺️ Mapa Mental Interativo")
+    st.info("💡 **Crie, conecte e visualize suas ideias** - Arraste as ideias e edite diretamente!")
     
-    # Inicializar sistema de mapa mental MODERNO
-    if 'modern_mind_map' not in st.session_state:
-        st.session_state.modern_mind_map = ModernMindMap()
+    # Inicializar sistema de mapa mental
+    if 'miro_map' not in st.session_state:
+        st.session_state.miro_map = MiroStyleMindMap()
         st.session_state.miro_nodes = []
         st.session_state.miro_edges = []
         st.session_state.miro_selected_node = None
-        st.session_state.miro_layout = "force"
-        st.session_state.visualization_3d = True
+        st.session_state.miro_layout = "hierarchical"
     
-    # Sidebar principal MODERNIZADA
+    # Sidebar principal
     with st.sidebar:
         st.header("🎨 Controles do Mapa")
         
-        # Modo de visualização
-        visualization_mode = st.selectbox("🎭 Modo de Visualização:", 
-                                        ["Mapa 3D Moderno", "Fluxograma", "Rede Colaborativa", "Mapa Radial"])
-        
-        # Criar nova ideia - INTERFACE MODERNIZADA
-        with st.expander("🚀 Nova Ideia", expanded=True):
-            with st.form("create_modern_node", clear_on_submit=True):
+        # Criar nova ideia - CORREÇÃO: posicionamento seguro
+        with st.expander("➕ Nova Ideia", expanded=True):
+            with st.form("create_miro_node", clear_on_submit=True):
                 node_label = st.text_input("Título da ideia:", placeholder="Ex: Pesquisa Qualitativa", key="new_node_label")
-                node_type = st.selectbox("Tipo:", options=list(st.session_state.modern_mind_map.node_types.keys()), 
-                                       format_func=lambda x: f"{st.session_state.modern_mind_map.node_types[x]['icon']} {x.title()}", 
-                                       key="new_node_type")
-                node_desc = st.text_area("Descrição:", placeholder="Detalhes, insights ou ações relacionadas...", 
-                                       height=100, key="new_node_desc")
+                node_type = st.selectbox("Tipo:", options=list(st.session_state.miro_map.node_types.keys()), key="new_node_type")
+                node_desc = st.text_area("Descrição:", placeholder="Detalhes sobre esta ideia...", height=100, key="new_node_desc")
                 
-                # BOTÃO DE ENVIO CORRETO - usando st.form_submit_button
-                submit_btn = st.form_submit_button("🎯 Criar Ideia", use_container_width=True)
-                
-                if submit_btn and node_label:
-                    node_id = f"node_{int(time.time())}_{random.randint(1000,9999)}"
-                    
-                    # Posicionamento inteligente
-                    x, y = st.session_state.modern_mind_map._calculate_smart_position(
-                        st.session_state.miro_nodes, 
-                        st.session_state.miro_selected_node
-                    )
-                    
-                    new_node = st.session_state.modern_mind_map.create_node(
-                        node_id, node_label, node_type, node_desc, x, y
-                    )
-                    st.session_state.miro_nodes.append(new_node)
-                    st.session_state.miro_selected_node = node_id
-                    st.success("✨ Ideia criada com sucesso!")
-                    safe_rerun()
+                if st.form_submit_button("🎯 Adicionar Ideia", use_container_width=True):
+                    if node_label:
+                        node_id = f"node_{int(time.time())}_{random.randint(1000,9999)}"
+                        
+                        # CORREÇÃO: Posicionamento seguro
+                        x, y = 500, 400  # Posição central padrão
+                        
+                        # Se há nós existentes, posicionar de forma inteligente
+                        if st.session_state.miro_nodes:
+                            if st.session_state.miro_selected_node:
+                                # Encontrar o nó selecionado
+                                selected_node = next((n for n in st.session_state.miro_nodes 
+                                                    if n["id"] == st.session_state.miro_selected_node), None)
+                                if selected_node:
+                                    # Posicionar próximo ao nó selecionado
+                                    angle = random.uniform(0, 2 * math.pi)
+                                    distance = random.uniform(100, 200)
+                                    x = selected_node.get("x", 500) + distance * math.cos(angle)
+                                    y = selected_node.get("y", 400) + distance * math.sin(angle)
+                            else:
+                                # Encontrar posição vazia
+                                occupied_positions = [(n.get("x", 0), n.get("y", 0)) for n in st.session_state.miro_nodes]
+                                for radius in range(200, 801, 100):
+                                    for angle in range(0, 360, 45):
+                                        rad = math.radians(angle)
+                                        test_x = 500 + radius * math.cos(rad)
+                                        test_y = 400 + radius * math.sin(rad)
+                                        too_close = any(math.sqrt((test_x - ox)**2 + (test_y - oy)**2) < 150 for ox, oy in occupied_positions)
+                                        if not too_close:
+                                            x, y = test_x, test_y
+                                            break
+                                    else:
+                                        continue
+                                    break
+                        
+                        new_node = st.session_state.miro_map.create_node(
+                            node_id, node_label, node_type, node_desc, x, y
+                        )
+                        st.session_state.miro_nodes.append(new_node)
+                        st.session_state.miro_selected_node = node_id
+                        st.success("Ideia criada!")
+                        safe_rerun()
         
         # Conectar ideias
         with st.expander("🔗 Conectar Ideias", expanded=False):
@@ -3215,7 +2501,7 @@ elif st.session_state.page == "mapa":
                             st.session_state.miro_edges.append({
                                 "source": source_id,
                                 "target": target_id,
-                                "label": "conecta a"
+                                "label": "conecta"
                             })
                             st.success("Conexão criada!")
                             safe_rerun()
@@ -3224,79 +2510,72 @@ elif st.session_state.page == "mapa":
             else:
                 st.info("Precisa de pelo menos 2 ideias para conectar")
         
-        # Gerenciamento avançado
-        with st.expander("🔧 Ferramentas Avançadas", expanded=False):
-            st.session_state.miro_layout = st.selectbox("Layout Automático:", 
-                                                      ["force", "hierarchical", "radial", "circular"])
+        # Configurações do mapa
+        with st.expander("👁️ Visualização", expanded=False):
+            visualization_mode = st.selectbox("Modo de Visualização:", options=["Mapa 2D", "Mapa 3D", "Fluxograma"], index=0)
+            
+            st.session_state.miro_layout = st.selectbox("Organização Automática:", options=["hierarchical", "radial", "force"])
             
             if st.button("🔄 Reorganizar Mapa", use_container_width=True):
-                st.session_state.miro_nodes = st.session_state.modern_mind_map.generate_layout(
+                st.session_state.miro_nodes = st.session_state.miro_map.generate_layout(
                     st.session_state.miro_nodes, st.session_state.miro_edges, st.session_state.miro_layout
                 )
                 st.success("Mapa reorganizado!")
                 safe_rerun()
             
-            # Exportar/Importar
-            col_exp1, col_exp2 = st.columns(2)
-            with col_exp1:
-                if st.button("💾 Exportar", use_container_width=True):
-                    map_data = {
-                        "nodes": st.session_state.miro_nodes,
-                        "edges": st.session_state.miro_edges,
-                        "layout": st.session_state.miro_layout
-                    }
-                    st.download_button(
-                        "⬇️ Baixar Mapa",
-                        data=json.dumps(map_data, indent=2),
-                        file_name=f"mapa_mental_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                        mime="application/json"
-                    )
-            with col_exp2:
-                uploaded_map = st.file_uploader("Importar", type=["json"], key="map_uploader")
-                if uploaded_map:
-                    try:
-                        map_data = json.load(uploaded_map)
-                        st.session_state.miro_nodes = map_data.get("nodes", [])
-                        st.session_state.miro_edges = map_data.get("edges", [])
-                        st.success("Mapa importado!")
-                        safe_rerun()
-                    except:
-                        st.error("Erro ao importar mapa")
+            st.markdown("---")
+            if st.button("🗑️ Limpar Mapa", type="secondary", use_container_width=True):
+                if st.checkbox("Confirmar limpeza total do mapa?"):
+                    st.session_state.miro_nodes = []
+                    st.session_state.miro_edges = []
+                    st.session_state.miro_selected_node = None
+                    st.success("Mapa limpo!")
+                    safe_rerun()
     
-    # Área principal do mapa MODERNIZADA
+    # Área principal do mapa
     col1, col2 = st.columns([2, 1])
     
     with col1:
         st.subheader(f"🎨 {visualization_mode}")
         
         if st.session_state.miro_nodes:
-            # Configurações visuais baseadas no modo
-            if visualization_mode == "Mapa 3D Moderno":
+            # Configurações baseadas no modo de visualização
+            if visualization_mode == "Mapa 3D":
                 st.markdown('<div class="three-d-effect">', unsafe_allow_html=True)
-                node_size = 35
-                font_size = 16
+                st.info("🌐 **Modo 3D Ativo**: Efeito visual tridimensional!")
+                node_size = 30
+                font_size = st.session_state.settings.get("node_font_size", 16)
                 physics_enabled = True
                 hierarchical_enabled = False
                 
-                # Aplicar efeitos 3D modernos
+                # Aplicar efeitos 3D
                 for node in st.session_state.miro_nodes:
-                    node["size"] = node_size
-                    node["font"] = {"size": font_size, "color": "#FFFFFF", "strokeWidth": 2, "strokeColor": "#000000"}
-                    node["borderWidth"] = 3
-                    node["borderColor"] = "#FFFFFF"
-                    node["shadow"] = True
-                    node["mass"] = 2.0
-            
+                    if node["color"] == "#4ECDC4": node["color"] = "#00FFCC"
+                    elif node["color"] == "#45B7D1": node["color"] = "#0099FF"
+                    elif node["color"] == "#96CEB4": node["color"] = "#66FF99"
+                    elif node["color"] == "#FECA57": node["color"] = "#FFCC00"
+                    elif node["color"] == "#FF6B6B": node["color"] = "#FF3333"
+                    elif node["color"] == "#A29BFE": node["color"] = "#9966FF"
+                    node["size"] = node_size * 1.5
+                    node["font"] = {"size": font_size, "color": "#FFFFFF"}
+
             elif visualization_mode == "Fluxograma":
                 st.markdown('<div class="flowchart-box">', unsafe_allow_html=True)
-                node_size = 30
-                font_size = 14
+                st.info("📋 **Modo Fluxograma**: Visualização estruturada!")
+                node_size = 25
+                font_size = st.session_state.settings.get("node_font_size", 14)
                 physics_enabled = False
                 hierarchical_enabled = True
                 
-            else:  # Modos padrão
-                node_size = 28
-                font_size = 14
+                for node in st.session_state.miro_nodes:
+                    node["shape"] = "square"
+                    node["color"] = "#2E86AB"
+                    node["size"] = node_size
+                    node["font"] = {"size": font_size, "color": "#FFFFFF"}
+
+            else:  # Mapa 2D padrão
+                node_size = 25
+                font_size = st.session_state.settings.get("node_font_size", 14)
                 physics_enabled = True
                 hierarchical_enabled = False
 
@@ -3312,10 +2591,7 @@ elif st.session_state.page == "mapa":
                         shape=node.get("shape", "dot"),
                         font=node.get("font", {"color": "#FFFFFF", "size": font_size}),
                         x=node.get("x", 0),
-                        y=node.get("y", 0),
-                        borderWidth=node.get("borderWidth", 2),
-                        borderColor=node.get("borderColor", "#FFFFFF"),
-                        shadow=node.get("shadow", True)
+                        y=node.get("y", 0)
                     )
                 )
 
@@ -3326,31 +2602,39 @@ elif st.session_state.page == "mapa":
                         source=edge["source"],
                         target=edge["target"],
                         label=edge.get("label", ""),
-                        color="#rgba(255,255,255,0.7)",
-                        width=3,
-                        dashes=False
+                        color="#rgba(200,200,200,0.8)",
+                        width=2
                     )
                 )
 
-            # Configuração moderna
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+            # INÍCIO DA CORREÇÃO DO TypeError
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
             config_params = {
                 "width": 800,
                 "height": 600,
                 "directed": True,
                 "physics": physics_enabled,
-                "hierarchical": hierarchical_enabled,
+                "hierarchical": False,
             }
 
             if hierarchical_enabled:
                 config_params["hierarchical"] = {
                     "enabled": True,
-                    "levelSeparation": 200,
-                    "nodeSpacing": 150,
-                    "treeSpacing": 250,
-                    "direction": "UD"
+                    "levelSeparation": 150,
+                    "nodeSpacing": 100,
+                    "treeSpacing": 200,
+                    "blockShifting": True,
+                    "edgeMinimization": True,
+                    "parentCentralization": True,
+                    "direction": "UD",
+                    "sortMethod": "hubsize"
                 }
 
             config = Config(**config_params)
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+            # FIM DA CORREÇÃO DO TypeError
+            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
             # Renderizar o gráfico
             try:
@@ -3358,86 +2642,104 @@ elif st.session_state.page == "mapa":
 
                 if return_value:
                     st.session_state.miro_selected_node = return_value
+                    # Não precisa de st.write, a seleção já atualiza a outra coluna
 
             except Exception as e:
                 st.error(f"Erro ao renderizar o mapa: {e}")
-                st.info("💡 Tente reorganizar o mapa ou reduzir o número de ideias")
+                st.info("Tente reorganizar o mapa ou reduzir o número de ideias")
 
             # Fechar divs de estilo
-            if visualization_mode == "Mapa 3D Moderno":
+            if visualization_mode == "Mapa 3D":
                 st.markdown('</div>', unsafe_allow_html=True)
             elif visualization_mode == "Fluxograma":
                 st.markdown('</div>', unsafe_allow_html=True)
 
         else:
-            st.info("""
-            ## 🌟 Comece seu mapa mental!
-            
-            **Para criar seu primeiro mapa:**
-            1. Use o painel à esquerda para criar ideias
-            2. Conecte ideias relacionadas
-            3. Explore diferentes visualizações
-            4. Organize seu pensamento de forma visual
-            
-            **💡 Dica**: Comece com uma ideia central e expanda a partir dela!
-            """)
+            st.info("🌟 **Comece criando sua primeira ideia!** Use o painel à esquerda para adicionar ideias e conectar conceitos.")
 
     with col2:
-        st.subheader("📋 Gerenciamento")
+        st.subheader("📋 Ideias & Conexões")
         
-        # Estatísticas rápidas
+        # Lista de ideias existentes
         if st.session_state.miro_nodes:
-            st.metric("Total de Ideias", len(st.session_state.miro_nodes))
-            st.metric("Conexões", len(st.session_state.miro_edges))
+            st.write(f"**{len(st.session_state.miro_nodes)} ideias no mapa:**")
             
-            # Nó selecionado
-            if st.session_state.miro_selected_node:
-                selected_node = next((n for n in st.session_state.miro_nodes 
-                                    if n["id"] == st.session_state.miro_selected_node), None)
-                if selected_node:
-                    st.markdown(f"**🎯 Selecionado:** {selected_node['label']}")
-            
-            # Lista de ideias com ações rápidas
-            st.markdown("### 💡 Suas Ideias")
-            for node in st.session_state.miro_nodes[:8]:  # Mostrar primeiras 8
+            for node in st.session_state.miro_nodes:
                 is_selected = st.session_state.miro_selected_node == node["id"]
-                emoji = "🟢" if is_selected else "⚪"
+                emoji = "🔵" if not is_selected else "🟢"
                 
-                col_btn1, col_btn2 = st.columns([3, 1])
-                with col_btn1:
-                    if st.button(f"{emoji} {node['label'][:20]}...", 
-                               key=f"sel_{node['id']}", 
-                               use_container_width=True):
-                        st.session_state.miro_selected_node = node["id"]
-                        safe_rerun()
-                with col_btn2:
-                    if st.button("🗑️", key=f"quick_del_{node['id']}", 
-                               help="Excluir", use_container_width=True):
-                        st.session_state.miro_nodes = [n for n in st.session_state.miro_nodes if n['id'] != node['id']]
-                        st.session_state.miro_edges = [e for e in st.session_state.miro_edges 
-                                                     if e['source'] != node['id'] and e['target'] != node['id']]
-                        if st.session_state.miro_selected_node == node['id']:
-                            st.session_state.miro_selected_node = None
-                        st.success("Ideia removida!")
-                        safe_rerun()
+                with st.expander(f"{emoji} {node['label']}", expanded=is_selected):
+                    st.write(f"**Tipo:** {node['type']}")
+                    if node.get('description'):
+                        st.write(f"**Descrição:** {node['description']}")
+                    
+                    # Mostrar conexões
+                    connections = []
+                    for edge in st.session_state.miro_edges:
+                        if edge['source'] == node['id']:
+                            target_node = next((n for n in st.session_state.miro_nodes if n['id'] == edge['target']), None)
+                            if target_node:
+                                connections.append(f"→ {target_node['label']}")
+                        elif edge['target'] == node['id']:
+                            source_node = next((n for n in st.session_state.miro_nodes if n['id'] == edge['source']), None)
+                            if source_node:
+                                connections.append(f"← {source_node['label']}")
+                    
+                    if connections:
+                        st.write("**Conexões:**")
+                        for conn in connections[:5]:
+                            st.write(f"• {conn}")
+                        if len(connections) > 5:
+                            st.write(f"... e mais {len(connections) - 5} conexões")
+                    else:
+                        st.write("_Sem conexões ainda_")
+                    
+                    # Botões de ação
+                    col_btn1, col_btn2 = st.columns(2)
+                    with col_btn1:
+                        if st.button("✏️ Editar", key=f"edit_{node['id']}", use_container_width=True):
+                            st.session_state.editing_node = node['id']
+                            safe_rerun()
+                    
+                    with col_btn2:
+                        if st.button("🗑️ Excluir", key=f"delete_{node['id']}", use_container_width=True):
+                            st.session_state.miro_nodes = [n for n in st.session_state.miro_nodes if n['id'] != node['id']]
+                            st.session_state.miro_edges = [e for e in st.session_state.miro_edges if e['source'] != node['id'] and e['target'] != node['id']]
+                            if st.session_state.miro_selected_node == node['id']:
+                                st.session_state.miro_selected_node = None
+                            st.success("Ideia removida!")
+                            safe_rerun()
         
-        # Ações em lote
-        with st.expander("⚡ Ações Rápidas", expanded=False):
-            if st.button("🎨 Aplicar Cores Automáticas", use_container_width=True):
-                for node in st.session_state.miro_nodes:
-                    if node["type"] in st.session_state.modern_mind_map.node_types:
-                        node_data = st.session_state.modern_mind_map.node_types[node["type"]]
-                        node["color"] = node_data["color"]
-                st.success("Cores atualizadas!")
-                safe_rerun()
+        # Editor de ideias
+        if hasattr(st.session_state, 'editing_node'):
+            editing_node_id = st.session_state.editing_node
+            editing_node = next((n for n in st.session_state.miro_nodes if n['id'] == editing_node_id), None)
             
-            if st.button("🧹 Limpar Mapa", type="secondary", use_container_width=True):
-                if st.checkbox("Confirmar limpeza total do mapa?"):
-                    st.session_state.miro_nodes = []
-                    st.session_state.miro_edges = []
-                    st.session_state.miro_selected_node = None
-                    st.success("Mapa limpo!")
-                    safe_rerun()
+            if editing_node:
+                st.markdown("---")
+                st.subheader("✏️ Editando Ideia")
+                
+                with st.form(f"edit_node_{editing_node_id}"):
+                    new_label = st.text_input("Título:", value=editing_node['label'].replace("💡 ", "").replace("✅ ", "").replace("❓ ", "").replace("📚 ", "").replace("🎯 ", "").replace("📝 ", ""), key=f"edit_label_{editing_node_id}")
+                    new_type = st.selectbox("Tipo:", options=list(st.session_state.miro_map.node_types.keys()), index=list(st.session_state.miro_map.node_types.keys()).index(editing_node['type']), key=f"edit_type_{editing_node_id}")
+                    new_desc = st.text_area("Descrição:", value=editing_node.get('description', ''), key=f"edit_desc_{editing_node_id}")
+                    
+                    col1, col2 = st.columns(2)
+                    with col1:
+                        if st.form_submit_button("💾 Salvar", use_container_width=True):
+                            editing_node['label'] = f"{st.session_state.miro_map.node_types[new_type]['icon']} {new_label}"
+                            editing_node['type'] = new_type
+                            editing_node['description'] = new_desc
+                            editing_node['color'] = st.session_state.miro_map.node_types[new_type]['color']
+                            editing_node['shape'] = st.session_state.miro_map.node_types[new_type]['shape']
+                            del st.session_state.editing_node
+                            st.success("Ideia atualizada!")
+                            safe_rerun()
+                    
+                    with col2:
+                        if st.form_submit_button("❌ Cancelar", use_container_width=True):
+                            del st.session_state.editing_node
+                            safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -3522,7 +2824,9 @@ elif st.session_state.page == "graficos":
         
         st.markdown("---")
         
-        # Assistente de IA SUPER INTELIGENTE
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # INÍCIO DA MELHORIA DO ASSISTENTE IA
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         st.subheader("💬 Converse com a IA sobre seus dados")
         ia_col1, ia_col2 = st.columns([4, 1])
         with ia_col1:
@@ -3546,6 +2850,9 @@ elif st.session_state.page == "graficos":
 
         if st.session_state.ia_response:
             st.markdown(st.session_state.ia_response)
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # FIM DA MELHORIA DO ASSISTENTE IA
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         
         st.markdown("---")
         
@@ -3621,6 +2928,9 @@ elif st.session_state.page == "busca":
     if df_total.empty:
         st.info("Ainda não há dados disponíveis na plataforma para busca.")
     else:
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # INÍCIO DA MELHORIA DA BUSCA
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         col1, col2 = st.columns([3, 1])
         with col1:
             search_query = st.text_input("Digite o termo para buscar:", 
@@ -3669,6 +2979,9 @@ elif st.session_state.page == "busca":
                     st.success(f"Encontrados {len(results)} resultados!")
             else:
                 st.warning("Por favor, digite um termo de busca.")
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # FIM DA MELHORIA DA BUSCA
+        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
         results_df = st.session_state.get('search_results', pd.DataFrame())
         
@@ -3696,7 +3009,7 @@ elif st.session_state.page == "busca":
                     st.markdown("---")
                     st.markdown(escape_html(det.get('resumo','Resumo não disponível.')))
                     
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
+                    col_btn1, col_btn2 = st.columns(2)
                     with col_btn1:
                         if st.button("⭐ Adicionar aos Favoritos", use_container_width=True, key=f"fav_search_{vi}_{USERNAME}"):
                             if add_to_favorites(det):
@@ -3706,11 +3019,6 @@ elif st.session_state.page == "busca":
                     with col_btn2:
                         if st.button("📝 Ver Anotações", use_container_width=True, key=f"notes_search_{vi}_{USERNAME}"):
                             st.session_state.page = "anotacoes"
-                            safe_rerun()
-                    with col_btn3:
-                        if st.button("💡 Ver Recomendações", use_container_width=True, key=f"rec_search_{vi}_{USERNAME}"):
-                            st.session_state.page = "recomendacoes"
-                            st.session_state.palavra_chave_recomendacao = det.get('título', '').split()[0] if det.get('título') else ''
                             safe_rerun()
 
             else:
@@ -3781,7 +3089,7 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mensagens
+# Page: mensagens - MOSTRAR NOME EM VEZ DE CPF
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
