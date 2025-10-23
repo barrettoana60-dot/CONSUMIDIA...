@@ -169,7 +169,7 @@ BACKUPS_DIR.mkdir(exist_ok=True)
 ATTACHMENTS_DIR.mkdir(exist_ok=True)
 
 # -------------------------
-# AI Helper Functions - MELHORADA
+# AI Helper Functions - SUPER MELHORADA
 # -------------------------
 class DataAnalyzer:
     def __init__(self, df):
@@ -598,10 +598,10 @@ class DataAnalyzer:
         return text
 
 # -------------------------
-# SISTEMA DE IA INTELIGENTE MELHORADO
+# SISTEMA DE IA SUPER INTELIGENTE MELHORADO
 # -------------------------
 def get_ai_assistant_response(question, context):
-    """Assistente de IA SUPER INTELIGENTE - Responde qualquer tipo de pergunta"""
+    """Assistente de IA SUPER HIPER MEGA INTELIGENTE - Responde qualquer tipo de pergunta"""
     
     question_lower = question.lower().strip()
     df = context.df
@@ -1128,7 +1128,7 @@ Não entendi completamente: "*{original_question}*"
 Faça uma pergunta mais específica sobre sua planilha!"""
 
 # -------------------------
-# Miro-like Mind Map Components - ATUALIZADO E TRADUZIDO
+# Miro-like Mind Map Components - ATUALIZADO APENAS 3D E FLUXOGRAMA
 # -------------------------
 class MiroStyleMindMap:
     def __init__(self):
@@ -1445,9 +1445,11 @@ def get_session_favorites(): return st.session_state.get("favorites", [])
 
 def add_to_favorites(result_data):
     favorites = get_session_favorites()
-    favorite_item = {"id": f"{int(time.time())}_{random.randint(1000,9999)}", "data": result_data, "added_at": datetime.utcnow().isoformat()}
-    temp_data_to_check = {k: v for k, v in result_data.items() if k not in ['_artemis_username', 'similarity']}
-    existing_contents = [json.dumps({k: v for k, v in fav["data"].items() if k not in ['_artemis_username', 'similarity']}, sort_keys=True) for fav in favorites]
+    # CORREÇÃO: Remover CPF dos dados salvos
+    clean_data = {k: v for k, v in result_data.items() if k != '_artemis_username'}
+    favorite_item = {"id": f"{int(time.time())}_{random.randint(1000,9999)}", "data": clean_data, "added_at": datetime.utcnow().isoformat()}
+    temp_data_to_check = {k: v for k, v in clean_data.items() if k not in ['similarity']}
+    existing_contents = [json.dumps({k: v for k, v in fav["data"].items() if k not in ['similarity']}, sort_keys=True) for fav in favorites]
     if json.dumps(temp_data_to_check, sort_keys=True) not in existing_contents:
         favorites.append(favorite_item)
         st.session_state.favorites = favorites
@@ -2035,7 +2037,6 @@ if "last_unread_count" not in st.session_state: st.session_state.last_unread_cou
 if UNREAD_COUNT > st.session_state.last_unread_count:
     st.toast(f"Você tem {UNREAD_COUNT} nova(s) mensagem(n) não lida(s).", icon="✉️")
 st.session_state.last_unread_count = UNREAD_COUNT
-mens_label = f"✉️ Mensagens ({UNREAD_COUNT})" if UNREAD_COUNT > 0 else "✉️ Mensagens"
 
 # -------------------------
 # Onboarding (first contact)
@@ -2079,7 +2080,7 @@ if st.session_state.authenticated and not st.session_state.recommendation_onboar
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Top navigation and pages
+# Top navigation and pages - ADICIONANDO ABA FAVORITOS
 # -------------------------
 st.markdown("<div class='glass-box' style='padding-top:10px; padding-bottom:10px;'><div class='specular'></div>", unsafe_allow_html=True)
 top1, top2 = st.columns([0.6, 0.4])
@@ -2099,9 +2100,10 @@ with top2:
 st.markdown("</div>", unsafe_allow_html=True)
 
 st.markdown("<div style='margin-top:-20px'>", unsafe_allow_html=True)
-nav_buttons = {"planilha": "📄 Planilha", "recomendacoes": "💡 Recomendações", "mapa": "🗺️ Mapa Mental",
+# ATUALIZADO: Adicionando aba de Favoritos
+nav_buttons = {"planilha": "📄 Planilha", "recomendacoes": "💡 Recomendações", "favoritos": "⭐ Favoritos", "mapa": "🗺️ Mapa Mental",
                "anotacoes": "📝 Anotações", "graficos": "📊 Análise", "busca": "🔍 Busca",
-               "mensagens": mens_label, "config": "⚙️ Configurações"}
+               "mensagens": f"✉️ Mensagens ({UNREAD_COUNT})" if UNREAD_COUNT > 0 else "✉️ Mensagens", "config": "⚙️ Configurações"}
 nav_cols = st.columns(len(nav_buttons))
 for i, (page_key, page_label) in enumerate(nav_buttons.items()):
     with nav_cols[i]:
@@ -2117,6 +2119,7 @@ if not st.session_state.get("tutorial_completed"):
         **O que cada botão faz?**
         * **📄 Planilha**: Carregue sua planilha (.csv ou .xlsx). Os dados dela alimentarão os gráficos e as buscas.
         * **💡 Recomendações**: Explore artigos e trabalhos de outros usuários com base em temas de interesse.
+        * **⭐ Favoritos**: Acesse todos os seus artigos favoritados em um só lugar.
         * **🗺️ Mapa Mental**: Visualize e edite mapas mentais e fluxogramas interativos para organizar ideias.
         * **📝 Anotações**: Um bloco de notas para destacar texto com `==sinais de igual==` e exportar como PDF.
         * **📊 Análise**: Gere gráficos e análises inteligentes a partir da sua planilha.
@@ -2179,7 +2182,7 @@ if st.session_state.page == "planilha":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: recomendacoes (mantém Favoritos aqui)
+# Page: recomendacoes (SEM FAVORITOS AQUI AGORA)
 # -------------------------
 elif st.session_state.page == "recomendacoes":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -2194,36 +2197,7 @@ elif st.session_state.page == "recomendacoes":
 
     temas_populares = extract_popular_themes_from_data(df_total) if not df_total.empty else []
 
-    # favorites panel (moved here)
-    with st.expander(f"⭐ Favoritos ({len(get_session_favorites())})", expanded=False):
-        favorites = get_session_favorites()
-        if not favorites:
-            st.info("Nenhum favorito salvo.")
-        else:
-            if st.button("🗑️ Limpar Todos os Favoritos", key=f"clear_favs_rec_{USERNAME}"):
-                clear_all_favorites(); st.session_state.recommendation_page = 1; safe_rerun()
-            for fav in sorted(favorites, key=lambda x: x['added_at'], reverse=True):
-                fav_data = fav['data']
-                st.markdown(f"""
-                <div class="card">
-                    <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
-                    <div class="small-muted">De <strong>{escape_html(fav_data.get('_artemis_username', 'N/A'))}</strong></div>
-                </div>""", unsafe_allow_html=True)
-                c1, c2 = st.columns([0.75, 0.25])
-                with c1:
-                    if st.button("Ver", key=f"fav_view_rec_{fav['id']}_{USERNAME}", use_container_width=True):
-                        st.session_state.fav_detail = fav['data']
-                with c2:
-                    if st.button("Remover", key=f"fav_del_rec_{fav['id']}_{USERNAME}", use_container_width=True):
-                        remove_from_favorites(fav['id']); safe_rerun()
-            if 'fav_detail' in st.session_state and st.session_state.fav_detail:
-                det_fav = st.session_state.pop("fav_detail")
-                det_fav = enrich_article_metadata(det_fav)
-                st.markdown("## Detalhes do Favorito")
-                st.markdown(f"**{escape_html(det_fav.get('título','— Sem título —'))}**")
-                st.markdown(f"_Autor(es):_ {escape_html(det_fav.get('autor','— —'))}")
-                st.markdown("---")
-                st.markdown(escape_html(det_fav.get('resumo','Resumo não disponível.')))
+    # NOVO: Removemos a seção de favoritos daqui (agora está na aba separada)
 
     # recommendation onboarding or refine
     if not st.session_state.recommendation_onboarding_complete:
@@ -2362,7 +2336,10 @@ elif st.session_state.page == "recomendacoes":
 
             for idx, row in page_df.iterrows():
                 user_src = row.get("_artemis_username", "N/A")
-                initials = "".join([p[0] for p in str(user_src).split()[:2]]).upper() or "U"
+                # CORREÇÃO: Mostrar nome em vez de CPF
+                all_users = load_users()
+                user_name = all_users.get(user_src, {}).get('name', user_src)
+                initials = "".join([p[0] for p in str(user_name).split()[:2]]).upper() or "U"
                 title = str(row.get('título') or row.get('titulo') or '(Sem título)')
                 similarity = row.get('similarity', 0)
                 author_snippet = row.get('autor') or ""
@@ -2377,7 +2354,7 @@ elif st.session_state.page == "recomendacoes":
                         <div class="avatar" style="background:#6c5ce7; color:white; font-weight:bold;">{escape_html(initials)}</div>
                         <div style="flex:1;">
                             <div class="card-title">{escape_html(title)}</div>
-                            <div class="small-muted">De <strong>{escape_html(user_src)}</strong> • {escape_html(author_snippet)}</div>
+                            <div class="small-muted">De <strong>{escape_html(user_name)}</strong> • {escape_html(author_snippet)}</div>
                             <div class="small-muted">Ano: {escape_html(str(year))} • País: {escape_html(country)}</div>
                             <div class="small-muted">Link: {escape_html(link)}</div>
                         </div>
@@ -2412,7 +2389,128 @@ elif st.session_state.page == "recomendacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa mental - CORRIGIDO
+# NOVA PÁGINA: FAVORITOS
+# -------------------------
+elif st.session_state.page == "favoritos":
+    st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
+    st.subheader("⭐ Seus Artigos Favoritos")
+    
+    favorites = get_session_favorites()
+    
+    if not favorites:
+        st.info("🌟 Você ainda não tem favoritos. Adicione artigos interessantes das abas 'Recomendações' ou 'Busca'!")
+        st.markdown("""
+        **💡 Como adicionar favoritos:**
+        - Na aba **Recomendações**: Clique em "⭐ Favoritar" em qualquer artigo
+        - Na aba **Busca**: Clique em "⭐ Favoritar" nos resultados da busca
+        - Os favoritos ficam salvos mesmo depois de sair do sistema
+        """)
+    else:
+        st.success(f"📚 Você tem {len(favorites)} artigo(s) favoritado(s)!")
+        
+        # Opções de organização
+        col1, col2, col3 = st.columns([2, 2, 1])
+        with col1:
+            sort_option = st.selectbox("Ordenar por:", 
+                                     ["Mais recentes", "Mais antigos", "Título (A-Z)", "Título (Z-A)"],
+                                     key="favorites_sort")
+        with col2:
+            filter_source = st.selectbox("Filtrar por fonte:", 
+                                       ["Todas", "Recomendações", "Busca", "Web"],
+                                       key="favorites_filter")
+        with col3:
+            if st.button("🗑️ Limpar Todos", type="secondary", use_container_width=True):
+                if st.checkbox("Confirmar limpeza de TODOS os favoritos?"):
+                    clear_all_favorites()
+                    st.success("Todos os favoritos foram removidos!")
+                    safe_rerun()
+        
+        # Aplicar filtros e ordenação
+        filtered_favorites = favorites.copy()
+        
+        # Filtro por fonte
+        if filter_source != "Todas":
+            if filter_source == "Recomendações":
+                filtered_favorites = [f for f in filtered_favorites if f["data"].get("similarity")]
+            elif filter_source == "Busca":
+                filtered_favorites = [f for f in filtered_favorites if not f["data"].get("similarity") and not f["data"].get("_tema_origem")]
+            elif filter_source == "Web":
+                filtered_favorites = [f for f in filtered_favorites if f["data"].get("_tema_origem")]
+        
+        # Ordenação
+        if sort_option == "Mais recentes":
+            filtered_favorites.sort(key=lambda x: x['added_at'], reverse=True)
+        elif sort_option == "Mais antigos":
+            filtered_favorites.sort(key=lambda x: x['added_at'])
+        elif sort_option == "Título (A-Z)":
+            filtered_favorites.sort(key=lambda x: x['data'].get('título', '').lower())
+        elif sort_option == "Título (Z-A)":
+            filtered_favorites.sort(key=lambda x: x['data'].get('título', '').lower(), reverse=True)
+        
+        # Exibir favoritos
+        for fav in filtered_favorites:
+            fav_data = fav['data']
+            
+            # Determinar tipo de fonte
+            source_type = "🔍 Busca"
+            if fav_data.get("similarity"):
+                source_type = "💡 Recomendações"
+            elif fav_data.get("_tema_origem"):
+                source_type = "🌐 Web"
+            
+            st.markdown(f"""
+            <div class="card">
+                <div class="card-title">{escape_html(fav_data.get('título', '(Sem título)'))}</div>
+                <div class="small-muted">
+                    {source_type} • Adicionado em {datetime.fromisoformat(fav['added_at']).strftime('%d/%m/%Y %H:%M')}
+                </div>
+                <div class="small-muted">
+                    {escape_html(fav_data.get('autor', 'Autor não informado'))} • {escape_html(str(fav_data.get('ano', 'Ano não informado')))}
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+            
+            col1, col2, col3 = st.columns([1, 1, 1])
+            with col1:
+                if st.button("📖 Ver Detalhes", key=f"view_fav_{fav['id']}", use_container_width=True):
+                    st.session_state.fav_detail = fav_data
+            with col2:
+                if st.button("📝 Anotações", key=f"notes_fav_{fav['id']}", use_container_width=True):
+                    st.session_state.page = "anotacoes"
+                    safe_rerun()
+            with col3:
+                if st.button("❌ Remover", key=f"remove_fav_{fav['id']}", use_container_width=True):
+                    remove_from_favorites(fav['id'])
+                    st.success("Favorito removido!")
+                    safe_rerun()
+            
+            st.markdown("---")
+        
+        # Visualização de detalhes
+        if 'fav_detail' in st.session_state and st.session_state.fav_detail:
+            det_fav = st.session_state.pop("fav_detail")
+            det_fav = enrich_article_metadata(det_fav)
+            
+            st.markdown("## 📄 Detalhes do Favorito")
+            st.markdown(f"**{escape_html(det_fav.get('título','— Sem título —'))}**")
+            st.markdown(f"**Autor(es):** {escape_html(det_fav.get('autor','— —'))}")
+            st.markdown(f"**Ano:** {escape_html(str(det_fav.get('ano','— —')))}")
+            
+            if det_fav.get('doi'):
+                doi_link = f"https://doi.org/{det_fav.get('doi')}"
+                st.markdown(f"**DOI:** [{det_fav.get('doi')}]({doi_link})")
+            
+            st.markdown("---")
+            st.markdown("**Resumo**")
+            st.markdown(escape_html(det_fav.get('resumo','Resumo não disponível.')))
+            
+            if st.button("⬅️ Voltar para lista de favoritos"):
+                safe_rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# -------------------------
+# Page: mapa mental - APENAS 3D E FLUXOGRAMA
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -2431,7 +2529,7 @@ elif st.session_state.page == "mapa":
     with st.sidebar:
         st.header("🎨 Controles do Mapa")
         
-        # Criar nova ideia - CORREÇÃO: posicionamento seguro
+        # Criar nova ideia
         with st.expander("➕ Nova Ideia", expanded=True):
             with st.form("create_miro_node", clear_on_submit=True):
                 node_label = st.text_input("Título da ideia:", placeholder="Ex: Pesquisa Qualitativa", key="new_node_label")
@@ -2442,7 +2540,7 @@ elif st.session_state.page == "mapa":
                     if node_label:
                         node_id = f"node_{int(time.time())}_{random.randint(1000,9999)}"
                         
-                        # CORREÇÃO: Posicionamento seguro
+                        # Posicionamento seguro
                         x, y = 500, 400  # Posição central padrão
                         
                         # Se há nós existentes, posicionar de forma inteligente
@@ -2510,9 +2608,9 @@ elif st.session_state.page == "mapa":
             else:
                 st.info("Precisa de pelo menos 2 ideias para conectar")
         
-        # Configurações do mapa
+        # Configurações do mapa - APENAS 3D E FLUXOGRAMA
         with st.expander("👁️ Visualização", expanded=False):
-            visualization_mode = st.selectbox("Modo de Visualização:", options=["Mapa 2D", "Mapa 3D", "Fluxograma"], index=0)
+            visualization_mode = st.selectbox("Modo de Visualização:", options=["Mapa 3D", "Fluxograma"], index=0)
             
             st.session_state.miro_layout = st.selectbox("Organização Automática:", options=["hierarchical", "radial", "force"])
             
@@ -2559,7 +2657,7 @@ elif st.session_state.page == "mapa":
                     node["size"] = node_size * 1.5
                     node["font"] = {"size": font_size, "color": "#FFFFFF"}
 
-            elif visualization_mode == "Fluxograma":
+            else:  # Fluxograma
                 st.markdown('<div class="flowchart-box">', unsafe_allow_html=True)
                 st.info("📋 **Modo Fluxograma**: Visualização estruturada!")
                 node_size = 25
@@ -2572,12 +2670,6 @@ elif st.session_state.page == "mapa":
                     node["color"] = "#2E86AB"
                     node["size"] = node_size
                     node["font"] = {"size": font_size, "color": "#FFFFFF"}
-
-            else:  # Mapa 2D padrão
-                node_size = 25
-                font_size = st.session_state.settings.get("node_font_size", 14)
-                physics_enabled = True
-                hierarchical_enabled = False
 
             # Preparar nós e arestas
             nodes_for_viz = []
@@ -2607,9 +2699,6 @@ elif st.session_state.page == "mapa":
                     )
                 )
 
-            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-            # INÍCIO DA CORREÇÃO DO TypeError
-            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
             config_params = {
                 "width": 800,
                 "height": 600,
@@ -2632,9 +2721,6 @@ elif st.session_state.page == "mapa":
                 }
 
             config = Config(**config_params)
-            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-            # FIM DA CORREÇÃO DO TypeError
-            # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
             # Renderizar o gráfico
             try:
@@ -2642,7 +2728,6 @@ elif st.session_state.page == "mapa":
 
                 if return_value:
                     st.session_state.miro_selected_node = return_value
-                    # Não precisa de st.write, a seleção já atualiza a outra coluna
 
             except Exception as e:
                 st.error(f"Erro ao renderizar o mapa: {e}")
@@ -2803,7 +2888,7 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos - COM BOTÃO DA IA CORRETO
+# Page: graficos - GRÁFICOS MAIS INTELIGENTES
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -2824,86 +2909,214 @@ elif st.session_state.page == "graficos":
         
         st.markdown("---")
         
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        # INÍCIO DA MELHORIA DO ASSISTENTE IA
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        # ASSISTENTE IA SUPER MELHORADO
         st.subheader("💬 Converse com a IA sobre seus dados")
-        ia_col1, ia_col2 = st.columns([4, 1])
-        with ia_col1:
+        
+        # Histórico de conversa
+        if 'ia_conversation' not in st.session_state:
+            st.session_state.ia_conversation = []
+        
+        # Exibir histórico
+        for msg in st.session_state.ia_conversation[-6:]:  # Últimas 6 mensagens
+            if msg['role'] == 'user':
+                st.markdown(f"**Você:** {msg['content']}")
+            else:
+                st.markdown(f"**IA:** {msg['content']}")
+        
+        # Nova pergunta
+        col1, col2 = st.columns([4, 1])
+        with col1:
             question = st.text_input(
                 "Faça uma pergunta sobre a planilha:", 
-                placeholder="Ex: Quais são os autores mais produtivos?",
+                placeholder="Ex: Quais são os autores mais produtivos? Como está a distribuição geográfica?",
                 key="ia_question_input",
                 label_visibility="collapsed"
             )
-        with ia_col2:
+        with col2:
             ask_button = st.button("Perguntar à IA", key="ia_ask_button", use_container_width=True)
 
         if ask_button and question:
-            with st.spinner("A IA está pensando..."):
+            with st.spinner("🧠 A IA está analisando seus dados..."):
+                # Adicionar pergunta ao histórico
+                st.session_state.ia_conversation.append({'role': 'user', 'content': question})
+                
+                # Obter resposta
                 analyzer = DataAnalyzer(df)
                 response = get_ai_assistant_response(question, analyzer)
-                st.session_state.ia_response = response
+                
+                # Adicionar resposta ao histórico
+                st.session_state.ia_conversation.append({'role': 'assistant', 'content': response})
+                
+                # Mostrar resposta
+                st.markdown(response)
         elif ask_button and not question:
-            st.session_state.ia_response = None
             st.warning("Por favor, digite uma pergunta.")
-
-        if st.session_state.ia_response:
-            st.markdown(st.session_state.ia_response)
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        # FIM DA MELHORIA DO ASSISTENTE IA
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
+        
+        # Sugestões de perguntas
+        st.markdown("---")
+        st.subheader("💡 Sugestões de Perguntas")
+        
+        col_sug1, col_sug2, col_sug3 = st.columns(3)
+        with col_sug1:
+            if st.button("📈 Análise Temporal", use_container_width=True):
+                st.session_state.ia_conversation.append({'role': 'user', 'content': "Como evoluiu a pesquisa ao longo do tempo?"})
+                analyzer = DataAnalyzer(df)
+                response = get_ai_assistant_response("Como evoluiu a pesquisa ao longo do tempo?", analyzer)
+                st.session_state.ia_conversation.append({'role': 'assistant', 'content': response})
+                safe_rerun()
+        
+        with col_sug2:
+            if st.button("👥 Autores Principais", use_container_width=True):
+                st.session_state.ia_conversation.append({'role': 'user', 'content': "Quais são os autores mais produtivos?"})
+                analyzer = DataAnalyzer(df)
+                response = get_ai_assistant_response("Quais são os autores mais produtivos?", analyzer)
+                st.session_state.ia_conversation.append({'role': 'assistant', 'content': response})
+                safe_rerun()
+        
+        with col_sug3:
+            if st.button("🌎 Distribuição Geográfica", use_container_width=True):
+                st.session_state.ia_conversation.append({'role': 'user', 'content': "Qual a distribuição geográfica da pesquisa?"})
+                analyzer = DataAnalyzer(df)
+                response = get_ai_assistant_response("Qual a distribuição geográfica da pesquisa?", analyzer)
+                st.session_state.ia_conversation.append({'role': 'assistant', 'content': response})
+                safe_rerun()
         
         st.markdown("---")
         
-        # Visualizações gráficas
-        st.subheader("📈 Visualizações Gráficas")
+        # VISUALIZAÇÕES GRÁFICAS INTELIGENTES
+        st.subheader("📈 Visualizações Gráficas Inteligentes")
+        
+        # Detecção automática de tipos de dados
+        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+        categorical_cols = df.select_dtypes(include=['object']).columns.tolist()
+        
+        # Sugestões automáticas baseadas nos dados
+        if numeric_cols and categorical_cols:
+            st.info("🎯 **Sugestões automáticas baseadas em seus dados:**")
+            
+            col_sug1, col_sug2, col_sug3 = st.columns(3)
+            
+            with col_sug1:
+                if st.button(f"📊 {categorical_cols[0]} vs {numeric_cols[0] if numeric_cols else 'contagem'}", use_container_width=True):
+                    st.session_state.auto_chart = {'x': categorical_cols[0], 'y': numeric_cols[0] if numeric_cols else None, 'type': 'bar'}
+            
+            with col_sug2:
+                if len(numeric_cols) >= 2 and st.button(f"📈 {numeric_cols[0]} vs {numeric_cols[1]}", use_container_width=True):
+                    st.session_state.auto_chart = {'x': numeric_cols[0], 'y': numeric_cols[1], 'type': 'line'}
+            
+            with col_sug3:
+                if st.button(f"🥧 Distribuição de {categorical_cols[0]}", use_container_width=True):
+                    st.session_state.auto_chart = {'x': categorical_cols[0], 'y': None, 'type': 'pie'}
         
         chart_type = st.selectbox("Escolha o tipo de gráfico:", 
-                                ["Barras", "Linhas", "Pizza"])
+                                ["Barras", "Linhas", "Pizza", "Histograma", "Dispersão"])
         
         col1, col2 = st.columns(2)
         
         with col1:
-            x_axis = st.selectbox("Eixo X (ou Categoria para Pizza):", options=df.columns.tolist())
+            # Seleção inteligente de eixo X
+            x_options = categorical_cols + numeric_cols
+            x_axis = st.selectbox("Eixo X (Categoria):", options=x_options)
         
         with col2:
-            if chart_type in ["Barras", "Linhas"]:
-                y_axis = st.selectbox("Eixo Y (Valores):", options=[None] + df.columns.tolist())
+            if chart_type in ["Barras", "Linhas", "Dispersão"]:
+                y_options = [None] + numeric_cols
+                y_axis = st.selectbox("Eixo Y (Valores):", options=y_options)
             else:
                 y_axis = None
         
+        # Configurações avançadas
+        with st.expander("⚙️ Configurações Avançadas"):
+            col_adv1, col_adv2 = st.columns(2)
+            with col_adv1:
+                top_n = st.slider("Top N categorias:", min_value=5, max_value=50, value=15)
+                opacity = st.slider("Opacidade:", min_value=0.3, max_value=1.0, value=0.8)
+            with col_adv2:
+                color_theme = st.selectbox("Tema de cores:", options=["Viridis", "Plasma", "Inferno", "Magma", "Cividis"])
+                show_grid = st.checkbox("Mostrar grade", value=True)
+        
         try:
+            # Gráficos inteligentes com detecção automática
             if chart_type == "Barras":
                 if y_axis: # Se o usuário selecionou um eixo Y, agregue os dados
                     if df[y_axis].dtype in ['int64', 'float64']:
-                        grouped_df = df.groupby(x_axis)[y_axis].sum().reset_index().sort_values(by=y_axis, ascending=False).head(20)
-                        fig = px.bar(grouped_df, x=x_axis, y=y_axis, title=f"Soma de '{y_axis}' por '{x_axis}'")
+                        # Agrupar e ordenar
+                        grouped_df = df.groupby(x_axis)[y_axis].sum().reset_index()
+                        grouped_df = grouped_df.sort_values(by=y_axis, ascending=False).head(top_n)
+                        
+                        fig = px.bar(grouped_df, x=x_axis, y=y_axis, 
+                                   title=f"Soma de '{y_axis}' por '{x_axis}'",
+                                   color=y_axis, color_continuous_scale=color_theme.lower())
+                        fig.update_traces(opacity=opacity)
                     else:
                         st.warning(f"Para agregar, o Eixo Y ('{y_axis}') deve ser numérico.")
                         fig = None
                 else: # Se não, faça uma contagem de frequência no eixo X
-                    value_counts = df[x_axis].value_counts().head(20)
-                    fig = px.bar(value_counts, x=value_counts.index, y=value_counts.values, 
-                               title=f"Contagem de Ocorrências em '{x_axis}'", labels={'x': x_axis, 'y': 'Contagem'})
+                    value_counts = df[x_axis].value_counts().head(top_n)
+                    fig = px.bar(x=value_counts.index, y=value_counts.values, 
+                               title=f"Contagem de Ocorrências em '{x_axis}'", 
+                               labels={'x': x_axis, 'y': 'Contagem'},
+                               color=value_counts.values, color_continuous_scale=color_theme.lower())
+                    fig.update_traces(opacity=opacity)
                 
                 if fig:
+                    fig.update_layout(showlegend=False, xaxis_tickangle=-45)
+                    if show_grid:
+                        fig.update_layout(xaxis_showgrid=True, yaxis_showgrid=True)
                     st.plotly_chart(fig, use_container_width=True)
             
             elif chart_type == "Linhas":
                 if y_axis and df[y_axis].dtype in ['int64', 'float64']:
-                    # Tenta ordenar o eixo X se for numérico (como ano) ou data
-                    df_sorted = df.sort_values(by=x_axis)
-                    fig = px.line(df_sorted, x=x_axis, y=y_axis, title=f"'{y_axis}' ao longo de '{x_axis}'")
+                    # Verificar se o eixo X é temporal
+                    if df[x_axis].dtype in ['int64', 'float64'] or any(keyword in x_axis.lower() for keyword in ['ano', 'year', 'data']):
+                        df_sorted = df.sort_values(by=x_axis)
+                        fig = px.line(df_sorted, x=x_axis, y=y_axis, 
+                                    title=f"'{y_axis}' ao longo de '{x_axis}'",
+                                    markers=True)
+                        fig.update_traces(line=dict(width=3), opacity=opacity)
+                    else:
+                        # Agrupar por categoria
+                        grouped_df = df.groupby(x_axis)[y_axis].mean().reset_index()
+                        fig = px.line(grouped_df, x=x_axis, y=y_axis,
+                                    title=f"Média de '{y_axis}' por '{x_axis}'",
+                                    markers=True)
+                        fig.update_traces(line=dict(width=3), opacity=opacity)
+                    
+                    if show_grid:
+                        fig.update_layout(xaxis_showgrid=True, yaxis_showgrid=True)
                     st.plotly_chart(fig, use_container_width=True)
                 else:
                     st.warning("Para gráfico de linhas, o eixo Y deve ser uma coluna numérica.")
             
             elif chart_type == "Pizza":
-                value_counts = df[x_axis].value_counts().head(10)
+                value_counts = df[x_axis].value_counts().head(top_n)
                 fig = px.pie(values=value_counts.values, names=value_counts.index, 
-                           title=f"Distribuição de '{x_axis}'")
+                           title=f"Distribuição de '{x_axis}'",
+                           color_discrete_sequence=px.colors.sequential.Viridis)
                 st.plotly_chart(fig, use_container_width=True)
+            
+            elif chart_type == "Histograma":
+                if x_axis in numeric_cols:
+                    fig = px.histogram(df, x=x_axis, 
+                                     title=f"Distribuição de '{x_axis}'",
+                                     nbins=20, opacity=opacity)
+                    if show_grid:
+                        fig.update_layout(xaxis_showgrid=True, yaxis_showgrid=True)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Para histograma, selecione uma coluna numérica.")
+            
+            elif chart_type == "Dispersão":
+                if x_axis in numeric_cols and y_axis in numeric_cols:
+                    fig = px.scatter(df, x=x_axis, y=y_axis,
+                                   title=f"Relação entre '{x_axis}' e '{y_axis}'",
+                                   opacity=opacity,
+                                   trendline="lowess")
+                    if show_grid:
+                        fig.update_layout(xaxis_showgrid=True, yaxis_showgrid=True)
+                    st.plotly_chart(fig, use_container_width=True)
+                else:
+                    st.warning("Para gráfico de dispersão, ambas as colunas devem ser numéricas.")
         
         except Exception as e:
             st.error(f"Erro ao gerar gráfico: {e}")
@@ -2912,7 +3125,7 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: busca - COM FILTROS MELHORADOS
+# Page: busca - CORRIGIDO VAZAMENTO DE CPF
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -2928,9 +3141,6 @@ elif st.session_state.page == "busca":
     if df_total.empty:
         st.info("Ainda não há dados disponíveis na plataforma para busca.")
     else:
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        # INÍCIO DA MELHORIA DA BUSCA
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
         col1, col2 = st.columns([3, 1])
         with col1:
             search_query = st.text_input("Digite o termo para buscar:", 
@@ -2979,9 +3189,6 @@ elif st.session_state.page == "busca":
                     st.success(f"Encontrados {len(results)} resultados!")
             else:
                 st.warning("Por favor, digite um termo de busca.")
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
-        # FIM DA MELHORIA DA BUSCA
-        # >>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>
 
         results_df = st.session_state.get('search_results', pd.DataFrame())
         
@@ -3032,7 +3239,7 @@ elif st.session_state.page == "busca":
 
                 st.markdown(f"**📊 {total}** resultado(s) encontrado(s) — exibindo {start+1} a {end}.")
 
-                # Obter todos os nomes de usuários de uma vez
+                # CORREÇÃO: Mostrar nome em vez de CPF
                 all_users = load_users()
 
                 for idx, row in page_df.iterrows():
@@ -3089,7 +3296,7 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mensagens - MOSTRAR NOME EM VEZ DE CPF
+# Page: mensagens
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
