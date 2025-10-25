@@ -2442,11 +2442,11 @@ elif st.session_state.page == "graficos":
         
         # Análise inteligente automática
         st.subheader("🤖 Análise Inteligente dos Dados")
-        if st.button("🔍 Gerar Análise Completa da Planilha", use_container_width=True):
-            with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
-                analyzer = DataAnalyzer(df)
-                analysis = analyzer.generate_comprehensive_analysis()
-                st.markdown(analysis)
+       if st.button("🔍 Gerar Análise Completa da Planilha", use_container_width=True):
+    with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
+        analyzer = AdvancedDataAnalyzer(df)  # ← CORRIGIDO
+        analysis = analyzer.generate_comprehensive_analysis()
+        st.markdown(analysis)
         
         st.markdown("---")
         
@@ -2482,7 +2482,7 @@ elif st.session_state.page == "graficos":
                 st.session_state.ia_conversation.append({'role': 'user', 'content': question})
                 
                 # Obter resposta
-                analyzer = DataAnalyzer(df)
+               analyzer = AdvancedDataAnalyzer(df)
                 response = get_ai_assistant_response(question, analyzer)
                 
                 # Adicionar resposta ao histórico
