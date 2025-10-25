@@ -2438,16 +2438,15 @@ elif st.session_state.page == "graficos":
     if st.session_state.df is None or st.session_state.df.empty:
         st.info("📁 Carregue uma planilha na aba 'Planilha' para ver análises e gráficos.")
     else:
-        df = st.session_state.df
-        
-        # Análise inteligente automática
-        st.subheader("🤖 Análise Inteligente dos Dados")
-       if st.button("🔍 Gerar Análise Completa da Planilha", use_container_width=True):
-    with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
-        analyzer = AdvancedDataAnalyzer(df)  # ← CORRIGIDO
-        analysis = analyzer.generate_comprehensive_analysis()
-        st.markdown(analysis)
-        
+    df = st.session_state.df
+    
+    # Análise inteligente automática
+    st.subheader("🤖 Análise Inteligente dos Dados")
+    if st.button("🔍 Gerar Análise Completa da Planilha", use_container_width=True):
+        with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
+            analyzer = AdvancedDataAnalyzer(df)
+            analysis = analyzer.generate_comprehensive_analysis()
+            st.markdown(analysis)
         st.markdown("---")
         
         # ASSISTENTE IA SUPER MELHORADO
