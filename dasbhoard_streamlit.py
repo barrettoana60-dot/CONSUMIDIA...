@@ -1,3 +1,6 @@
+Vou implementar as melhorias solicitadas na análise da planilha e no mapa mental. Aqui está o código completo atualizado:
+
+```python
 import os
 import re
 import io
@@ -173,1037 +176,609 @@ BACKUPS_DIR.mkdir(exist_ok=True)
 ATTACHMENTS_DIR.mkdir(exist_ok=True)
 
 # -------------------------
-# AI Helper Functions - SUPER MELHORADA
+# ANÁLISE INTELIGENTE MELHORADA - PLANILHA COMO UM TODO
 # -------------------------
 class DataAnalyzer:
     def __init__(self, df):
         self.df = df.copy()
         self.insights = []
+        self._detect_columns()
+    
+    def _detect_columns(self):
+        """Detecção inteligente de colunas - MAIS ROBUSTA"""
+        self.column_types = {
+            'authors': [],
+            'years': [], 
+            'titles': [],
+            'abstracts': [],
+            'countries': [],
+            'keywords': [],
+            'dates': [],
+            'institutions': [],
+            'journals': [],
+            'urls': []
+        }
+        
+        for col in self.df.columns:
+            col_lower = col.lower()
+            col_data = self.df[col].dropna()
+            
+            # Detecção de autores
+            if any(keyword in col_lower for keyword in ['autor', 'author', 'pesquisador', 'escritor', 'writer']):
+                self.column_types['authors'].append(col)
+            
+            # Detecção de anos
+            elif any(keyword in col_lower for keyword in ['ano', 'year', 'publication']):
+                self.column_types['years'].append(col)
+            
+            # Detecção de títulos
+            elif any(keyword in col_lower for keyword in ['título', 'titulo', 'title']):
+                self.column_types['titles'].append(col)
+            
+            # Detecção de resumos
+            elif any(keyword in col_lower for keyword in ['resumo', 'abstract', 'summary']):
+                self.column_types['abstracts'].append(col)
+            
+            # Detecção de países
+            elif any(keyword in col_lower for keyword in ['país', 'pais', 'country', 'nacionalidade', 'local']):
+                self.column_types['countries'].append(col)
+            
+            # Detecção de datas
+            elif any(keyword in col_lower for keyword in ['data', 'date']):
+                self.column_types['dates'].append(col)
+            
+            # Detecção de palavras-chave
+            elif any(keyword in col_lower for keyword in ['palavra', 'keyword', 'tema', 'assunto']):
+                self.column_types['keywords'].append(col)
+            
+            # Detecção de instituições
+            elif any(keyword in col_lower for keyword in ['instituição', 'instituicao', 'universidade', 'faculdade', 'institution']):
+                self.column_types['institutions'].append(col)
+            
+            # Detecção de periódicos
+            elif any(keyword in col_lower for keyword in ['periódico', 'periodico', 'journal', 'revista']):
+                self.column_types['journals'].append(col)
+            
+            # Detecção de URLs
+            elif any(keyword in col_lower for keyword in ['url', 'link', 'doi', 'website']):
+                self.column_types['urls'].append(col)
     
     def generate_comprehensive_analysis(self):
         """Gera uma análise completa e inteligente dos dados"""
-        analysis = ""
+        analysis = "## 🧠 ANÁLISE INTELIGENTE COMPLETA DA PLANILHA\n\n"
         
-        # Análise básica
-        analysis += self._basic_analysis()
-        analysis += self._author_analysis()
-        analysis += self._temporal_analysis()
-        analysis += self._thematic_analysis()
-        analysis += self._collaboration_analysis()
-        analysis += self._geographic_analysis()
-        analysis += self._trend_analysis()
+        # Resumo executivo
+        analysis += self._executive_summary()
+        analysis += self._data_quality_analysis()
+        analysis += self._author_network_analysis()
+        analysis += self._temporal_analysis_advanced()
+        analysis += self._thematic_analysis_advanced()
+        analysis += self._geographic_analysis_advanced()
+        analysis += self._collaboration_analysis_advanced()
+        analysis += self._institutional_analysis()
+        analysis += self._trends_and_patterns()
+        analysis += self._recommendations()
         
         return analysis
     
-    def _basic_analysis(self):
-        """Análise básica dos dados"""
-        text = "### 📊 Visão Geral\n\n"
-        text += f"- **Total de registros**: {len(self.df)}\n"
-        text += f"- **Colunas disponíveis**: {', '.join(self.df.columns.tolist())}\n"
+    def _executive_summary(self):
+        """Resumo executivo inteligente"""
+        text = "### 📋 RESUMO EXECUTIVO\n\n"
         
-        # Estatísticas por tipo de dado
-        numeric_cols = self.df.select_dtypes(include=[np.number]).columns.tolist()
-        text_cols = self.df.select_dtypes(include=['object']).columns.tolist()
-        text += f"- **Colunas numéricas**: {len(numeric_cols)}\n"
-        text += f"- **Colunas de texto**: {len(text_cols)}\n\n"
+        total_records = len(self.df)
+        total_columns = len(self.df.columns)
+        
+        text += f"**📊 Dimensões da Base**: {total_records} registros × {total_columns} colunas\n\n"
+        
+        # Análise de completude
+        completeness = {}
+        for col in self.df.columns:
+            non_null = self.df[col].notna().sum()
+            completeness[col] = (non_null / total_records) * 100
+        
+        high_completeness = sum(1 for comp in completeness.values() if comp > 80)
+        medium_completeness = sum(1 for comp in completeness.values() if 50 <= comp <= 80)
+        
+        text += f"**✅ Qualidade dos Dados**:\n"
+        text += f"- {high_completeness} colunas com alta completude (>80%)\n"
+        text += f"- {medium_completeness} colunas com completude moderada (50-80%)\n"
+        text += f"- {total_columns - high_completeness - medium_completeness} colunas com baixa completude\n\n"
+        
+        # Principais achados
+        if self.column_types['authors']:
+            authors_col = self.column_types['authors'][0]
+            unique_authors = self._extract_unique_authors(authors_col)
+            if unique_authors:
+                text += f"**👥 Autores Únicos**: {len(unique_authors)} pesquisadores identificados\n"
+        
+        if self.column_types['years']:
+            years_col = self.column_types['years'][0]
+            years_data = pd.to_numeric(self.df[years_col], errors='coerce').dropna()
+            if len(years_data) > 0:
+                year_range = f"{int(years_data.min())}-{int(years_data.max())}"
+                text += f"**📅 Período**: {year_range} ({len(years_data)} anos de dados)\n"
+        
+        if self.column_types['countries']:
+            countries_col = self.column_types['countries'][0]
+            unique_countries = self.df[countries_col].nunique()
+            text += f"**🌎 Países/Regiões**: {unique_countries} localizações distintas\n"
+        
+        return text + "\n"
+    
+    def _data_quality_analysis(self):
+        """Análise detalhada da qualidade dos dados"""
+        text = "### 🔍 ANÁLISE DE QUALIDADE DOS DADOS\n\n"
+        
+        issues = []
+        recommendations = []
+        
+        # Verificar dados duplicados
+        duplicates = self.df.duplicated().sum()
+        if duplicates > 0:
+            issues.append(f"❌ **{duplicates} registros duplicados** encontrados")
+            recommendations.append("💡 **Remova registros duplicados** para melhorar a qualidade da análise")
+        
+        # Verificar valores nulos
+        null_counts = self.df.isnull().sum()
+        high_null_cols = null_counts[null_counts > len(self.df) * 0.5]  # >50% nulos
+        if len(high_null_cols) > 0:
+            issues.append(f"⚠️ **{len(high_null_cols)} colunas** com mais de 50% de dados faltantes")
+            recommendations.append("💡 **Considere remover ou imputar** colunas com muitos dados faltantes")
+        
+        # Verificar colunas essenciais
+        essential_cols_present = []
+        if self.column_types['authors']: essential_cols_present.append("autores")
+        if self.column_types['years']: essential_cols_present.append("anos")
+        if self.column_types['titles']: essential_cols_present.append("títulos")
+        
+        text += f"**Colunas Essenciais Identificadas**: {', '.join(essential_cols_present) if essential_cols_present else 'Nenhuma'}\n\n"
+        
+        if issues:
+            text += "**Problemas Identificados**:\n"
+            for issue in issues:
+                text += f"- {issue}\n"
+            text += "\n"
+        
+        if recommendations:
+            text += "**Recomendações de Melhoria**:\n"
+            for rec in recommendations:
+                text += f"- {rec}\n"
+            text += "\n"
         
         return text
     
-    def _author_analysis(self):
-        """Análise de autores e colaborações - CORRIGIDA E FUNCIONANDO"""
-        text = "### 👥 Análise de Autores\n\n"
+    def _author_network_analysis(self):
+        """Análise avançada de rede de autores"""
+        text = "### 👥 ANÁLISE DE REDE DE AUTORES\n\n"
         
-        # BUSCA MAIS AGRESSIVA POR COLUNA DE AUTORES
-        author_col = None
-        possible_author_cols = []
+        if not self.column_types['authors']:
+            return text + "❌ Nenhuma coluna de autores identificada para análise\n\n"
         
-        for col in self.df.columns:
-            col_lower = col.lower()
-            # Adicionar mais palavras-chave e verificar conteúdo
-            if any(keyword in col_lower for keyword in ['autor', 'author', 'pesquisador', 'escritor', 'writer', 'nome']):
-                possible_author_cols.append(col)
+        authors_col = self.column_types['authors'][0]
+        authors_network = self._build_authors_network(authors_col)
+        
+        if not authors_network['unique_authors']:
+            return text + "⚠️ Dados de autores encontrados mas não foi possível extrair nomes válidos\n\n"
+        
+        text += f"**📈 Estatísticas da Rede**:\n"
+        text += f"- **Autores únicos**: {len(authors_network['unique_authors'])}\n"
+        text += f"- **Trabalhos em colaboração**: {authors_network['collaborations']}\n"
+        text += f"- **Taxa de colaboração**: {authors_network['collaboration_rate']:.1f}%\n"
+        text += f"- **Autor mais produtivo**: {authors_network['most_prolific_author']} ({authors_network['most_prolific_count']} trabalhos)\n\n"
+        
+        # Análise de centralidade
+        if authors_network['collaborations'] > 0:
+            text += "**🎯 Autores Centrais na Rede**:\n"
+            for author, degree in authors_network['central_authors'][:5]:
+                text += f"- **{author}**: {degree} conexões\n"
+            text += "\n"
+        
+        return text
+    
+    def _build_authors_network(self, authors_col):
+        """Constrói rede de colaboração entre autores"""
+        unique_authors = set()
+        author_works = {}
+        collaborations = 0
+        
+        for authors_str in self.df[authors_col].dropna():
+            if isinstance(authors_str, str):
+                authors_list = self._parse_authors(authors_str)
+                unique_authors.update(authors_list)
                 
-                # Verificar se a coluna tem dados que parecem nomes
-                sample_data = self.df[col].dropna().head(5)
-                if len(sample_data) > 0:
-                    # Verificar se contém vírgulas, pontos e vírgulas (indicando múltiplos autores)
-                    has_multiple_authors = any(';' in str(val) or ',' in str(val) for val in sample_data)
-                    if has_multiple_authors or any(len(str(val).split()) >= 2 for val in sample_data):
-                        author_col = col
-                        break
-        
-        # Se não encontrou, usar a primeira possível
-        if not author_col and possible_author_cols:
-            author_col = possible_author_cols[0]
-        
-        if not author_col:
-            return "❌ **Autores**: Nenhuma coluna de autores identificada. Verifique se há colunas como 'autor', 'autores', 'author' na sua planilha.\n\n"
-        
-        text += f"**Coluna utilizada**: '{author_col}'\n\n"
-        
-        # PROCESSAMENTO MELHORADO DOS AUTORES
-        all_authors = []
-        authors_found = 0
-        
-        for authors_str in self.df[author_col].dropna():
-            if isinstance(authors_str, str) and authors_str.strip():
-                authors_found += 1
-                # Múltiplas estratégias de parsing
-                authors = re.split(r'[;,]|\be\b|\band\b|&', authors_str)
-                for author in authors:
-                    author_clean = author.strip()
-                    if (author_clean and len(author_clean) > 2 and 
-                        author_clean.lower() not in ['', 'e', 'and', 'et', 'de', 'da', 'do', 'dos', 'das'] and
-                        not author_clean.isdigit() and
-                        not author_clean.replace('.', '').isdigit()):
-                        all_authors.append(author_clean)
-        
-        if all_authors:
-            author_counts = pd.Series(all_authors).value_counts()
-            text += "**Principais autores identificados:**\n"
-            for author, count in author_counts.head(8).items():
-                text += f"- **{author}**: {count} publicação(ões)\n"
-            
-            # Colaborações
-            collaborations = 0
-            for authors_str in self.df[author_col].dropna():
-                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b|&', authors_str)) > 1:
+                # Contar trabalhos por autor
+                for author in authors_list:
+                    author_works[author] = author_works.get(author, 0) + 1
+                
+                # Verificar colaboração
+                if len(authors_list) > 1:
                     collaborations += 1
-            
-            if collaborations > 0:
-                collaboration_rate = (collaborations / authors_found) * 100
-                text += f"\n**Colaborações**: {collaborations} trabalhos com coautoria ({collaboration_rate:.1f}%)\n"
-            else:
-                text += f"\n**Colaborações**: Nenhuma colaboração identificada\n"
-            
-            text += f"\n**Total de registros com autores**: {authors_found}\n"
-            text += f"**Total de nomes extraídos**: {len(all_authors)}\n\n"
-            
-        else:
-            text += f"⚠️ **Autores**: Coluna '{author_col}' encontrada mas não foi possível extrair autores válidos\n\n"
-            text += f"**Dica**: Verifique o formato dos dados na coluna '{author_col}'\n\n"
         
-        return text
-    
-    def _temporal_analysis(self):
-        """Análise temporal dos dados - CORRIGIDA E MELHORADA"""
-        text = "### 📈 Análise Temporal\n\n"
+        # Encontrar autor mais produtivo
+        most_prolific = max(author_works.items(), key=lambda x: x[1]) if author_works else (None, 0)
         
-        # Buscar coluna de ano de forma mais abrangente
-        year_col = None
-        year_data_found = False
+        # Calcular taxa de colaboração
+        total_works = len(self.df[authors_col].dropna())
+        collaboration_rate = (collaborations / total_works * 100) if total_works > 0 else 0
         
-        for col in self.df.columns:
-            col_lower = col.lower()
-            if any(keyword in col_lower for keyword in ['ano', 'year', 'data', 'date', 'publication']):
-                year_col = col
-                year_data_found = True
-                break
+        # Autores centrais (baseado na produtividade)
+        central_authors = sorted(author_works.items(), key=lambda x: x[1], reverse=True)[:5]
         
-        if not year_data_found:
-            # Tentar encontrar colunas numéricas que possam ser anos
-            for col in self.df.select_dtypes(include=[np.number]).columns:
-                sample_data = self.df[col].dropna().head(10)
-                if len(sample_data) > 0:
-                    # Verificar se os valores são anos (entre 1900 e ano atual)
-                    current_year = datetime.now().year
-                    if all(1900 <= val <= current_year for val in sample_data if pd.notnull(val)):
-                        year_col = col
-                        year_data_found = True
-                        text += f"⚠️ **Atenção**: Usando coluna '{col}' para análise temporal (detecção automática)\n\n"
-                        break
-        
-        if not year_col:
-            return "❌ **Anos**: Nenhuma coluna de anos identificada na planilha\n\n"
-            
-        try:
-            years = pd.to_numeric(self.df[year_col], errors='coerce').dropna()
-        except:
-            years = pd.Series(dtype=float)
-        
-        if len(years) > 0:
-            min_year = int(years.min())
-            max_year = int(years.max())
-            year_range = max_year - min_year
-            
-            text += f"- **Período analisado**: {min_year} - {max_year} ({year_range} anos)\n"
-            
-            # Ano mais frequente
-            year_counts = years.value_counts()
-            if not year_counts.empty:
-                most_frequent_year = int(year_counts.index[0])
-                most_frequent_count = int(year_counts.iloc[0])
-                text += f"- **Ano com mais publicações**: {most_frequent_year} ({most_frequent_count} publicações)\n"
-            
-            # Distribuição por década
-            if year_range > 20:
-                decades = (years // 10) * 10
-                decade_counts = decades.value_counts().sort_index()
-                if len(decade_counts) > 1:
-                    text += "\n**Distribuição por década:**\n"
-                    for decade, count in decade_counts.head(5).items():
-                        text += f"- {int(decade)}s: {int(count)} publicação(ões)\n"
-            
-            # Tendência
-            if len(years) > 5:
-                recent_threshold = max_year - 5
-                recent_years = years[years >= recent_threshold]
-                older_years = years[years < recent_threshold]
-                
-                if len(recent_years) > 0 and len(older_years) > 0:
-                    recent_avg = len(recent_years) / 5  # média por ano nos últimos 5 anos
-                    older_avg = len(older_years) / max(1, (recent_threshold - min_year))  # média por ano no período anterior
-                    
-                    if recent_avg > older_avg * 1.2:
-                        text += "- **Tendência**: 📈 Crescimento na produção recente\n"
-                    elif recent_avg < older_avg * 0.8:
-                        text += "- **Tendência**: 📉 Produção mais concentrada no passado\n"
-                    else:
-                        text += "- **Tendência**: ➡️ Produção constante ao longo do tempo\n"
-            
-            text += f"\n**Total de registros com anos**: {len(years)}\n\n"
-        else:
-            text += f"⚠️ **Anos**: Coluna '{year_col}' encontrada mas sem dados numéricos válidos\n\n"
-        
-        return text
-    
-    def _thematic_analysis(self):
-        """Análise temática dos dados"""
-        text = "### 🔍 Análise Temática\n\n"
-        
-        # Combinar texto de todas as colunas relevantes
-        texto_completo = ""
-        text_cols = [col for col in self.df.columns if self.df[col].dtype == 'object']
-        for col in text_cols[:4]:  # Aumentei para 4 colunas
-            col_text = self.df[col].fillna('').astype(str).str.cat(sep=' ')
-            if len(col_text) > 100:  # Só adiciona se tiver conteúdo significativo
-                texto_completo += " " + col_text
-        
-        if not texto_completo.strip():
-            return "❌ **Temas**: Não há texto suficiente para análise temática\n\n"
-        
-        # Extrair temas
-        palavras = re.findall(r'\b[a-zà-ú]{4,}\b', texto_completo.lower())
-        stop_words = set(PORTUGUESE_STOP_WORDS)
-        palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
-        
-        if palavras_filtradas:
-            temas = pd.Series(palavras_filtradas).value_counts().head(12)
-            text += "**Palavras-chave mais frequentes:**\n"
-            for i, (tema, count) in enumerate(temas.items(), 1):
-                text += f"{i}. **{tema}**: {count} palavras repetidas\n"
-            text += "\n"
-        else:
-            text += "⚠️ **Temas**: Não foi possível identificar palavras-chave frequentes\n\n"
-        
-        return text
-    
-    def _collaboration_analysis(self):
-        """Análise de colaborações e redes"""
-        text = "### 🤝 Análise de Colaborações\n\n"
-        
-        author_col = None
-        for col in self.df.columns:
-            col_lower = col.lower()
-            if any(keyword in col_lower for keyword in ['autor', 'author']):
-                author_col = col
-                break
-        
-        if author_col:
-            coautorias = 0
-            total_trabalhos = len(self.df[author_col].dropna())
-            
-            for authors_str in self.df[author_col].dropna():
-                if isinstance(authors_str, str) and len(re.split(r'[;,]|\be\b|\band\b|&', authors_str)) > 1:
-                    coautorias += 1
-            
-            if total_trabalhos > 0:
-                taxa_colaboracao = (coautorias/total_trabalhos)*100
-                text += f"- **Trabalhos em colaboração**: {coautorias}\n"
-                text += f"- **Taxa de colaboração**: {taxa_colaboracao:.1f}%\n"
-                
-                if coautorias > 0:
-                    if taxa_colaboracao > 60:
-                        text += "- **Padrão**: Alta colaboração entre pesquisadores\n"
-                    elif taxa_colaboracao > 30:
-                        text += "- **Padrão**: Boa colaboração acadêmica\n"
-                    else:
-                        text += "- **Padrão**: Oportunidade para aumentar colaborações\n"
-                else:
-                    text += "- **Padrão**: Produção individual predominante\n"
-            else:
-                text += "⚠️ **Colaboração**: Sem dados de autores para análise\n"
-            
-            text += "\n"
-        
-        return text
-    
-    def _geographic_analysis(self):
-        """Análise geográfica dos dados - CORRIGIDA E MELHORADA"""
-        text = "### 🌎 Análise Geográfica\n\n"
-        
-        # Buscar coluna de país de forma mais abrangente
-        country_col = None
-        country_data_found = False
-        
-        for col in self.df.columns:
-            col_lower = col.lower()
-            if any(keyword in col_lower for keyword in ['país', 'pais', 'country', 'local', 'location', 'nacionalidade', 'região']):
-                country_col = col
-                country_data_found = True
-                break
-        
-        if not country_data_found:
-            # Tentar encontrar dados de país em colunas de texto
-            for col in self.df.select_dtypes(include=['object']).columns:
-                sample_data = self.df[col].dropna().head(10)
-                if len(sample_data) > 0:
-                    # Verificar se contém nomes de países conhecidos
-                    common_countries = ['brasil', 'brazil', 'eua', 'usa', 'portugal', 'espanha', 'frança']
-                    has_countries = any(any(country in str(val).lower() for country in common_countries) for val in sample_data)
-                    if has_countries:
-                        country_col = col
-                        country_data_found = True
-                        text += f"⚠️ **Atenção**: Usando coluna '{col}' para análise geográfica (detecção automática)\n\n"
-                        break
-        
-        if not country_col:
-            return "❌ **Países**: Nenhuma coluna de países identificada na planilha\n\n"
-            
-        countries = self.df[country_col].dropna()
-        
-        if len(countries) > 0:
-            country_counts = countries.value_counts()
-            text += "**Países/regiões mais frequentes:**\n"
-            for country, count in country_counts.head(8).items():
-                text += f"- **{country}**: {count} publicação(ões)\n"
-            
-            # Diversidade geográfica
-            unique_countries = len(country_counts)
-            total_countries = len(countries)
-            diversity_index = (unique_countries / total_countries) * 100
-            
-            text += f"\n- **Diversidade geográfica**: {diversity_index:.1f}%\n"
-            text += f"- **Países/regiões únicos**: {unique_countries}\n"
-            
-            if unique_countries == 1:
-                text += "- **Foco**: Pesquisa concentrada em uma única região\n"
-            elif unique_countries <= 3:
-                text += "- **Foco**: Pesquisa com foco regional\n"
-            elif unique_countries <= 8:
-                text += "- **Foco**: Pesquisa com boa diversidade geográfica\n"
-            else:
-                text += "- **Foco**: Pesquisa com excelente abrangência internacional\n"
-            
-            text += f"\n**Total de registros com localização**: {total_countries}\n\n"
-        else:
-            text += f"⚠️ **Países**: Coluna '{country_col}' encontrada mas sem dados válidos\n\n"
-        
-        return text
-    
-    def _trend_analysis(self):
-        """Análise de tendências e insights - SUGESTÕES INTELIGENTES REAIS"""
-        text = "### 💡 Análise e Sugestões Inteligentes\n\n"
-        
-        insights = []
-        sugestoes_inteligentes = []
-        
-        # ANÁLISE INTELIGENTE BASEADA NOS DADOS REAIS
-        total_registros = len(self.df)
-        
-        # 1. Análise de completude
-        colunas_principais = ['autor', 'ano', 'título', 'resumo']
-        colunas_presentes = [col for col in colunas_principais 
-                            if any(col in col_name.lower() for col_name in self.df.columns)]
-        completude = len(colunas_presentes) / len(colunas_principais) * 100
-        
-        if completude < 50:
-            sugestoes_inteligentes.append("📋 **Melhore a estrutura da planilha** - Adicione colunas básicas como autor, ano, título")
-        elif completude < 80:
-            sugestoes_inteligentes.append("📊 **Estrutura boa** - Considere adicionar mais metadados para análises avançadas")
-        else:
-            sugestoes_inteligentes.append("🎯 **Estrutura excelente** - Todos os elementos essenciais estão presentes")
-        
-        # 2. Análise temporal (se houver anos)
-        year_col = next((col for col in self.df.columns if 'ano' in col.lower() or 'year' in col.lower()), None)
-        if year_col:
-            try:
-                anos = pd.to_numeric(self.df[year_col], errors='coerce').dropna()
-                if len(anos) > 0:
-                    range_anos = int(anos.max()) - int(anos.min())
-                    if range_anos < 3:
-                        sugestoes_inteligentes.append("⏳ **Expanda o período** - Dados concentrados em poucos anos, busque maior variedade temporal")
-                    elif range_anos > 10:
-                        sugestoes_inteligentes.append("📈 **Analise tendências** - Período extenso permite análise de evolução temporal")
-            except:
-                pass
-        
-        # 3. Análise de diversidade de autores
-        author_col = next((col for col in self.df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
-        if author_col:
-            autores_unicos = set()
-            for authors_str in self.df[author_col].dropna():
-                if isinstance(authors_str, str):
-                    authors = re.split(r'[;,]', authors_str)
-                    for author in authors:
-                        if author.strip():
-                            autores_unicos.add(author.strip())
-            
-            if len(autores_unicos) < 5:
-                sugestoes_inteligentes.append("👥 **Amplie rede de autores** - Pouca diversidade de pesquisadores")
-            elif len(autores_unicos) > 20:
-                sugestoes_inteligentes.append("🤝 **Rede colaborativa forte** - Excelente diversidade de autores")
-        
-        # 4. Análise de temas emergentes
-        texto_completo = ""
-        for col in self.df.select_dtypes(include=['object']).columns[:3]:
-            texto_completo += " " + self.df[col].fillna('').astype(str).str.cat(sep=' ')
-        
-        if len(texto_completo) > 1000:
-            palavras = re.findall(r'\b[a-zà-ú]{5,}\b', texto_completo.lower())
-            from collections import Counter
-            contagem = Counter(palavras)
-            temas_comuns = [pal for pal, cnt in contagem.most_common(10) 
-                           if pal not in PORTUGUESE_STOP_WORDS and cnt > 2]
-            
-            if temas_comuns:
-                sugestoes_inteligentes.append(f"🔍 **Foque em**: {', '.join(temas_comuns[:3])}")
-        
-        # 5. Sugestões baseadas no tamanho
-        if total_registros < 15:
-            sugestoes_inteligentes.extend([
-                "📥 **Colete mais dados** - Mínimo 20 registros para análises confiáveis",
-                "🔎 **Use busca integrada** - Encontre trabalhos relacionados na plataforma"
-            ])
-        elif total_registros < 50:
-            sugestoes_inteligentes.extend([
-                "📊 **Análises básicas possíveis** - Explore gráficos e estatísticas",
-                "🗺️ **Organize conceitos** - Use o mapa mental para estruturar ideias"
-            ])
-        else:
-            sugestoes_inteligentes.extend([
-                "📈 **Análises avançadas** - Dados suficientes para ML e redes complexas",
-                "🌐 **Explore colaborações** - Identifique redes de coautoria"
-            ])
-        
-        # Formatar resposta
-        text += "**Sugestões Inteligentes Baseadas na Sua Planilha:**\n\n"
-        for i, sugestao in enumerate(sugestoes_inteligentes, 1):
-            text += f"{i}. {sugestao}\n"
-        
-        text += f"\n**Resumo da Base:**\n"
-        text += f"• Registros: {total_registros}\n"
-        text += f"• Completude: {completude:.1f}%\n"
-        if author_col:
-            text += f"• Coluna autores: '{author_col}'\n"
-        if year_col:
-            text += f"• Coluna anos: '{year_col}'\n"
-        
-        return text
-
-# -------------------------
-# SISTEMA DE IA SUPER INTELIGENTE MELHORADO
-# -------------------------
-class AdvancedAIAssistant:
-    def __init__(self):
-        self.context_history = []
-        self.response_patterns = self._load_response_patterns()
-    
-    def _load_response_patterns(self):
-        """Padrões de resposta inteligentes"""
         return {
-            'saudacao': [
-                "Olá! Sou seu assistente de IA especializado em análise de dados acadêmicos.",
-                "Oi! Estou aqui para ajudar você a analisar sua pesquisa.",
-                "Olá, pesquisador! Vamos explorar seus dados juntos?"
-            ],
-            'despedida': [
-                "Foi um prazer ajudar! Volte sempre com mais perguntas.",
-                "Espero ter ajudado. Continue explorando seus dados!",
-                "Até logo! Estarei aqui quando precisar de mais análises."
-            ],
-            'duvida': [
-                "Excelente pergunta! Deixe-me analisar isso para você.",
-                "Interessante! Vou investigar essa questão nos seus dados.",
-                "Boa pergunta! Analisando suas informações..."
-            ]
+            'unique_authors': unique_authors,
+            'collaborations': collaborations,
+            'collaboration_rate': collaboration_rate,
+            'most_prolific_author': most_prolific[0],
+            'most_prolific_count': most_prolific[1],
+            'central_authors': central_authors
         }
     
-    def get_contextual_response(self, question, df):
-        """Resposta contextual super inteligente"""
-        question_lower = question.lower().strip()
+    def _temporal_analysis_advanced(self):
+        """Análise temporal avançada"""
+        text = "### 📈 ANÁLISE TEMPORAL AVANÇADA\n\n"
         
-        # Análise de sentimento da pergunta
-        sentiment = self._analyze_question_sentiment(question)
+        if not self.column_types['years']:
+            return text + "❌ Nenhuma coluna temporal identificada\n\n"
         
-        # Resposta baseada no contexto
-        response = self._generate_intelligent_response(question, df, sentiment)
-        
-        # Adicionar elementos conversacionais
-        enhanced_response = self._enhance_with_conversation(question, response, sentiment)
-        
-        return enhanced_response
-    
-    def _analyze_question_sentiment(self, question):
-        """Analisa o sentimento da pergunta"""
-        positive_words = ['bom', 'boa', 'excelente', 'ótimo', 'maravilhoso', 'incrível', 'fantástico']
-        negative_words = ['ruim', 'péssimo', 'horrível', 'terrível', 'problema', 'erro', 'dificuldade']
-        
-        question_lower = question.lower()
-        positive_count = sum(1 for word in positive_words if word in question_lower)
-        negative_count = sum(1 for word in negative_words if word in question_lower)
-        
-        if positive_count > negative_count:
-            return 'positive'
-        elif negative_count > positive_count:
-            return 'negative'
-        else:
-            return 'neutral'
-    
-    def _generate_intelligent_response(self, question, df, sentiment):
-        """Gera resposta inteligente baseada nos dados"""
-        
-        # PERGUNTAS SOBRE AUTORES
-        if any(word in question.lower() for word in ['autor', 'autores', 'pesquisador', 'escritor', 'quem escreveu', 'quem publicou']):
-            return self._analyze_authors_advanced(df, question)
-        
-        # PERGUNTAS SOBRE TEMPO
-        elif any(word in question.lower() for word in ['ano', 'anos', 'temporal', 'evolução', 'cronologia', 'linha do tempo']):
-            return self._analyze_temporal_advanced(df, question)
-        
-        # PERGUNTAS COMPLEXAS/PREDITIVAS
-        elif any(word in question.lower() for word in ['prever', 'futuro', 'tendência', 'próximos', 'será']):
-            return self._predictive_analysis(df, question)
-        
-        # PERGUNTAS SOBRE QUALIDADE
-        elif any(word in question.lower() for word in ['qualidade', 'melhorar', 'otimizar', 'problema', 'issue']):
-            return self._quality_analysis(df, question)
-        
-        # RESPOSTA PADRÃO INTELIGENTE
-        else:
-            return self._comprehensive_analysis_fallback(df, question)
-    
-    def _analyze_authors_advanced(self, df, question):
-        """Análise avançada de autores com ML"""
-        analyzer = DataAnalyzer(df)
-        
-        # Encontrar coluna de autores
-        author_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
-        
-        if not author_col:
-            return "**❌ Autores**: Não encontrei dados de autores para análise."
-        
-        response = "**👥 ANÁLISE AVANÇADA DE AUTORES**\n\n"
-        
-        # Análise básica
-        authors_data = []
-        for authors_str in df[author_col].dropna():
-            if isinstance(authors_str, str):
-                authors = re.split(r'[;,]', authors_str)
-                authors_data.extend([a.strip() for a in authors if a.strip()])
-        
-        if not authors_data:
-            return "**⚠️ Autores**: Dados encontrados mas não foi possível extrair autores."
-        
-        author_series = pd.Series(authors_data)
-        author_counts = author_series.value_counts()
-        
-        response += f"**Estatísticas Básicas:**\n"
-        response += f"- Autores únicos: {len(author_counts)}\n"
-        response += f"- Total de menções: {len(authors_data)}\n"
-        response += f"- Média de autores por trabalho: {len(authors_data)/len(df[author_col].dropna()):.2f}\n\n"
-        
-        # Análise de produtividade
-        response += "**Top 5 Autores Mais Produtivos:**\n"
-        for author, count in author_counts.head(5).items():
-            response += f"- **{author}**: {count} publicações\n"
-        
-        # Análise de colaboração com ML
-        collaborations = 0
-        for authors_str in df[author_col].dropna():
-            if isinstance(authors_str, str):
-                authors = re.split(r'[;,]', authors_str)
-                if len([a for a in authors if a.strip()]) > 1:
-                    collaborations += 1
-        
-        collab_rate = (collaborations / len(df[author_col].dropna())) * 100
-        response += f"\n**🤝 Taxa de Colaboração**: {collab_rate:.1f}%\n"
-        
-        # Insights baseados na pergunta
-        if 'produt' in question.lower():
-            top_author = author_counts.index[0]
-            top_count = author_counts.iloc[0]
-            response += f"\n**🏆 Insight**: {top_author} é o pesquisador mais produtivo com {top_count} publicações\n"
-        
-        if 'colabor' in question.lower():
-            if collab_rate > 60:
-                response += "**🎯 Padrão**: Alta colaboração - rede de pesquisa muito ativa\n"
-            elif collab_rate > 30:
-                response += "**🎯 Padrão**: Boa colaboração - trabalho em equipe presente\n"
-            else:
-                response += "**💡 Sugestão**: Oportunidade para aumentar colaborações\n"
-        
-        return response
-    
-    def _analyze_temporal_advanced(self, df, question):
-        """Análise temporal avançada com previsão"""
-        year_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['ano', 'year'])), None)
-        
-        if not year_col:
-            return "**❌ Dados Temporais**: Não encontrei coluna de anos."
-        
+        years_col = self.column_types['years'][0]
         try:
-            years = pd.to_numeric(df[year_col], errors='coerce').dropna()
+            years = pd.to_numeric(self.df[years_col], errors='coerce').dropna()
+            
             if len(years) == 0:
-                return "**⚠️ Anos**: Coluna encontrada mas sem valores numéricos válidos."
+                return text + "⚠️ Coluna temporal encontrada mas sem valores numéricos válidos\n\n"
             
-            response = "**📈 ANÁLISE TEMPORAL AVANÇADA**\n\n"
-            
-            # Estatísticas básicas
+            # Análise básica
             min_year, max_year = int(years.min()), int(years.max())
             year_range = max_year - min_year
             
-            response += f"**Período Analisado**: {min_year} - {max_year} ({year_range} anos)\n"
-            response += f"**Total de Registros**: {len(years)}\n\n"
+            text += f"**🕰️ Período Analisado**: {min_year} - {max_year} ({year_range} anos)\n"
+            text += f"**📊 Registros com anos**: {len(years)}/{len(self.df)} ({len(years)/len(self.df)*100:.1f}%)\n\n"
             
             # Análise de tendência
             year_counts = years.value_counts().sort_index()
             
             if len(year_counts) > 3:
-                # Calcular tendência
-                X = np.array(list(year_counts.index)).reshape(-1, 1)
-                y = np.array(list(year_counts.values))
+                # Calcular crescimento
+                recent_5_years = [y for y in years if y >= max_year - 5]
+                older_years = [y for y in years if y < max_year - 5]
                 
-                model = LinearRegression()
-                model.fit(X, y)
+                recent_avg = len(recent_5_years) / 5 if recent_5_years else 0
+                older_avg = len(older_years) / max(1, (max_year - 5 - min_year)) if older_years else 0
                 
-                slope = model.coef_[0]
-                current_prod = year_counts.iloc[-1] if len(year_counts) > 0 else 0
-                
-                response += "**📊 Tendência Temporal**:\n"
-                if slope > 0.5:
-                    response += "- 📈 **Crescimento Forte** - Produção aumentando significativamente\n"
-                elif slope > 0:
-                    response += "- ↗️ **Crescimento Moderado** - Produção em leve ascensão\n"
-                elif slope < -0.5:
-                    response += "- 📉 **Declínio Acentuado** - Produção diminuindo\n"
+                text += "**📈 Tendência de Produção**:\n"
+                if recent_avg > older_avg * 1.3:
+                    text += "- 🚀 **Crescimento Acelerado** na produção recente\n"
+                elif recent_avg > older_avg:
+                    text += "- 📈 **Crescimento Moderado**\n"
+                elif recent_avg < older_avg * 0.7:
+                    text += "- 📉 **Declínio** na produção recente\n"
                 else:
-                    response += "- ➡️ **Estabilidade** - Produção constante\n"
+                    text += "- ➡️ **Estabilidade** na produção\n"
                 
-                # Previsão simples
-                if len(year_counts) > 5:
-                    next_year = max_year + 1
-                    pred = model.predict([[next_year]])[0]
-                    response += f"- 🔮 **Previsão {next_year}**: ~{int(pred)} publicações\n"
-            
-            # Ano mais produtivo
-            if not year_counts.empty:
+                # Ano mais produtivo
                 best_year = year_counts.idxmax()
                 best_count = year_counts.max()
-                response += f"\n**🏆 Ano Mais Produtivo**: {int(best_year)} ({best_count} publicações)\n"
+                text += f"- 🏆 **Ano de Pico**: {int(best_year)} ({best_count} publicações)\n\n"
             
-            return response
-            
-        except Exception as e:
-            return f"**❌ Erro na análise temporal**: {str(e)}"
-    
-    def _predictive_analysis(self, df, question):
-        """Análise preditiva com ML"""
-        response = "**🔮 ANÁLISE PREDITIVA AVANÇADA**\n\n"
-        
-        if len(df) < 20:
-            return response + "⚠️ **Dados insuficientes** para análise preditiva (mínimo 20 registros)\n"
-        
-        try:
-            # Análise de crescimento
-            year_col = next((col for col in df.columns if 'ano' in col.lower()), None)
-            if year_col:
-                years = pd.to_numeric(df[year_col], errors='coerce').dropna()
-                if len(years) > 5:
-                    year_counts = years.value_counts().sort_index()
-                    
-                    # Modelo de previsão
-                    X = np.array(list(year_counts.index)).reshape(-1, 1)
-                    y = np.array(list(year_counts.values))
-                    
-                    model = RandomForestRegressor(n_estimators=100, random_state=42)
-                    model.fit(X, y)
-                    
-                    # Prever próximos 3 anos
-                    future_years = np.array(range(int(years.max()) + 1, int(years.max()) + 4)).reshape(-1, 1)
-                    predictions = model.predict(future_years)
-                    
-                    response += "**📈 Previsão de Produção (Próximos 3 Anos):**\n"
-                    for year, pred in zip(future_years.flatten(), predictions):
-                        response += f"- **{year}**: ~{int(pred)} publicações estimadas\n"
-                    
-                    # Tendência geral
-                    avg_growth = np.mean(np.diff(predictions))
-                    if avg_growth > 1:
-                        response += "\n**🎯 Tendência**: CRESCENTE 📈\n"
-                    elif avg_growth < -1:
-                        response += "\n**🎯 Tendência**: DECRESCENTE 📉\n"
-                    else:
-                        response += "\n**🎯 Tendência**: ESTÁVEL ➡️\n"
-            
-            # Análise de temas emergentes
-            text_cols = [col for col in df.columns if df[col].dtype == 'object']
-            if text_cols and TfidfVectorizer:
-                corpus = df[text_cols[0]].fillna('').astype(str)
-                if len(corpus) > 10:
-                    vectorizer = TfidfVectorizer(stop_words=PORTUGUESE_STOP_WORDS, max_features=50)
-                    X = vectorizer.fit_transform(corpus)
-                    
-                    # Identificar temas emergentes
-                    feature_names = vectorizer.get_feature_names_out()
-                    tfidf_scores = np.asarray(X.mean(axis=0)).flatten()
-                    
-                    top_indices = tfidf_scores.argsort()[-5:][::-1]
-                    emerging_themes = [feature_names[i] for i in top_indices]
-                    
-                    response += f"\n**🔍 Temas Emergentes**: {', '.join(emerging_themes[:3])}\n"
-            
-            return response
-            
-        except Exception as e:
-            return response + f"⚠️ **Análise Preditiva**: Limitada devido a restrições técnicas\n\n"
-    
-    def _quality_analysis(self, df, question):
-        """Análise de qualidade dos dados"""
-        response = "**🏆 ANÁLISE DE QUALIDADE DOS DADOS**\n\n"
-        
-        total = len(df)
-        
-        # Completude
-        completeness = {}
-        for col in df.columns:
-            non_null = df[col].notna().sum()
-            completeness[col] = (non_null / total) * 100
-        
-        response += "**📊 Completude por Coluna:**\n"
-        for col, comp in list(completeness.items())[:6]:
-            status = "✅" if comp > 80 else "⚠️" if comp > 50 else "❌"
-            response += f"- {col}: {comp:.1f}% {status}\n"
-        
-        # Qualidade dos metadados
-        essential_cols = ['autor', 'ano', 'título']
-        present_essential = 0
-        for col in essential_cols:
-            if any(col in col_name.lower() for col_name in df.columns):
-                present_essential += 1
-        
-        quality_score = (present_essential / len(essential_cols)) * 100
-        response += f"\n**🎯 Qualidade dos Metadados**: {quality_score:.1f}%\n"
-        
-        # Recomendações
-        response += "\n**💡 Recomendações para Melhoria:**\n"
-        if quality_score < 70:
-            response += "- Adicione colunas essenciais: autor, ano, título\n"
-        if total < 30:
-            response += "- Aumente o número de registros para análises mais robustas\n"
-        
-        # Verificar duplicatas
-        duplicates = df.duplicated().sum()
-        if duplicates > 0:
-            response += f"- Remova {duplicates} registros duplicados\n"
-        
-        return response
-    
-    def _comprehensive_analysis_fallback(self, df, question):
-        """Análise compreensiva quando não há padrão específico"""
-        analyzer = DataAnalyzer(df)
-        
-        response = "**🤖 ANÁLISE INTELIGENTE COMPLETA**\n\n"
-        
-        # Análise básica
-        response += f"**📈 Visão Geral da Base**:\n"
-        response += f"- Registros: {len(df)}\n"
-        response += f"- Colunas: {len(df.columns)}\n"
-        response += f"- Período: {self._get_data_period(df)}\n\n"
-        
-        # Insights automáticos
-        insights = self._generate_automatic_insights(df)
-        response += "**💡 Insights Automáticos**:\n"
-        for insight in insights[:5]:
-            response += f"- {insight}\n"
-        
-        # Próximos passos recomendados
-        response += "\n**🎯 Próximos Passos Recomendados**:\n"
-        if len(df) < 20:
-            response += "- Colete mais dados para análises estatísticas\n"
-        else:
-            response += "- Explore análises de tendência temporal\n"
-            response += "- Use o mapa mental para organizar conceitos\n"
-            response += "- Consulte recomendações de artigos relacionados\n"
-        
-        return response
-    
-    def _get_data_period(self, df):
-        """Obtém o período dos dados"""
-        year_col = next((col for col in df.columns if 'ano' in col.lower()), None)
-        if year_col:
-            try:
-                years = pd.to_numeric(df[year_col], errors='coerce').dropna()
-                if len(years) > 0:
-                    return f"{int(years.min())} - {int(years.max())}"
-            except:
-                pass
-        return "Não identificado"
-    
-    def _generate_automatic_insights(self, df):
-        """Gera insights automáticos dos dados"""
-        insights = []
-        
-        # Insight de tamanho
-        if len(df) < 15:
-            insights.append("Base pequena - ideal para exploração inicial")
-        elif len(df) < 50:
-            insights.append("Base média - permite análises básicas")
-        else:
-            insights.append("Base robusta - adequada para análises complexas")
-        
-        # Insight temporal
-        year_col = next((col for col in df.columns if 'ano' in col.lower()), None)
-        if year_col:
-            try:
-                years = pd.to_numeric(df[year_col], errors='coerce').dropna()
-                if len(years) > 0:
-                    year_range = years.max() - years.min()
-                    if year_range > 10:
-                        insights.append("Dados abrangem período extenso - ótimo para análise temporal")
-            except:
-                pass
-        
-        # Insight de colaboração
-        author_col = next((col for col in df.columns if any(kw in col.lower() for kw in ['autor', 'author'])), None)
-        if author_col:
-            collaborations = 0
-            for authors_str in df[author_col].dropna():
-                if isinstance(authors_str, str) and len(re.split(r'[;,]', authors_str)) > 1:
-                    collaborations += 1
-            
-            if collaborations > len(df) * 0.3:
-                insights.append("Alta taxa de colaboração entre pesquisadores")
-        
-        return insights
-    
-    def _enhance_with_conversation(self, question, response, sentiment):
-        """Melhora a resposta com elementos conversacionais"""
-        enhanced = ""
-        
-        # Saudação baseada no sentimento
-        if sentiment == 'positive':
-            enhanced += "😊 " + random.choice(self.response_patterns['saudacao']) + "\n\n"
-        elif sentiment == 'negative':
-            enhanced += "🤔 Entendo sua preocupação. " + "\n\n"
-        else:
-            enhanced += "🔍 " + random.choice(self.response_patterns['duvida']) + "\n\n"
-        
-        enhanced += response
-        
-        # Encerramento
-        enhanced += "\n\n---\n"
-        enhanced += "💡 **Dica**: Posso ajudar com análises de autores, tendências temporais, qualidade de dados e muito mais!"
-        
-        return enhanced
-
-# -------------------------
-# SISTEMA DE VISÃO COMPUTACIONAL PARA ANÁLISE DE PADRÕES
-# -------------------------
-class ComputationalVisionAnalyzer:
-    def __init__(self):
-        self.patterns_detected = []
-    
-    def analyze_data_patterns(self, df):
-        """Analisa padrões complexos nos dados usando abordagens de visão computacional"""
-        analysis = "### 👁️ Análise Computacional de Padrões\n\n"
-        
-        if len(df) < 10:
-            return analysis + "⚠️ Dados insuficientes para análise computacional avançada\n"
-        
-        try:
-            # Análise de distribuição multidimensional
-            analysis += self._multidimensional_analysis(df)
-            
-            # Detecção de anomalias
-            analysis += self._anomaly_detection(df)
-            
-            # Análise de clusters naturais
-            analysis += self._natural_clustering(df)
-            
-            # Análise de sequências temporais
-            analysis += self._temporal_pattern_analysis(df)
-            
-            return analysis
-            
-        except Exception as e:
-            return analysis + f"⚠️ Algumas análises computacionais não puderam ser executadas: {str(e)}\n"
-    
-    def _multidimensional_analysis(self, df):
-        """Análise multidimensional dos dados"""
-        text = "**📊 Análise Multidimensional**\n\n"
-        
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        if len(numeric_cols) < 2:
-            return text + "⚠️ Número insuficiente de colunas numéricas para análise multidimensional\n"
-        
-        try:
-            # PCA para redução de dimensionalidade
-            from sklearn.decomposition import PCA
-            from sklearn.preprocessing import StandardScaler
-            
-            numeric_data = df[numeric_cols].dropna()
-            if len(numeric_data) < 5:
-                return text + "⚠️ Dados numéricos insuficientes\n"
-            
-            scaler = StandardScaler()
-            scaled_data = scaler.fit_transform(numeric_data)
-            
-            pca = PCA(n_components=min(3, len(numeric_cols)))
-            principal_components = pca.fit_transform(scaled_data)
-            
-            variance_explained = pca.explained_variance_ratio_
-            
-            text += f"- **Dimensões analisadas**: {len(numeric_cols)} colunas numéricas\n"
-            text += f"- **Variância explicada**: {variance_explained[0]:.1%} (1ª componente)\n"
-            text += f"- **Redução para**: {len(variance_explained)} componentes principais\n\n"
-            
-            # Interpretação dos componentes
-            if len(variance_explained) > 0 and variance_explained[0] > 0.5:
-                text += "✅ **Padrão**: Dados bem estruturados com padrões claros\n"
-            else:
-                text += "🔍 **Padrão**: Dados distribuídos de forma mais homogênea\n"
+            # Distribuição por década
+            if year_range > 15:
+                decades = (years // 10) * 10
+                decade_counts = decades.value_counts().sort_index()
+                text += "**🗓️ Distribuição por Década**:\n"
+                for decade, count in decade_counts.items():
+                    text += f"- {int(decade)}s: {int(count)} publicação(ões)\n"
+                text += "\n"
             
             return text
             
         except Exception as e:
-            return text + f"❌ Erro na análise multidimensional: {str(e)}\n"
+            return text + f"❌ Erro na análise temporal: {str(e)}\n\n"
     
-    def _anomaly_detection(self, df):
-        """Detecção de anomalias nos dados"""
-        text = "**🔍 Detecção de Anomalias**\n\n"
+    def _thematic_analysis_advanced(self):
+        """Análise temática avançada"""
+        text = "### 🔍 ANÁLISE TEMÁTICA AVANÇADA\n\n"
         
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        if not numeric_cols:
-            return text + "⚠️ Nenhuma coluna numérica para detecção de anomalias\n"
+        # Combinar texto de colunas relevantes
+        text_columns = []
+        if self.column_types['titles']:
+            text_columns.extend(self.column_types['titles'])
+        if self.column_types['abstracts']:
+            text_columns.extend(self.column_types['abstracts'])
+        if self.column_types['keywords']:
+            text_columns.extend(self.column_types['keywords'])
         
-        try:
-            from sklearn.ensemble import IsolationForest
+        if not text_columns:
+            return text + "❌ Nenhuma coluna de texto identificada para análise temática\n\n"
+        
+        # Combinar texto
+        combined_text = ""
+        for col in text_columns[:3]:  # Limitar a 3 colunas para performance
+            col_text = self.df[col].fillna('').astype(str).str.cat(sep=' ')
+            if len(col_text.strip()) > 100:
+                combined_text += " " + col_text
+        
+        if len(combined_text.strip()) < 500:
+            return text + "⚠️ Texto insuficiente para análise temática robusta\n\n"
+        
+        # Análise de frequência de termos
+        palavras = re.findall(r'\b[a-zà-ú]{4,}\b', combined_text.lower())
+        stop_words = set(PORTUGUESE_STOP_WORDS)
+        palavras_filtradas = [p for p in palavras if p not in stop_words and len(p) > 3]
+        
+        if palavras_filtradas:
+            term_freq = pd.Series(palavras_filtradas).value_counts().head(15)
             
-            numeric_data = df[numeric_cols].dropna()
-            if len(numeric_data) < 10:
-                return text + "⚠️ Dados insuficientes para detecção de anomalias\n"
+            text += "**📊 Termos Mais Frequentes**:\n"
+            for term, freq in term_freq.head(10).items():
+                text += f"- **{term}**: {freq} ocorrências\n"
+            text += "\n"
             
-            model = IsolationForest(contamination=0.1, random_state=42)
-            anomalies = model.fit_predict(numeric_data)
+            # Bigramas (combinações de 2 palavras)
+            bigrams = []
+            words = palavras_filtradas
+            for i in range(len(words)-1):
+                bigram = f"{words[i]} {words[i+1]}"
+                if len(bigram) > 8:  # Filtrar bigramas muito curtos
+                    bigrams.append(bigram)
             
-            anomaly_count = sum(1 for x in anomalies if x == -1)
-            anomaly_percent = (anomaly_count / len(anomalies)) * 100
-            
-            text += f"- **Registros analisados**: {len(numeric_data)}\n"
-            text += f"- **Anomalias detectadas**: {anomaly_count} ({anomaly_percent:.1f}%)\n"
-            
-            if anomaly_percent > 15:
-                text += "⚠️ **Alerta**: Alta taxa de anomalias - verifique a qualidade dos dados\n"
-            elif anomaly_percent > 5:
-                text += "🔍 **Observação**: Taxa moderada de anomalias\n"
-            else:
-                text += "✅ **Status**: Baixa taxa de anomalias - dados consistentes\n"
-            
-            return text + "\n"
-            
-        except Exception as e:
-            return text + f"❌ Erro na detecção de anomalias: {str(e)}\n"
+            if bigrams:
+                bigram_freq = pd.Series(bigrams).value_counts().head(8)
+                text += "**🔗 Principais Bigramas**:\n"
+                for bigram, freq in bigram_freq.items():
+                    text += f"- **{bigram}**: {freq} ocorrências\n"
+                text += "\n"
+        
+        return text
     
-    def _natural_clustering(self, df):
-        """Identificação de clusters naturais nos dados"""
-        text = "**🎯 Análise de Agrupamentos Naturais**\n\n"
+    def _geographic_analysis_advanced(self):
+        """Análise geográfica avançada"""
+        text = "### 🌎 ANÁLISE GEOGRÁFICA AVANÇADA\n\n"
         
-        numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
-        if len(numeric_cols) < 2:
-            return text + "⚠️ Colunas numéricas insuficientes para análise de clusters\n"
+        if not self.column_types['countries']:
+            return text + "❌ Nenhuma coluna geográfica identificada\n\n"
         
-        try:
-            from sklearn.cluster import KMeans
-            from sklearn.preprocessing import StandardScaler
-            
-            numeric_data = df[numeric_cols].dropna()
-            if len(numeric_data) < 10:
-                return text + "⚠️ Dados insuficientes para análise de clusters\n"
-            
-            scaler = StandardScaler()
-            scaled_data = scaler.fit_transform(numeric_data)
-            
-            # Determinar número ótimo de clusters
-            n_clusters = min(5, len(numeric_data) // 3)
-            kmeans = KMeans(n_clusters=n_clusters, random_state=42)
-            clusters = kmeans.fit_predict(scaled_data)
-            
-            cluster_counts = pd.Series(clusters).value_counts().sort_index()
-            
-            text += f"- **Clusters identificados**: {n_clusters}\n"
-            text += "- **Distribuição**: "
-            for cluster, count in cluster_counts.items():
-                percent = (count / len(clusters)) * 100
-                text += f"Grupo {cluster+1}: {percent:.1f}% | "
-            
-            text = text.rstrip(" | ") + "\n"
-            
-            # Interpretação
-            if n_clusters == 1:
-                text += "🔍 **Padrão**: Dados homogêneos sem agrupamentos distintos\n"
-            elif max(cluster_counts) / len(clusters) > 0.7:
-                text += "🎯 **Padrão**: Um grupo dominante com subgrupos menores\n"
-            else:
-                text += "📊 **Padrão**: Múltiplos grupos bem distribuídos\n"
-            
-            return text + "\n"
-            
-        except Exception as e:
-            return text + f"❌ Erro na análise de clusters: {str(e)}\n"
+        countries_col = self.column_types['countries'][0]
+        countries = self.df[countries_col].dropna()
+        
+        if len(countries) == 0:
+            return text + "⚠️ Coluna geográfica encontrada mas sem dados válidos\n\n"
+        
+        country_counts = countries.value_counts()
+        
+        text += f"**🗺️ Distribuição Geográfica** ({len(country_counts)} países/regiões):\n"
+        for country, count in country_counts.head(10).items():
+            percentage = (count / len(countries)) * 100
+            text += f"- **{country}**: {count} ({percentage:.1f}%)\n"
+        
+        # Diversidade geográfica
+        diversity_index = (len(country_counts) / len(countries)) * 100
+        text += f"\n**🌍 Diversidade Geográfica**: {diversity_index:.1f}%\n"
+        
+        if len(country_counts) == 1:
+            text += "- 🎯 **Foco Geográfico**: Concentrado em uma única região\n"
+        elif len(country_counts) <= 3:
+            text += "- 🎯 **Foco Geográfico**: Poucos países/regiões\n"
+        elif len(country_counts) <= 8:
+            text += "- 🌐 **Foco Geográfico**: Boa diversidade internacional\n"
+        else:
+            text += "- 🌐 **Foco Geográfico**: Excelente abrangência internacional\n"
+        
+        text += "\n"
+        return text
     
-    def _temporal_pattern_analysis(self, df):
-        """Análise de padrões temporais complexos"""
-        text = "**⏰ Análise de Padrões Temporais**\n\n"
+    def _collaboration_analysis_advanced(self):
+        """Análise de colaboração avançada"""
+        text = "### 🤝 ANÁLISE DE COLABORAÇÃO AVANÇADA\n\n"
         
-        year_col = next((col for col in df.columns if 'ano' in col.lower()), None)
-        if not year_col:
-            return text + "⚠️ Nenhuma coluna temporal identificada\n"
+        if not self.column_types['authors']:
+            return text + "❌ Dados de autores necessários para análise de colaboração\n\n"
         
-        try:
-            years = pd.to_numeric(df[year_col], errors='coerce').dropna()
-            if len(years) < 5:
-                return text + "⚠️ Dados temporais insuficientes\n"
-            
-            year_counts = years.value_counts().sort_index()
-            
-            # Calcular autocorrelação
-            if len(year_counts) > 3:
-                autocorr = year_counts.autocorr()
+        authors_col = self.column_types['authors'][0]
+        collaboration_data = self._analyze_collaboration_patterns(authors_col)
+        
+        text += f"**📊 Estatísticas de Colaboração**:\n"
+        text += f"- Trabalhos individuais: {collaboration_data['individual_works']}\n"
+        text += f"- Trabalhos em colaboração: {collaboration_data['collaborative_works']}\n"
+        text += f"- Taxa de colaboração: {collaboration_data['collaboration_rate']:.1f}%\n\n"
+        
+        if collaboration_data['top_collaborators']:
+            text += "**👥 Maiores Colaboradores**:\n"
+            for author, collab_count in collaboration_data['top_collaborators'][:5]:
+                text += f"- **{author}**: {collab_count} colaborações\n"
+            text += "\n"
+        
+        # Análise de padrões
+        if collaboration_data['collaboration_rate'] > 60:
+            text += "🎯 **Padrão**: Alta colaboração - rede de pesquisa muito ativa\n"
+        elif collaboration_data['collaboration_rate'] > 30:
+            text += "🎯 **Padrão**: Boa colaboração - trabalho em equipe presente\n"
+        else:
+            text += "💡 **Oportunidade**: Espaço para aumentar colaborações\n"
+        
+        text += "\n"
+        return text
+    
+    def _institutional_analysis(self):
+        """Análise institucional"""
+        text = "### 🏛️ ANÁLISE INSTITUCIONAL\n\n"
+        
+        if not self.column_types['institutions']:
+            return text + "❌ Nenhuma coluna institucional identificada\n\n"
+        
+        institutions_col = self.column_types['institutions'][0]
+        institutions = self.df[institutions_col].dropna()
+        
+        if len(institutions) == 0:
+            return text + "⚠️ Coluna institucional encontrada mas sem dados válidos\n\n"
+        
+        institution_counts = institutions.value_counts().head(10)
+        
+        text += "**🏫 Instituições Mais Produtivas**:\n"
+        for institution, count in institution_counts.items():
+            text += f"- **{institution}**: {count} publicações\n"
+        
+        text += f"\n**Total de instituições únicas**: {institutions.nunique()}\n\n"
+        
+        return text
+    
+    def _analyze_collaboration_patterns(self, authors_col):
+        """Analisa padrões de colaboração"""
+        individual_works = 0
+        collaborative_works = 0
+        author_collaborations = {}
+        
+        for authors_str in self.df[authors_col].dropna():
+            if isinstance(authors_str, str):
+                authors_list = self._parse_authors(authors_str)
                 
-                text += f"- **Período analisado**: {len(year_counts)} anos\n"
-                text += f"- **Autocorrelação temporal**: {autocorr:.3f}\n"
-                
-                if autocorr > 0.5:
-                    text += "📈 **Padrão**: Forte dependência temporal - tendências consistentes\n"
-                elif autocorr > 0.2:
-                    text += "↗️ **Padrão**: Moderada dependência temporal\n"
+                if len(authors_list) == 1:
+                    individual_works += 1
                 else:
-                    text += "🔄 **Padrão**: Baixa dependência temporal - padrões mais aleatórios\n"
-                
-                # Identificar sazonalidade
-                if len(year_counts) > 8:
-                    from scipy import signal
-                    detrended = signal.detrend(year_counts.values)
-                    text += f"- **Variação residual**: {np.std(detrended):.2f}\n"
-            
-            return text + "\n"
-            
-        except Exception as e:
-            return text + f"❌ Erro na análise temporal: {str(e)}\n"
+                    collaborative_works += 1
+                    
+                    # Contar colaborações por autor
+                    for author in authors_list:
+                        author_collaborations[author] = author_collaborations.get(author, 0) + 1
+        
+        total_works = individual_works + collaborative_works
+        collaboration_rate = (collaborative_works / total_works * 100) if total_works > 0 else 0
+        
+        top_collaborators = sorted(author_collaborations.items(), key=lambda x: x[1], reverse=True)[:8]
+        
+        return {
+            'individual_works': individual_works,
+            'collaborative_works': collaborative_works,
+            'collaboration_rate': collaboration_rate,
+            'top_collaborators': top_collaborators
+        }
+    
+    def _trends_and_patterns(self):
+        """Identifica tendências e padrões nos dados"""
+        text = "### 🔮 TENDÊNCIAS E PADRÕES IDENTIFICADOS\n\n"
+        
+        patterns = []
+        
+        # Padrão de colaboração
+        if self.column_types['authors']:
+            authors_col = self.column_types['authors'][0]
+            collab_data = self._analyze_collaboration_patterns(authors_col)
+            if collab_data['collaboration_rate'] > 50:
+                patterns.append("🤝 **Alta colaboração** entre pesquisadores")
+            else:
+                patterns.append("👤 **Produção individual** predominante")
+        
+        # Padrão temporal
+        if self.column_types['years']:
+            years_col = self.column_types['years'][0]
+            years = pd.to_numeric(self.df[years_col], errors='coerce').dropna()
+            if len(years) > 5:
+                recent = years[years >= datetime.now().year - 5]
+                if len(recent) > len(years) * 0.6:
+                    patterns.append("🚀 **Produção recente** intensa")
+        
+        # Padrão geográfico
+        if self.column_types['countries']:
+            countries_col = self.column_types['countries'][0]
+            unique_countries = self.df[countries_col].nunique()
+            if unique_countries == 1:
+                patterns.append("🎯 **Foco geográfico** concentrado")
+            elif unique_countries > 5:
+                patterns.append("🌐 **Abrangência internacional** significativa")
+        
+        if patterns:
+            for pattern in patterns:
+                text += f"- {pattern}\n"
+        else:
+            text += "ℹ️ Padrões serão identificados com mais dados\n"
+        
+        text += "\n"
+        return text
+    
+    def _recommendations(self):
+        """Recomendações inteligentes baseadas nos dados"""
+        text = "### 💡 RECOMENDAÇÕES INTELIGENTES\n\n"
+        
+        recommendations = []
+        
+        # Recomendações baseadas no tamanho da base
+        total_records = len(self.df)
+        if total_records < 20:
+            recommendations.extend([
+                "📥 **Amplie a base** com mais registros para análises estatísticas confiáveis",
+                "🔍 **Use a busca integrada** para encontrar trabalhos relacionados",
+                "📊 **Foque em análises descritivas** básicas por enquanto"
+            ])
+        elif total_records < 50:
+            recommendations.extend([
+                "📈 **Explore tendências temporais** com os dados atuais",
+                "🤝 **Analise redes de colaboração** entre autores",
+                "🗺️ **Use o mapa mental** para organizar conceitos principais"
+            ])
+        else:
+            recommendations.extend([
+                "🔬 **Realize análises avançadas** de clusters e padrões",
+                "🌐 **Explore redes complexas** de coautoria",
+                "📚 **Use o sistema de recomendação** para descobrir novos artigos"
+            ])
+        
+        # Recomendações específicas baseadas nos dados
+        if not self.column_types['authors']:
+            recommendations.append("👥 **Adicione dados de autores** para análise de redes de colaboração")
+        
+        if not self.column_types['years']:
+            recommendations.append("📅 **Inclua informações temporais** para análise de tendências")
+        
+        if len(self.df.columns) < 5:
+            recommendations.append("📋 **Enriqueça a base** com mais metadados (resumos, palavras-chave, etc)")
+        
+        for i, rec in enumerate(recommendations, 1):
+            text += f"{i}. {rec}\n"
+        
+        text += "\n"
+        return text
+    
+    def _parse_authors(self, authors_str):
+        """Parser robusto de autores"""
+        if not isinstance(authors_str, str):
+            return []
+        
+        # Múltiplas estratégias de parsing
+        separators = [';', ',', ' e ', ' and ', '&']
+        
+        for sep in separators:
+            if sep in authors_str:
+                authors = [a.strip() for a in authors_str.split(sep) if a.strip()]
+                if len(authors) > 1:
+                    # Filtrar autores válidos
+                    valid_authors = []
+                    for author in authors:
+                        if (len(author) > 2 and 
+                            not author.isdigit() and
+                            author.lower() not in ['', 'e', 'and', 'et', 'de', 'da', 'do']):
+                            valid_authors.append(author)
+                    return valid_authors
+        
+        # Se não encontrou separadores, retorna o autor único se for válido
+        author_clean = authors_str.strip()
+        if (len(author_clean) > 2 and 
+            not author_clean.isdigit() and
+            author_clean.lower() not in ['', 'e', 'and', 'et']):
+            return [author_clean]
+        
+        return []
+    
+    def _extract_unique_authors(self, authors_col):
+        """Extrai autores únicos de forma robusta"""
+        unique_authors = set()
+        
+        for authors_str in self.df[authors_col].dropna():
+            authors_list = self._parse_authors(authors_str)
+            unique_authors.update(authors_list)
+        
+        return unique_authors
 
 # -------------------------
-# Miro-like Mind Map Components - TOTALMENTE REFEITO E INTUITIVO
+# MAPA MENTAL SIMPLIFICADO - SEM 3D
 # -------------------------
 class AdvancedMindMap:
     def __init__(self):
@@ -1253,10 +828,7 @@ class AdvancedMindMap:
         if not existing_nodes:
             return random.randint(300, 700), random.randint(200, 500)
         
-        # Encontrar área menos congestionada
-        occupied_positions = [(n.get("x", 0), n.get("y", 0)) for n in existing_nodes]
-        
-        # Buscar em espiral a partir do centro
+        # Buscar área menos congestionada
         center_x, center_y = 500, 350
         for radius in range(100, 801, 100):
             for angle in range(0, 360, 30):
@@ -1264,16 +836,16 @@ class AdvancedMindMap:
                 x = center_x + radius * math.cos(rad)
                 y = center_y + radius * math.sin(rad)
                 
-                # Verificar se está longe o suficiente
+                # Verificar se está longe o suficiente de outros nós
                 too_close = any(
-                    math.sqrt((x - ox)**2 + (y - oy)**2) < 120 
-                    for ox, oy in occupied_positions
+                    math.sqrt((x - n.get("x", 0))**2 + (y - n.get("y", 0))**2) < 120 
+                    for n in existing_nodes
                 )
                 
                 if not too_close:
                     return x, y
         
-        # Fallback
+        # Fallback: posição aleatória
         return random.randint(200, 800), random.randint(150, 550)
     
     def create_connection(self, source_id, target_id, connection_type="relacionado", label=""):
@@ -1291,7 +863,7 @@ class AdvancedMindMap:
         }
     
     def auto_layout(self, nodes, edges, layout_type="hierarchical"):
-        """Layout automático inteligente"""
+        """Layout automático inteligente SEM 3D"""
         if not nodes:
             return nodes
         
@@ -1312,6 +884,8 @@ class AdvancedMindMap:
                 pos = nx.circular_layout(G)
             elif layout_type == "force":
                 pos = nx.spring_layout(G, k=3, iterations=150, seed=42)
+            elif layout_type == "circular":
+                pos = nx.circular_layout(G)
             else:
                 pos = nx.random_layout(G, seed=42)
             
@@ -1970,8 +1544,6 @@ def save_user_state_minimal(USER_STATE):
 # -------------------------
 # Inicializar componentes avançados
 # -------------------------
-advanced_ai = AdvancedAIAssistant()
-vision_analyzer = ComputationalVisionAnalyzer()
 advanced_mindmap = AdvancedMindMap()
 
 # -------------------------
@@ -2581,80 +2153,51 @@ elif st.session_state.page == "favoritos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mapa mental - TOTALMENTE REFEITO
+# Page: mapa mental - SIMPLIFICADO SEM 3D
 # -------------------------
 elif st.session_state.page == "mapa":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("🗺️ Mapa Mental Interativo Avançado")
-    st.info("💡 **Crie, conecte e visualize suas ideias** - Sistema totalmente redesenhado para máxima intuitividade!")
+    st.subheader("🗺️ Mapa Mental Interativo")
+    st.info("💡 **Crie, conecte e visualize suas ideias** - Sistema simplificado e intuitivo!")
     
-    # Inicializar sistema de mapa mental avançado
+    # Inicializar sistema de mapa mental
     if 'advanced_mindmap_nodes' not in st.session_state:
         st.session_state.advanced_mindmap_nodes = []
         st.session_state.advanced_mindmap_edges = []
         st.session_state.advanced_mindmap_selected_node = None
         st.session_state.advanced_mindmap_layout = "hierarchical"
     
-    # Sidebar principal
+    # Sidebar simplificada
     with st.sidebar:
-        st.header("🎨 Controles do Mapa Avançado")
+        st.header("🎨 Controles do Mapa")
         
         # Criar nova ideia
         with st.expander("➕ Nova Ideia", expanded=True):
             with st.form("create_advanced_node", clear_on_submit=True):
-                node_label = st.text_input("Título da ideia:", placeholder="Ex: Pesquisa Qualitativa", key="new_advanced_node_label")
-                node_type = st.selectbox("Tipo:", options=list(advanced_mindmap.node_types.keys()), key="new_advanced_node_type")
-                node_desc = st.text_area("Descrição:", placeholder="Detalhes sobre esta ideia...", height=100, key="new_advanced_node_desc")
+                node_label = st.text_input("Título da ideia:", placeholder="Ex: Pesquisa Qualitativa")
+                node_type = st.selectbox("Tipo:", options=list(advanced_mindmap.node_types.keys()))
+                node_desc = st.text_area("Descrição:", placeholder="Detalhes sobre esta ideia...", height=100)
                 
                 if st.form_submit_button("🎯 Adicionar Ideia", use_container_width=True):
                     if node_label:
                         node_id = f"node_{int(time.time())}_{random.randint(1000,9999)}"
-                        
-                        new_node = advanced_mindmap.create_node(
-                            node_id, node_label, node_type, node_desc
-                        )
+                        new_node = advanced_mindmap.create_node(node_id, node_label, node_type, node_desc)
                         st.session_state.advanced_mindmap_nodes.append(new_node)
                         st.session_state.advanced_mindmap_selected_node = node_id
                         st.success("Ideia criada!")
                         safe_rerun()
         
-        # Conectar ideias
-        with st.expander("🔗 Conectar Ideias", expanded=False):
-            if len(st.session_state.advanced_mindmap_nodes) >= 2:
-                nodes_list = [(node["id"], node["label"]) for node in st.session_state.advanced_mindmap_nodes]
-                with st.form("connect_advanced_nodes"):
-                    source_options = {f"{label}": node_id for node_id, label in nodes_list}
-                    target_options = {f"{label}": node_id for node_id, label in nodes_list}
-                    connection_types = list(advanced_mindmap.connection_types.keys())
-                    
-                    source_label = st.selectbox("De:", options=list(source_options.keys()), key="connect_advanced_source")
-                    target_label = st.selectbox("Para:", options=[k for k in target_options.keys() if k != source_label], key="connect_advanced_target")
-                    connection_type = st.selectbox("Tipo de conexão:", options=connection_types, key="connect_advanced_type")
-                    connection_label = st.text_input("Rótulo (opcional):", placeholder="Descreva a relação", key="connect_advanced_label")
-                    
-                    if st.form_submit_button("🔗 Conectar", use_container_width=True):
-                        source_id = source_options[source_label]
-                        target_id = target_options[target_label]
-                        
-                        existing = any(e["source"] == source_id and e["target"] == target_id for e in st.session_state.advanced_mindmap_edges)
-                        if not existing:
-                            new_connection = advanced_mindmap.create_connection(
-                                source_id, target_id, connection_type, connection_label
-                            )
-                            st.session_state.advanced_mindmap_edges.append(new_connection)
-                            st.success("Conexão criada!")
-                            safe_rerun()
-                        else:
-                            st.warning("Essas ideias já estão conectadas.")
-            else:
-                st.info("Precisa de pelo menos 2 ideias para conectar")
-        
-        # Configurações do mapa
-        with st.expander("👁️ Visualização", expanded=False):
-            visualization_mode = st.selectbox("Modo de Visualização:", options=["Mapa 3D", "Fluxograma", "Rede"], index=0)
+        # Layout simplificado - SEM 3D
+        with st.expander("🔄 Organização", expanded=False):
+            layout_options = {
+                "Hierárquico": "hierarchical",
+                "Força": "force", 
+                "Circular": "circular",
+                "Radial": "radial"
+            }
             
-            st.session_state.advanced_mindmap_layout = st.selectbox("Organização Automática:", 
-                                                                  options=["hierarchical", "radial", "force", "circular"])
+            selected_layout = st.selectbox("Layout:", options=list(layout_options.keys()))
+            st.session_state.advanced_mindmap_layout = layout_options[selected_layout]
             
             if st.button("🔄 Reorganizar Mapa", use_container_width=True):
                 st.session_state.advanced_mindmap_nodes = advanced_mindmap.auto_layout(
@@ -2664,78 +2207,29 @@ elif st.session_state.page == "mapa":
                 )
                 st.success("Mapa reorganizado!")
                 safe_rerun()
-            
-            # Exportação
-            st.markdown("---")
-            col_exp1, col_exp2 = st.columns(2)
-            with col_exp1:
-                if st.button("📥 Exportar JSON", use_container_width=True):
-                    export_data = advanced_mindmap.export_mindmap(
-                        st.session_state.advanced_mindmap_nodes,
-                        st.session_state.advanced_mindmap_edges,
-                        "json"
-                    )
-                    st.download_button(
-                        "💾 Baixar JSON",
-                        data=export_data,
-                        file_name=f"mapa_mental_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
-                        mime="application/json"
-                    )
-            with col_exp2:
-                if st.button("📝 Exportar Texto", use_container_width=True):
-                    export_data = advanced_mindmap.export_mindmap(
-                        st.session_state.advanced_mindmap_nodes,
-                        st.session_state.advanced_mindmap_edges,
-                        "text"
-                    )
-                    st.download_button(
-                        "💾 Baixar Texto",
-                        data=export_data,
-                        file_name=f"mapa_mental_{datetime.now().strftime('%Y%m%d_%H%M')}.txt",
-                        mime="text/plain"
-                    )
-            
-            st.markdown("---")
-            if st.button("🗑️ Limpar Mapa", type="secondary", use_container_width=True):
-                if st.checkbox("Confirmar limpeza total do mapa?"):
-                    st.session_state.advanced_mindmap_nodes = []
-                    st.session_state.advanced_mindmap_edges = []
-                    st.session_state.advanced_mindmap_selected_node = None
-                    st.success("Mapa limpo!")
-                    safe_rerun()
+        
+        # Exportação
+        with st.expander("💾 Exportar", expanded=False):
+            if st.button("📥 Exportar JSON", use_container_width=True):
+                export_data = advanced_mindmap.export_mindmap(
+                    st.session_state.advanced_mindmap_nodes,
+                    st.session_state.advanced_mindmap_edges,
+                    "json"
+                )
+                st.download_button(
+                    "💾 Baixar JSON",
+                    data=export_data,
+                    file_name=f"mapa_mental_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                    mime="application/json"
+                )
     
-    # Área principal do mapa
+    # Área principal do mapa - VISUALIZAÇÃO SIMPLIFICADA
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.subheader(f"🎨 {visualization_mode}")
+        st.subheader("🎨 Visualização do Mapa")
         
         if st.session_state.advanced_mindmap_nodes:
-            # Configurações baseadas no modo de visualização
-            if visualization_mode == "Mapa 3D":
-                st.markdown('<div class="three-d-effect">', unsafe_allow_html=True)
-                st.info("🌐 **Modo 3D Ativo**: Efeito visual tridimensional avançado!")
-                node_size = 30
-                font_size = st.session_state.settings.get("node_font_size", 16)
-                physics_enabled = True
-                hierarchical_enabled = False
-                
-            elif visualization_mode == "Fluxograma":
-                st.markdown('<div class="flowchart-box">', unsafe_allow_html=True)
-                st.info("📋 **Modo Fluxograma**: Visualização estruturada profissional!")
-                node_size = 25
-                font_size = st.session_state.settings.get("node_font_size", 14)
-                physics_enabled = False
-                hierarchical_enabled = True
-                
-            else:  # Rede
-                st.markdown('<div class="mindmap-3d">', unsafe_allow_html=True)
-                st.info("🔗 **Modo Rede**: Visualização de conexões complexas!")
-                node_size = 28
-                font_size = st.session_state.settings.get("node_font_size", 15)
-                physics_enabled = True
-                hierarchical_enabled = False
-
             # Preparar nós e arestas
             nodes_for_viz = []
             for node in st.session_state.advanced_mindmap_nodes:
@@ -2748,7 +2242,7 @@ elif st.session_state.page == "mapa":
                         size=node.get("size", node_data["size"]),
                         color=node["color"],
                         shape=node.get("shape", node_data["shape"]),
-                        font={"color": "#FFFFFF", "size": font_size},
+                        font={"color": "#FFFFFF", "size": 14},
                         x=node.get("x", 0),
                         y=node.get("y", 0)
                     )
@@ -2762,56 +2256,34 @@ elif st.session_state.page == "mapa":
                         target=edge["target"],
                         label=edge.get("label", ""),
                         color=edge["color"],
-                        width=3,
-                        #dashes=True if edge.get("style") in ["dashed", "dotted"] else False,
-                        #arrows_to=True if edge.get("style") == "arrow" else False
+                        width=3
                     )
                 )
 
-            config_params = {
-                "width": 800,
-                "height": 600,
-                "directed": True,
-                "physics": physics_enabled,
-                "hierarchical": hierarchical_enabled,
-            }
-
-            if hierarchical_enabled:
-                config_params["hierarchical"] = {
+            # Configuração SIMPLIFICADA - SEM 3D
+            config = Config(
+                width=800,
+                height=600,
+                directed=True,
+                physics=True,
+                hierarchical=False if st.session_state.advanced_mindmap_layout != "hierarchical" else {
                     "enabled": True,
                     "levelSeparation": 150,
                     "nodeSpacing": 100,
                     "treeSpacing": 200,
-                    "blockShifting": True,
-                    "edgeMinimization": True,
-                    "parentCentralization": True,
-                    "direction": "UD",
-                    "sortMethod": "hubsize"
+                    "direction": "UD"
                 }
+            )
 
-            config = Config(**config_params)
-
-            # Renderizar o gráfico
             try:
                 return_value = agraph(nodes=nodes_for_viz, edges=edges_for_viz, config=config)
-
                 if return_value:
                     st.session_state.advanced_mindmap_selected_node = return_value
-
             except Exception as e:
                 st.error(f"Erro ao renderizar o mapa: {e}")
-                st.info("Tente reorganizar o mapa ou reduzir o número de ideias")
-
-            # Fechar divs de estilo
-            if visualization_mode == "Mapa 3D":
-                st.markdown('</div>', unsafe_allow_html=True)
-            elif visualization_mode == "Fluxograma":
-                st.markdown('</div>', unsafe_allow_html=True)
-            elif visualization_mode == "Rede":
-                st.markdown('</div>', unsafe_allow_html=True)
 
         else:
-            st.info("🌟 **Comece criando sua primeira ideia!** Use o painel à esquerda para adicionar ideias e conectar conceitos.")
+            st.info("🌟 **Comece criando sua primeira ideia!** Use o painel à esquerda para adicionar ideias.")
             st.markdown("""
             **💡 Dicas para uso eficiente:**
             - Use **diferentes tipos** de nós para categorizar suas ideias
@@ -2821,7 +2293,7 @@ elif st.session_state.page == "mapa":
             """)
 
     with col2:
-        st.subheader("📋 Ideias & Conexões")
+        st.subheader("📋 Lista de Ideias")
         
         # Lista de ideias existentes
         if st.session_state.advanced_mindmap_nodes:
@@ -2859,93 +2331,19 @@ elif st.session_state.page == "mapa":
                         st.write("_Sem conexões ainda_")
                     
                     # Botões de ação
-                    col_btn1, col_btn2, col_btn3 = st.columns(3)
+                    col_btn1, col_btn2 = st.columns(2)
                     with col_btn1:
                         if st.button("✏️ Editar", key=f"edit_adv_{node['id']}", use_container_width=True):
                             st.session_state.editing_advanced_node = node['id']
                             safe_rerun()
                     
                     with col_btn2:
-                        if st.button("🔗 Conectar", key=f"connect_adv_{node['id']}", use_container_width=True):
-                            st.session_state.connecting_from_node = node['id']
-                            safe_rerun()
-                    
-                    with col_btn3:
                         if st.button("🗑️ Excluir", key=f"delete_adv_{node['id']}", use_container_width=True):
                             st.session_state.advanced_mindmap_nodes = [n for n in st.session_state.advanced_mindmap_nodes if n['id'] != node['id']]
                             st.session_state.advanced_mindmap_edges = [e for e in st.session_state.advanced_mindmap_edges if e['source'] != node['id'] and e['target'] != node['id']]
                             if st.session_state.advanced_mindmap_selected_node == node['id']:
                                 st.session_state.advanced_mindmap_selected_node = None
                             st.success("Ideia removida!")
-                            safe_rerun()
-        
-        # Editor de ideias
-        if hasattr(st.session_state, 'editing_advanced_node'):
-            editing_node_id = st.session_state.editing_advanced_node
-            editing_node = next((n for n in st.session_state.advanced_mindmap_nodes if n['id'] == editing_node_id), None)
-            
-            if editing_node:
-                st.markdown("---")
-                st.subheader("✏️ Editando Ideia")
-                
-                with st.form(f"edit_advanced_node_{editing_node_id}"):
-                    new_label = st.text_input("Título:", value=editing_node['label'], key=f"edit_adv_label_{editing_node_id}")
-                    new_type = st.selectbox("Tipo:", options=list(advanced_mindmap.node_types.keys()), 
-                                          index=list(advanced_mindmap.node_types.keys()).index(editing_node['type']), 
-                                          key=f"edit_adv_type_{editing_node_id}")
-                    new_desc = st.text_area("Descrição:", value=editing_node.get('description', ''), key=f"edit_adv_desc_{editing_node_id}")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.form_submit_button("💾 Salvar", use_container_width=True):
-                            editing_node['label'] = new_label
-                            editing_node['type'] = new_type
-                            editing_node['description'] = new_desc
-                            node_data = advanced_mindmap.node_types[new_type]
-                            editing_node['color'] = node_data["color"]
-                            editing_node['shape'] = node_data["shape"]
-                            editing_node['size'] = node_data["size"]
-                            del st.session_state.editing_advanced_node
-                            st.success("Ideia atualizada!")
-                            safe_rerun()
-                    
-                    with col2:
-                        if st.form_submit_button("❌ Cancelar", use_container_width=True):
-                            del st.session_state.editing_advanced_node
-                            safe_rerun()
-
-        # Conector rápido
-        if hasattr(st.session_state, 'connecting_from_node'):
-            from_node_id = st.session_state.connecting_from_node
-            from_node = next((n for n in st.session_state.advanced_mindmap_nodes if n['id'] == from_node_id), None)
-            
-            if from_node:
-                st.markdown("---")
-                st.subheader(f"🔗 Conectando de: {from_node['label']}")
-                
-                available_nodes = [(n["id"], n["label"]) for n in st.session_state.advanced_mindmap_nodes if n["id"] != from_node_id]
-                
-                with st.form("quick_connect"):
-                    target_options = {label: node_id for node_id, label in available_nodes}
-                    target_label = st.selectbox("Para:", options=list(target_options.keys()))
-                    connection_type = st.selectbox("Tipo:", options=list(advanced_mindmap.connection_types.keys()))
-                    connection_label = st.text_input("Rótulo:", placeholder="Descreva a relação")
-                    
-                    col1, col2 = st.columns(2)
-                    with col1:
-                        if st.form_submit_button("🔗 Conectar", use_container_width=True):
-                            target_id = target_options[target_label]
-                            new_connection = advanced_mindmap.create_connection(
-                                from_node_id, target_id, connection_type, connection_label
-                            )
-                            st.session_state.advanced_mindmap_edges.append(new_connection)
-                            del st.session_state.connecting_from_node
-                            st.success("Conexão criada!")
-                            safe_rerun()
-                    
-                    with col2:
-                        if st.form_submit_button("❌ Cancelar", use_container_width=True):
-                            del st.session_state.connecting_from_node
                             safe_rerun()
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -3010,7 +2408,7 @@ elif st.session_state.page == "anotacoes":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: graficos - COM IA AVANÇADA E VISÃO COMPUTACIONAL
+# Page: graficos - COM ANÁLISE INTELIGENTE MELHORADA
 # -------------------------
 elif st.session_state.page == "graficos":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -3021,92 +2419,14 @@ elif st.session_state.page == "graficos":
     else:
         df = st.session_state.df
         
-        # Análise inteligente automática
-        st.subheader("🤖 Análise Inteligente dos Dados")
+        # ANÁLISE INTELIGENTE AUTOMÁTICA - USANDO A NOVA CLASSE
+        st.subheader("🤖 Análise Inteligente da Planilha")
+        
         if st.button("🔍 Gerar Análise Completa da Planilha", use_container_width=True):
-            with st.spinner("Analisando dados... Isso pode levar alguns segundos"):
+            with st.spinner("Analisando dados de forma inteligente... Isso pode levar alguns segundos"):
                 analyzer = DataAnalyzer(df)
                 analysis = analyzer.generate_comprehensive_analysis()
                 st.markdown(analysis)
-        
-        st.markdown("---")
-        
-        # ASSISTENTE IA SUPER MELHORADO
-        st.subheader("💬 Converse com a IA Avançada sobre seus dados")
-        
-        # Histórico de conversa
-        if 'ia_conversation' not in st.session_state:
-            st.session_state.ia_conversation = []
-        
-        # Exibir histórico
-        for msg in st.session_state.ia_conversation[-6:]:  # Últimas 6 mensagens
-            if msg['role'] == 'user':
-                st.markdown(f"**Você:** {msg['content']}")
-            else:
-                st.markdown(f'<div class="ai-response">{msg["content"]}</div>', unsafe_allow_html=True)
-        
-        # Nova pergunta
-        col1, col2 = st.columns([4, 1])
-        with col1:
-            question = st.text_input(
-                "Faça uma pergunta sobre a planilha:", 
-                placeholder="Ex: Quais são os autores mais produtivos? Como está a distribuição geográfica?",
-                key="ia_question_input",
-                label_visibility="collapsed"
-            )
-        with col2:
-            ask_button = st.button("Perguntar à IA", key="ia_ask_button", use_container_width=True)
-
-        if ask_button and question:
-            with st.spinner("🧠 A IA avançada está analisando seus dados..."):
-                # Adicionar pergunta ao histórico
-                st.session_state.ia_conversation.append({'role': 'user', 'content': question})
-                
-                # Obter resposta da IA avançada
-                response = advanced_ai.get_contextual_response(question, df)
-                
-                # Adicionar resposta ao histórico
-                st.session_state.ia_conversation.append({'role': 'assistant', 'content': response})
-                
-                # Mostrar resposta
-                st.markdown(f'<div class="ai-response">{response}</div>', unsafe_allow_html=True)
-        elif ask_button and not question:
-            st.warning("Por favor, digite uma pergunta.")
-        
-        # Sugestões de perguntas
-        st.markdown("---")
-        st.subheader("💡 Sugestões de Perguntas para a IA")
-        
-        col_sug1, col_sug2, col_sug3 = st.columns(3)
-        with col_sug1:
-            if st.button("📈 Análise Temporal", use_container_width=True):
-                st.session_state.ia_conversation.append({'role': 'user', 'content': "Como evoluiu a pesquisa ao longo do tempo?"})
-                response = advanced_ai.get_contextual_response("Como evoluiu a pesquisa ao longo do tempo?", df)
-                st.session_state.ia_conversation.append({'role': 'assistant', 'content': response})
-                safe_rerun()
-        
-        with col_sug2:
-            if st.button("👥 Autores Principais", use_container_width=True):
-                st.session_state.ia_conversation.append({'role': 'user', 'content': "Quais são os autores mais produtivos?"})
-                response = advanced_ai.get_contextual_response("Quais são os autores mais produtivos?", df)
-                st.session_state.ia_conversation.append({'role': 'assistant', 'content': response})
-                safe_rerun()
-        
-        with col_sug3:
-            if st.button("🌎 Distribuição Geográfica", use_container_width=True):
-                st.session_state.ia_conversation.append({'role': 'user', 'content': "Qual a distribuição geográfica da pesquisa?"})
-                response = advanced_ai.get_contextual_response("Qual a distribuição geográfica da pesquisa?", df)
-                st.session_state.ia_conversation.append({'role': 'assistant', 'content': response})
-                safe_rerun()
-        
-        # NOVA SEÇÃO: Análise Computacional Avançada
-        st.markdown("---")
-        st.subheader("👁️ Análise Computacional Avançada")
-        
-        if st.button("🔬 Executar Análise de Padrões com Visão Computacional", use_container_width=True):
-            with st.spinner("Analisando padrões complexos com visão computacional..."):
-                vision_analysis = vision_analyzer.analyze_data_patterns(df)
-                st.markdown(f'<div class="vision-analysis">{vision_analysis}</div>', unsafe_allow_html=True)
         
         st.markdown("---")
         
@@ -3252,7 +2572,7 @@ elif st.session_state.page == "graficos":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: busca - CORRIGIDO VAZAMENTO DE CPF
+# Page: busca
 # -------------------------
 elif st.session_state.page == "busca":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -3423,7 +2743,7 @@ elif st.session_state.page == "busca":
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: mensagens - CORRIGIDO VAZAMENTO DE CPF
+# Page: mensagens
 # -------------------------
 elif st.session_state.page == "mensagens":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
@@ -3540,185 +2860,308 @@ elif st.session_state.page == "mensagens":
             subject = st.text_input("Assunto:", 
                                   value=f"Re: {reply_to_msg['subject']}" if reply_to_msg else "")
             body = st.text_area("Mensagem:", height=200,
-                              value=f"\n\n---\nEm resposta à mensagem de {users.get(reply_to_msg['from'], {}).get('name', reply_to_msg['from'])}:\n> {reply_to_msg['body'][:500].replace(chr(10), chr(10)+'> ')}..." if reply_to_msg else "")
+                              value=f"\n\n---\nEm resposta à mensagem de {users.get(reply_to_msg['from'], {}).get('name', reply_to_msg['from'])}:\n> {reply_to_msg['body'][:500].replace(chr(10), chr(10)+'> ')}..." 
+                                                            value=f"\n\n---\nEm resposta à mensagem de {users.get(reply_to_msg['from'], {}).get('name', reply_to_msg['from'])}:\n> {reply_to_msg['body'][:500].replace(chr(10), chr(10)+'> ')}..." if reply_to_msg else "")
             
-            attachment = st.file_uploader("Anexar arquivo", type=['pdf', 'docx', 'txt', 'jpg', 'png'])
+            attachment_file = st.file_uploader("Anexar arquivo", type=['pdf', 'docx', 'txt', 'jpg', 'png'])
             
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.form_submit_button("📤 Enviar Mensagem", use_container_width=True):
-                    if not recipients:
-                        st.error("Selecione pelo menos um destinatário.")
-                    elif not subject:
-                        st.error("Digite um assunto.")
-                    elif not body:
-                        st.error("Digite uma mensagem.")
+            if st.form_submit_button("📤 Enviar Mensagem", use_container_width=True):
+                if not recipients:
+                    st.error("Selecione pelo menos um destinatário.")
+                elif not subject.strip():
+                    st.error("O assunto é obrigatório.")
+                elif not body.strip():
+                    st.error("A mensagem não pode estar vazia.")
+                else:
+                    # Converter nomes de volta para CPFs para envio
+                    recipient_cpfs = []
+                    for recipient_name in recipients:
+                        # Encontrar o CPF correspondente ao nome
+                        for cpf, user_data in users.items():
+                            if user_data.get('name') == recipient_name:
+                                recipient_cpfs.append(cpf)
+                                break
+                    
+                    if not recipient_cpfs:
+                        st.error("Nenhum destinatário válido encontrado.")
                     else:
-                        for recipient_display in recipients:
-                            # CORREÇÃO: Obter CPF a partir do nome selecionado
-                            recipient_username = user_options[recipient_display]
-                            send_message(USERNAME, recipient_username, subject, body, attachment)
-                            st.success(f"Mensagem enviada para {recipient_display}!")
+                        # Enviar mensagem para cada destinatário
+                        success_count = 0
+                        for recipient_cpf in recipient_cpfs:
+                            sent_msg = send_message(USERNAME, recipient_cpf, subject, body, attachment_file)
+                            if sent_msg:
+                                success_count += 1
                         
-                        if st.session_state.get('reply_message_id'):
-                            st.session_state.reply_message_id = None
-                        if st.session_state.get('compose_inline'):
-                            st.session_state.compose_inline = False
-                        
-                        time.sleep(1)
-                        safe_rerun()
-            
-            with col2:
-                if st.form_submit_button("❌ Cancelar", type="secondary", use_container_width=True):
-                    if st.session_state.get('reply_message_id'):
-                        st.session_state.reply_message_id = None
-                    if st.session_state.get('compose_inline'):
-                        st.session_state.compose_inline = False
-                    safe_rerun()
+                        if success_count > 0:
+                            st.success(f"Mensagem enviada para {success_count} destinatário(s)!")
+                            if st.session_state.get('reply_message_id'):
+                                st.session_state.reply_message_id = None
+                            safe_rerun()
+                        else:
+                            st.error("Erro ao enviar a mensagem.")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Page: configuracoes
+# Page: config
 # -------------------------
 elif st.session_state.page == "config":
     st.markdown("<div class='glass-box' style='position:relative;'><div class='specular'></div>", unsafe_allow_html=True)
-    st.subheader("⚙️ Configurações e Personalização")
-
+    st.subheader("⚙️ Configurações do Sistema")
+    
     # Configurações de aparência
-    st.subheader("🎨 Aparência e Visual")
-    
-    col1, col2 = st.columns(2)
-    
-    with col1:
-        font_scale = st.slider("Tamanho da fonte:", 
-                              min_value=0.8, 
-                              max_value=1.5, 
-                              value=st.session_state.settings.get("font_scale", 1.0),
-                              step=0.1,
-                              help="Ajusta o tamanho geral do texto")
+    with st.expander("🎨 Configurações de Aparência", expanded=True):
+        col1, col2 = st.columns(2)
         
-        node_font_size = st.slider("Tamanho da fonte nos mapas:", 
-                                  min_value=10, 
-                                  max_value=24, 
-                                  value=st.session_state.settings.get("node_font_size", 14),
-                                  step=1,
-                                  help="Tamanho do texto nos nós do mapa mental")
-    
-    with col2:
-        plot_height = st.slider("Altura dos gráficos (px):", 
-                               min_value=400, 
-                               max_value=1200, 
-                               value=st.session_state.settings.get("plot_height", 600),
-                               step=100,
-                               help="Altura padrão para visualizações de gráficos")
-        
-        node_opacity = st.slider("Opacidade dos nós:", 
-                                min_value=0.3, 
-                                max_value=1.0, 
-                                value=st.session_state.settings.get("node_opacity", 0.8),
-                                step=0.1,
-                                help="Transparência dos elementos no mapa mental")
-
-    if st.button("💾 Aplicar Configurações", use_container_width=True):
-        st.session_state.settings.update({
-            "font_scale": font_scale,
-            "plot_height": plot_height,
-            "node_opacity": node_opacity,
-            "node_font_size": node_font_size
-        })
-        apply_global_styles(font_scale)
-        save_user_state_minimal(USER_STATE)
-        st.success("Configurações aplicadas! A página será recarregada.")
-        time.sleep(1)
-        safe_rerun()
-
-    # Gerenciamento de dados
-    st.subheader("📊 Gerenciamento de Dados")
-    
-    col3, col4 = st.columns(2)
-    
-    with col3:
-        if st.button("🗑️ Limpar Todos os Dados", type="secondary", use_container_width=True):
-            if st.checkbox("CONFIRMAR: Esta ação não pode ser desfeita. Todos os seus dados serão perdidos."):
-                for key in list(st.session_state.keys()):
-                    if key not in ['authenticated', 'username', 'user_obj']:
-                        del st.session_state[key]
-                
-                if USER_STATE.exists():
-                    USER_STATE.unlink()
-                
-                st.success("Todos os dados locais foram removidos!")
-                time.sleep(2)
-                safe_rerun()
-    
-    with col4:
-        import zipfile
-        from io import BytesIO
-        
-        zip_buffer = BytesIO()
-        with zipfile.ZipFile(zip_buffer, 'w', zipfile.ZIP_DEFLATED) as zip_file:
-            state_data = {
-                "notes": st.session_state.get("notes", ""),
-                "favorites": st.session_state.get("favorites", []),
-                "settings": st.session_state.get("settings", {}),
-                "tutorial_completed": st.session_state.get("tutorial_completed", False)
-            }
-            zip_file.writestr("user_state.json", json.dumps(state_data, indent=2))
+        with col1:
+            font_scale = st.slider(
+                "Escala de Fonte:",
+                min_value=0.8,
+                max_value=1.5,
+                value=st.session_state.settings.get("font_scale", 1.0),
+                step=0.1,
+                key="config_font_scale"
+            )
             
-            backup_path = st.session_state.get("last_backup_path")
-            if backup_path and Path(backup_path).exists():
-                zip_file.write(backup_path, f"planilha_backup_{Path(backup_path).name}")
+            plot_height = st.slider(
+                "Altura dos Gráficos:",
+                min_value=400,
+                max_value=1000,
+                value=st.session_state.settings.get("plot_height", 720),
+                step=50,
+                key="config_plot_height"
+            )
         
-        st.download_button(
-            "📥 Exportar Backup Completo",
-            data=zip_buffer.getvalue(),
-            file_name=f"nugep_pqr_backup_{USERNAME}_{datetime.now().strftime('%Y%m%d_%H%M')}.zip",
-            mime="application/zip",
-            use_container_width=True
-        )
-
+        with col2:
+            node_opacity = st.slider(
+                "Opacidade dos Nós (Mapa Mental):",
+                min_value=0.3,
+                max_value=1.0,
+                value=st.session_state.settings.get("node_opacity", 1.0),
+                step=0.1,
+                key="config_node_opacity"
+            )
+            
+            font_size = st.slider(
+                "Tamanho da Fonte Base:",
+                min_value=10,
+                max_value=20,
+                value=st.session_state.settings.get("font_size", 14),
+                step=1,
+                key="config_font_size"
+            )
+    
+    # Configurações de funcionalidades
+    with st.expander("🔧 Configurações de Funcionalidades", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            auto_save = st.checkbox(
+                "Auto-save automático",
+                value=st.session_state.autosave,
+                key="config_auto_save"
+            )
+            
+            enable_animations = st.checkbox(
+                "Habilitar animações",
+                value=True,
+                key="config_animations"
+            )
+        
+        with col2:
+            show_tutorial = st.checkbox(
+                "Mostrar tutorial inicial",
+                value=not st.session_state.tutorial_completed,
+                key="config_show_tutorial"
+            )
+            
+            enable_notifications = st.checkbox(
+                "Notificações de novas mensagens",
+                value=True,
+                key="config_notifications"
+            )
+    
+    # Configurações de dados
+    with st.expander("📊 Configurações de Dados", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            backup_retention = st.selectbox(
+                "Retenção de Backups:",
+                options=["7 dias", "30 dias", "90 dias", "1 ano", "Manter todos"],
+                index=1,
+                key="config_backup_retention"
+            )
+            
+            data_export_format = st.selectbox(
+                "Formato de Exportação:",
+                options=["CSV", "Excel", "JSON"],
+                index=0,
+                key="config_export_format"
+            )
+        
+        with col2:
+            search_results_per_page = st.slider(
+                "Resultados por página (Busca):",
+                min_value=5,
+                max_value=20,
+                value=8,
+                step=1,
+                key="config_search_results"
+            )
+            
+            recommendation_results_per_page = st.slider(
+                "Resultados por página (Recomendações):",
+                min_value=5,
+                max_value=15,
+                value=5,
+                step=1,
+                key="config_rec_results"
+            )
+    
+    # Ações do sistema
+    with st.expander("⚠️ Ações do Sistema", expanded=False):
+        col1, col2, col3 = st.columns(3)
+        
+        with col1:
+            if st.button("💾 Aplicar Configurações", use_container_width=True):
+                # Aplicar configurações de aparência
+                st.session_state.settings["font_scale"] = font_scale
+                st.session_state.settings["plot_height"] = plot_height
+                st.session_state.settings["node_opacity"] = node_opacity
+                st.session_state.settings["font_size"] = font_size
+                
+                # Aplicar outras configurações
+                st.session_state.autosave = auto_save
+                if not show_tutorial:
+                    st.session_state.tutorial_completed = True
+                
+                save_user_state_minimal(USER_STATE)
+                st.success("Configurações aplicadas com sucesso!")
+                safe_rerun()
+        
+        with col2:
+            if st.button("🔄 Restaurar Padrões", use_container_width=True):
+                if st.checkbox("Confirmar restauração das configurações padrão?"):
+                    st.session_state.settings = _defaults["settings"].copy()
+                    st.session_state.autosave = _defaults["autosave"]
+                    save_user_state_minimal(USER_STATE)
+                    st.success("Configurações restauradas para os padrões!")
+                    safe_rerun()
+        
+        with col3:
+            if st.button("🗑️ Limpar Cache", use_container_width=True):
+                if st.checkbox("Confirmar limpeza do cache?"):
+                    try:
+                        # Limpar cache de dados
+                        st.cache_data.clear()
+                        st.success("Cache limpo com sucesso!")
+                    except Exception as e:
+                        st.error(f"Erro ao limpar cache: {e}")
+    
     # Informações do sistema
-    st.subheader("ℹ️ Informações do Sistema")
-    
-    st.write(f"**Usuário (CPF):** {format_cpf_display(USERNAME)}")
-    st.write(f"**Nome:** {USER_OBJ.get('name', 'Não informado')}")
-    st.write(f"**Bolsa:** {USER_OBJ.get('scholarship', 'Não informada')}")
-    created_at_str = USER_OBJ.get('created_at', 'Data não disponível')
-    try:
-        created_at_dt = datetime.fromisoformat(created_at_str)
-        st.write(f"**Cadastrado em:** {created_at_dt.strftime('%d/%m/%Y %H:%M')}")
-    except:
-        st.write(f"**Cadastrado em:** {created_at_str}")
-    
-    st.write("**Estatísticas:**")
-    st.write(f"- Favoritos salvos: {len(get_session_favorites())}")
-    st.write(f"- Mensagens não lidas: {UNREAD_COUNT}")
-    st.write(f"- Planilha carregada: {'Sim' if st.session_state.df is not None else 'Não'}")
-    
-    if st.session_state.df is not None:
-        st.write(f"- Registros na planilha: {len(st.session_state.df)}")
-        st.write(f"- Colunas na planilha: {len(st.session_state.df.columns)}")
+    with st.expander("ℹ️ Informações do Sistema", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            st.write("**Informações do Usuário:**")
+            st.write(f"- Nome: {USER_OBJ.get('name', 'N/A')}")
+            st.write(f"- Tipo de Bolsa: {USER_OBJ.get('scholarship', 'N/A')}")
+            st.write(f"- Data de Cadastro: {USER_OBJ.get('created_at', 'N/A')}")
+            
+            st.write("**Uso do Sistema:**")
+            st.write(f"- Favoritos: {len(get_session_favorites())}")
+            st.write(f"- Mensagens Não Lidas: {UNREAD_COUNT}")
+            if st.session_state.df is not None:
+                st.write(f"- Planilha Carregada: {st.session_state.uploaded_name or 'N/A'}")
+        
+        with col2:
+            st.write("**Estatísticas do Sistema:**")
+            
+            # Contar usuários
+            users = load_users()
+            st.write(f"- Usuários Cadastrados: {len(users)}")
+            
+            # Contar mensagens totais
+            all_messages = load_all_messages()
+            user_messages = [m for m in all_messages if m.get('from') == USERNAME or m.get('to') == USERNAME]
+            st.write(f"- Suas Mensagens: {len(user_messages)}")
+            
+            # Contar backups
+            backup_count = 0
+            user_backup_dir = BACKUPS_DIR / USERNAME
+            if user_backup_dir.exists():
+                backup_count = len(list(user_backup_dir.glob("*.csv")))
+            st.write(f"- Seus Backups: {backup_count}")
+            
+            # Versão do sistema
+            st.write(f"- Versão: NUGEP-PQR 2.0")
+
+    # Exportação de dados
+    with st.expander("💾 Exportação de Dados", expanded=False):
+        col1, col2 = st.columns(2)
+        
+        with col1:
+            if st.button("📥 Exportar Meus Dados", use_container_width=True):
+                export_data = {
+                    "user_info": USER_OBJ,
+                    "favorites": get_session_favorites(),
+                    "notes": st.session_state.notes,
+                    "settings": st.session_state.settings,
+                    "exported_at": datetime.now().isoformat()
+                }
+                
+                export_json = json.dumps(export_data, ensure_ascii=False, indent=2)
+                st.download_button(
+                    "⬇️ Baixar Dados do Usuário",
+                    data=export_json,
+                    file_name=f"nugep_pqr_dados_{USERNAME}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
+        
+        with col2:
+            if st.button("📊 Exportar Estatísticas", use_container_width=True):
+                stats_data = {
+                    "user_stats": {
+                        "favorites_count": len(get_session_favorites()),
+                        "unread_messages": UNREAD_COUNT,
+                        "backup_count": backup_count,
+                        "notes_length": len(st.session_state.notes)
+                    },
+                    "system_stats": {
+                        "total_users": len(users),
+                        "total_messages": len(all_messages),
+                        "user_messages": len(user_messages)
+                    },
+                    "exported_at": datetime.now().isoformat()
+                }
+                
+                stats_json = json.dumps(stats_data, ensure_ascii=False, indent=2)
+                st.download_button(
+                    "⬇️ Baixar Estatísticas",
+                    data=stats_json,
+                    file_name=f"nugep_pqr_stats_{USERNAME}_{datetime.now().strftime('%Y%m%d_%H%M')}.json",
+                    mime="application/json",
+                    use_container_width=True
+                )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # -------------------------
-# Finalização e salvamento automático
+# Footer and final touches
 # -------------------------
-if st.session_state.autosave and st.session_state.get('notes') is not None:
+st.markdown("---")
+st.markdown(
+    "<div style='text-align:center; color:#bfc6cc; font-size:12px; padding:16px;'>"
+    "NUGEP-PQR • Sistema de Gestão de Pesquisa • Desenvolvido para a comunidade acadêmica"
+    "</div>",
+    unsafe_allow_html=True
+)
+
+# Auto-save final se habilitado
+if st.session_state.autosave and st.session_state.authenticated:
     try:
         save_user_state_minimal(USER_STATE)
     except Exception:
         pass
-
-# -------------------------
-# Rodapé
-# -------------------------
-st.markdown("---")
-st.markdown(
-    "<div style='text-align:center; color:#bfc6cc; font-size:0.9em; padding:10px;'>"
-    "NUGEP-PQR — Sistema Avançado de Gestão de Pesquisa e Análise | "
-    "IA Avançada • Visão Computacional • Mapa Mental Inteligente"
-    "</div>", 
-    unsafe_allow_html=True
-)
