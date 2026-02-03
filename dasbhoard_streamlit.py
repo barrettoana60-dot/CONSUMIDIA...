@@ -80,8 +80,8 @@ LIQUID_CSS = """
 .glass-main {
     backdrop-filter: blur(28px);
     -webkit-backdrop-filter: blur(28px);
-    background: radial-gradient(circle at top, rgba(255,255,255,0.06), transparent 55%)
-                ,rgba(8, 14, 38, 0.96);
+    background: radial-gradient(circle at top, rgba(255,255,255,0.06), transparent 55%),
+                rgba(8, 14, 38, 0.96);
     border-radius: 22px;
     border: 1px solid rgba(255,255,255,0.18);
     box-shadow: 0 28px 80px rgba(0,0,0,0.75);
@@ -159,8 +159,8 @@ LIQUID_CSS = """
 .pqr-btn {
     border-radius: 999px !important;
     border: 1px solid rgba(255,255,255,0.16) !important;
-    background: radial-gradient(circle at top left, rgba(255,255,255,0.15), transparent 45%)
-                ,rgba(3,7,24,0.92) !important;
+    background: radial-gradient(circle at top left, rgba(255,255,255,0.15), transparent 45%),
+                rgba(3,7,24,0.92) !important;
     color: var(--pqr-text-main) !important;
     font-size: 0.82rem !important;
     padding: 6px 14px !important;
@@ -181,6 +181,11 @@ LIQUID_CSS = """
 /* Ajeitar botões padrão do Streamlit */
 .stButton > button {
     border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: radial-gradient(circle at top left, rgba(255,255,255,0.12), transparent 45%),
+                rgba(3,7,24,0.92);
+    color: var(--pqr-text-main);
+    font-size: 0.84rem;
 }
 
 /* “Timeline card” estilo social feed */
@@ -270,6 +275,19 @@ textarea, input, select {
     color: var(--pqr-text-main) !important;
     font-size: 0.85rem !important;
 }
+
+/* Badge simples */
+.pqr-badge {
+    display:inline-block;
+    padding:3px 10px;
+    border-radius:999px;
+    font-size:0.72rem;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    background:rgba(85,214,255,0.12);
+    border:1px solid rgba(85,214,255,0.7);
+    color:var(--pqr-accent);
+}
 </style>
 """
 
@@ -278,8 +296,6 @@ st.markdown(LIQUID_CSS, unsafe_allow_html=True)
 # ======================================================
 # MODELOS DE DADOS
 # ======================================================
-from dataclasses import dataclass
-
 @dataclass
 class User:
     name: str
@@ -313,7 +329,6 @@ class MindNode:
     label: str
     children: List["MindNode"] = field(default_factory=list)
 
-
 # ======================================================
 # PERSISTÊNCIA EM ARQUIVO (SALVAR / CARREGAR)
 # ======================================================
@@ -342,8 +357,19 @@ def load_persistent_state():
         return default_state_dict()
 
 
+def mindnode_to_dict(n: MindNode) -> Dict[str, Any]:
+    return {"id": n.id, "label": n.label, "children": [mindnode_to_dict(c) for c in n.children]}
+
+
+def dict_to_mindnode(d: Dict[str, Any]) -> MindNode:
+    return MindNode(
+        id=d.get("id", "no-id"),
+        label=d.get("label", ""),
+        children=[dict_to_mindnode(c) for c in d.get("children", [])],
+    )
+
+
 def save_persistent_state():
-    # Monta um dicionário serializável a partir de session_state
     data = {
         "users": [asdict(u) for u in st.session_state.users],
         "current_user_email": st.session_state.current_user_email,
@@ -361,20 +387,6 @@ def save_persistent_state():
         st.success("Dados salvos com sucesso.")
     except Exception as e:
         st.warning(f"Não foi possível salvar em arquivo: {e}")
-
-
-# MindNode <-> dict
-def mindnode_to_dict(n: MindNode) -> Dict[str, Any]:
-    return {"id": n.id, "label": n.label, "children": [mindnode_to_dict(c) for c in n.children]}
-
-
-def dict_to_mindnode(d: Dict[str, Any]) -> MindNode:
-    return MindNode(
-        id=d.get("id", "no-id"),
-        label=d.get("label", ""),
-        children=[dict_to_mindnode(c) for c in d.get("children", [])],
-    )
-
 
 # ======================================================
 # SESSION STATE
@@ -501,7 +513,6 @@ def timeline_completion() -> int:
     done = len([c for c in st.session_state.cards if c.status == "redacao"])
     return round(done / total * 100)
 
-
 # ======================================================
 # AUTENTICAÇÃO
 # ======================================================
@@ -513,11 +524,11 @@ def auth_screen():
         st.markdown(
             """
             <div class="pqr-logo-line">
-              <div class="pqr-logo-avatar">PQR</div>
-              <div class="pqr-title-text">
-                <div class="pqr-title-main">PQR</div>
-                <div class="pqr-title-sub">Pesquisa Qualitativa de Resultados</div>
-              </div>
+                <div class="pqr-logo-avatar">PQR</div>
+                <div class="pqr-title-text">
+                    <div class="pqr-title-main">PQR</div>
+                    <div class="pqr-title-sub">Pesquisa Qualitativa de Resultados</div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -583,7 +594,6 @@ def auth_screen():
 
         st.markdown("</div>", unsafe_allow_html=True)
 
-
 # ======================================================
 # VIEW: BOARD – COMO FEED DE PROGRESSO
 # ======================================================
@@ -612,9 +622,7 @@ def view_board():
                 + "\n"
                 + st.session_state.research_notes
                 + "\n"
-                + "\n".join(
-                    f"{c.title} {c.description}" for c in st.session_state.cards
-                )
+                + "\n".join(f"{c.title} {c.description}" for c in st.session_state.cards)
             )
             found = query.strip() and query.lower() in haystack.lower()
             if not query.strip():
@@ -691,17 +699,17 @@ def view_board():
                     st.markdown(
                         f"""
                         <div class="timeline-card">
-                          <div class="timeline-card-header">
-                            <span>{c.title}</span>
-                            <span>{created_str}</span>
-                          </div>
-                          <div class="timeline-card-body">
-                            {c.description or "<i>(sem descrição)</i>"}
-                          </div>
-                          <div class="timeline-card-footer">
-                            <span>Prazo: {c.deadline}</span>
-                            <span>{status_label}</span>
-                          </div>
+                            <div class="timeline-card-header">
+                                <span>{c.title}</span>
+                                <span>{created_str}</span>
+                            </div>
+                            <div class="timeline-card-body">
+                                {c.description or "<i>(sem descrição)</i>"}
+                            </div>
+                            <div class="timeline-card-footer">
+                                <span>Prazo: {c.deadline}</span>
+                                <span>{status_label}</span>
+                            </div>
                         </div>
                         """,
                         unsafe_allow_html=True,
@@ -726,7 +734,6 @@ def view_board():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-
 # ======================================================
 # VIEW: PESQUISA / PASTA PRINCIPAL
 # ======================================================
@@ -736,8 +743,8 @@ def view_research():
 
     tabs_html = """
     <div class="pqr-tabs">
-      <div class="pqr-tab pqr-tab-active">Resumo & notas</div>
-      <div class="pqr-tab">Artigos & buscas</div>
+        <div class="pqr-tab pqr-tab-active">Resumo & notas</div>
+        <div class="pqr-tab">Artigos & buscas</div>
     </div>
     """
     st.markdown(tabs_html, unsafe_allow_html=True)
@@ -771,9 +778,7 @@ def view_research():
         with c1:
             if st.button("Artigos gerais"):
                 if keywords.strip():
-                    url = "https://scholar.google.com/scholar?q=" + keywords.replace(
-                        " ", "+"
-                    )
+                    url = "https://scholar.google.com/scholar?q=" + keywords.replace(" ", "+")
                     st.markdown(f"[Abrir Google Acadêmico]({url})")
         with c2:
             if st.button("Últimos 5 anos"):
@@ -787,7 +792,6 @@ def view_research():
                     st.markdown(f"[Abrir (últimos 5 anos)]({url})")
 
     st.markdown("</div>", unsafe_allow_html=True)
-
 
 # ======================================================
 # VIEW: MAPA MENTAL
@@ -851,7 +855,6 @@ def view_mindmap():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-
 # ======================================================
 # VIEW: ANÁLISE INTELIGENTE (MOCK)
 # ======================================================
@@ -863,30 +866,32 @@ def view_analysis():
         summary = st.session_state.research_summary or ""
         notes = st.session_state.research_notes or ""
         total_cards = len(st.session_state.cards) or 1
-        done_cards = len(
-            [c for c in st.session_state.cards if c.status == "redacao"]
-        )
+        done_cards = len([c for c in st.session_state.cards if c.status == "redacao"])
         completion = round(done_cards / total_cards * 100)
 
         st.subheader("Síntese do que você já escreveu")
         if len(summary.strip()) < 60:
             st.write(
-                "- O resumo ainda está enxuto. Tente explicitar: (1) contexto, (2) problema, (3) objetivos, (4) perguntas de pesquisa."
+                "- O resumo ainda está enxuto. Tente explicitar: (1) contexto, (2) problema, (3) "
+                "objetivos, (4) perguntas de pesquisa."
             )
         else:
             st.write(
-                "- O resumo já tem um corpo interessante. Revise se está claro o recorte qualitativo (quem, onde, como, por quê)."
+                "- O resumo já tem um corpo interessante. Revise se está claro o recorte qualitativo "
+                "(quem, onde, como, por quê)."
             )
 
         st.subheader("Andamento do projeto")
         st.write(f"- Etapas concluídas (redação/resultados): {done_cards}/{total_cards}.")
         if completion < 30:
             st.write(
-                "- Fase inicial: foque em consolidar problema, referencial e possíveis caminhos metodológicos."
+                "- Fase inicial: foque em consolidar problema, referencial e possíveis caminhos "
+                "metodológicos."
             )
         elif completion < 70:
             st.write(
-                "- Fase intermediária: revise se a forma de coleta (entrevista, grupo focal, observação etc.) está coerente com o que você quer responder."
+                "- Fase intermediária: revise se a forma de coleta (entrevista, grupo focal, "
+                "observação etc.) está coerente com o que você quer responder."
             )
         else:
             st.write(
@@ -897,23 +902,28 @@ def view_analysis():
         concat = (summary + " " + notes).lower()
         if "entrevista" in concat:
             st.write(
-                "- Há entrevistas: explore estratégias como análise temática, análise de conteúdo ou análise narrativa."
+                "- Há entrevistas: explore estratégias como análise temática, análise de conteúdo "
+                "ou análise narrativa."
             )
         if "grupo focal" in concat or "focal" in concat:
             st.write(
-                "- Menciona grupo focal: pense em como a interação entre participantes impacta os sentidos produzidos."
+                "- Menciona grupo focal: pense em como a interação entre participantes impacta os "
+                "sentidos produzidos."
             )
         if "questionário" in concat or "questionario" in concat:
             st.write(
-                "- Questionários aparecem no texto: se houver questões abertas, trate-as como narrativas/dizeres a serem categorizados."
+                "- Questionários aparecem no texto: se houver questões abertas, trate-as como "
+                "narrativas/dizeres a serem categorizados."
             )
         if len(notes) > 200:
             st.write(
-                "- Muitas anotações: excelente. Talvez seja momento de criar um quadro de códigos/categorias preliminares."
+                "- Muitas anotações: excelente. Talvez seja momento de criar um quadro de códigos/"
+                "categorias preliminares."
             )
         if not summary.strip() and not notes.strip():
             st.info(
-                "Ainda não há conteúdo suficiente para análise. Escreva pelo menos um parágrafo de resumo e algumas notas."
+                "Ainda não há conteúdo suficiente para análise. Escreva pelo menos um parágrafo de "
+                "resumo e algumas notas."
             )
 
         st.write("---")
@@ -922,11 +932,11 @@ def view_analysis():
         st.caption(f"{completion}% concluído (estimativa via timeline).")
     else:
         st.info(
-            "Clique em **Rodar análise qualitativa agora** para gerar um diagnóstico textual com base no que você já registrou."
+            "Clique em **Rodar análise qualitativa agora** para gerar um diagnóstico textual com "
+            "base no que você já registrou."
         )
 
     st.markdown("</div>", unsafe_allow_html=True)
-
 
 # ======================================================
 # VIEW: CHAT ESTILO REDE SOCIAL
@@ -996,7 +1006,6 @@ def view_chat():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-
 # ======================================================
 # VIEW: CADEIA DE LIGAÇÃO / REDE DE INTERESSES
 # ======================================================
@@ -1035,7 +1044,6 @@ def view_network():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-
 # ======================================================
 # VIEW: CONFIGURAÇÕES, SALVAR & SAIR
 # ======================================================
@@ -1048,11 +1056,13 @@ def view_settings():
         st.markdown(
             f"""
             <div class="user-pill">
-              <div class="user-pill-avatar">{user.name[:1].upper()}</div>
-              <div>
-                <strong>{user.name}</strong><br/>
-                <span style="font-size:0.78rem;color:#a6aec9;">{user.email} – {map_type_label(user.type)}</span>
-              </div>
+                <div class="user-pill-avatar">{user.name[:1].upper()}</div>
+                <div>
+                    <strong>{user.name}</strong><br/>
+                    <span style="font-size:0.78rem;color:#a6aec9;">
+                        {user.email} – {map_type_label(user.type)}
+                    </span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1079,7 +1089,6 @@ def view_settings():
 
     st.markdown("</div>", unsafe_allow_html=True)
 
-
 # ======================================================
 # MAIN
 # ======================================================
@@ -1094,11 +1103,11 @@ def main():
         st.markdown(
             """
             <div class="pqr-logo-line">
-              <div class="pqr-logo-avatar">P</div>
-              <div class="pqr-title-text">
-                <div class="pqr-title-main">PQR</div>
-                <div class="pqr-title-sub">sua rede de pesquisa qualitativa</div>
-              </div>
+                <div class="pqr-logo-avatar">P</div>
+                <div class="pqr-title-text">
+                    <div class="pqr-title-main">PQR</div>
+                    <div class="pqr-title-sub">sua rede de pesquisa qualitativa</div>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -1107,11 +1116,11 @@ def main():
         st.markdown(
             f"""
             <div class="user-pill">
-              <div class="user-pill-avatar">{user.name[:1].upper()}</div>
-              <div style="font-size:0.78rem;">
-                {user.name.split(" ")[0]}<br/>
-                <span style="color:#a6aec9;">{map_type_label(user.type)}</span>
-              </div>
+                <div class="user-pill-avatar">{user.name[:1].upper()}</div>
+                <div style="font-size:0.78rem;">
+                    {user.name.split(" ")[0]}<br/>
+                    <span style="color:#a6aec9;">{map_type_label(user.type)}</span>
+                </div>
             </div>
             """,
             unsafe_allow_html=True,
