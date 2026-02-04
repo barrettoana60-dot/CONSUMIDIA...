@@ -264,7 +264,7 @@ class User:
     email: str
     type: str
     password: str
-    avatar_url: Optional[str] = None  # avatar opcional
+    avatar_url: Optional[str] = None
 
 @dataclass
 class Card:
@@ -380,7 +380,6 @@ def save_persistent_state():
     try:
         with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        st.toast("Dados salvos.", icon="✅")
     except Exception as e:
         st.warning(f"Não foi possível salvar em arquivo: {e}")
 
@@ -393,7 +392,7 @@ def init_state():
         return
     persisted = load_persistent_state()
 
-    # normalizar users para ter avatar_url
+    # users com avatar_url sempre
     users_norm = []
     for u in persisted["users"]:
         u2 = dict(u)
@@ -410,8 +409,23 @@ def init_state():
     st.session_state.mind_selected_id = persisted["mind_selected_id"]
     st.session_state.chat_messages = [ChatMessage(**m) for m in persisted["chat_messages"]]
     st.session_state.chat_topic = persisted["chat_topic"]
-    st.session_state.posts = [Post(**p) for p in persisted.get("posts", [])]
-    st.session_state.slides = [Slide(**s) for s in persisted.get("slides", [])]
+
+    # garantir posts e slides mesmo se não existirem
+    raw_posts = persisted.get("posts", [])
+    posts_norm = []
+    for p in raw_posts:
+        p2 = dict(p)
+        if "likes" not in p2:
+            p2["likes"] = 0
+        if "liked_by_me" not in p2:
+            p2["liked_by_me"] = False
+        posts_norm.append(Post(**p2))
+    st.session_state.posts = posts_norm
+
+    raw_slides = persisted.get("slides", [])
+    slides_norm = [Slide(**s) for s in raw_slides]
+    st.session_state.slides = slides_norm
+
     st.session_state.initialized = True
 
 init_state()
@@ -536,7 +550,6 @@ def auth_screen():
         st.write("")
         tabs = st.tabs(["Entrar", "Criar conta"])
 
-        # LOGIN
         with tabs[0]:
             email = st.text_input("Email", key="login_email")
             password = st.text_input("Senha", type="password", key="login_password")
@@ -548,7 +561,6 @@ def auth_screen():
                     st.session_state.current_user_email = email
                     st.experimental_rerun()
 
-        # CADASTRO
         with tabs[1]:
             name = st.text_input("Nome completo", key="cad_nome")
             email_c = st.text_input("Email institucional", key="cad_email")
@@ -601,7 +613,7 @@ def auth_screen():
                     )
                     st.session_state.current_user_email = email_c
                     save_persistent_state()
-                    st.success("Conta criada. Bem‑vindo(a) ao PQR!")
+                    st.success("Conta criada.")
                     st.experimental_rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
@@ -612,6 +624,11 @@ def auth_screen():
 
 def view_social_feed():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+
+    # blindagem extra: garantir posts no session_state
+    if "posts" not in st.session_state or st.session_state.posts is None:
+        st.session_state.posts = []
+
     st.markdown("### Feed da rede (posts, curtidas)")
     user = get_current_user()
     if not user:
@@ -1083,7 +1100,7 @@ def view_analysis():
         if "grupo focal" in concat or "focal" in concat:
             st.write("- Grupo focal: considere o papel da interação na produção de sentidos.")
         if "questionário" in concat or "questionario" in concat:
-            st.write("- Questionários abertos: trate respostas como narrativas a categorizAR.")
+            st.write("- Questionários abertos: trate respostas como narrativas a categorizar.")
         if len(notes) > 200:
             st.write("- Muitas anotações: hora de estruturar códigos/categorias preliminares.")
         if not summary.strip() and not notes.strip():
