@@ -1,710 +1,1163 @@
-from anvil import *
-import anvil.server
+m Streamlit
+GPT-5.1
 
+
+import streamlit as st
 import datetime
-import uuid
-import re
-from collections import Counter
-from dataclasses import dataclass, field, asdict
+import json
+import osa
+from dataclasses import dataclass, asdict, field
 from typing import List, Optional, Dict, Any
-
-
-# ======================================================
-# DATACLASSES / MODELOS
-# ======================================================
-
-@dataclass
-class UserData:
-  name: str
-  email: str
-  type: str
-  password: str
-
-
-@dataclass
-class CardData:
-  id: str
-  title: str
-  description: str
-  status: str
-  deadline: Optional[str] = None
-  created_at: str = ""
-
-
-@dataclass
-class ChatMessageData:
-  id: str
-  user_name: str
-  topic: str
-  text: str
-  time: str
-
-
-@dataclass
-class MindNodeData:
-  id: str
-  label: str
-  children: List["MindNodeData"] = field(default_factory=list)
-
+from collections import Counter
+import re
+import uuid
 
 # ======================================================
-# HELPERS GERAIS (equivalentes às funções do Streamlit)
+# CONFIG BÁSICA
 # ======================================================
+st.set_page_config(
+    page_title="PQR – Pesquisa Qualitativa de Resultados",
+    layout="wide",
+    initial_sidebar_state="expanded",
+)
 
-def default_state() -> Dict[str, Any]:
-  return {
-    "users": [],
-    "current_user_email": None,
-    "cards": [],
-    "research_summary": "",
-    "research_notes": "",
-    "mind_root": MindNodeData(id="root", label="Tema central", children=[]),
-    "mind_selected_id": "root",
-    "chat_messages": [],
-    "chat_topic": "metodologia",
-  }
+STATE_FILE = "pqr_state.json"
+
+# ======================================================
+# CSS – TUDO EM LIQUID GLASS + AZUL ESCURO, ESTILO REDE SOCIAL
+# ======================================================
+LIQUID_CSS = """
+<style>
+:root {
+    --pqr-accent: #55d6ff;
+    --pqr-accent-soft: rgba(85, 214, 255, 0.18);
+    --pqr-bg-dark: #050814;
+    --pqr-bg-glass: rgba(5, 10, 25, 0.85);
+    --pqr-border-soft: rgba(255,255,255,0.16);
+    --pqr-text-main: #f7f9ff;
+    --pqr-text-soft: #a6aec9;
+}
+
+/* Fundo geral com imagem + overlay azul escuro */
+.stApp {
+    background: var(--pqr-bg-dark);
+    color: var(--pqr-text-main);
+    font-family: system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
+}
+.stApp::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background-image: url("https://images.pexels.com/photos/237272/pexels-photo-237272.jpeg?auto=compress&cs=tinysrgb&w=1600");
+    background-size: cover;
+    background-position: center;
+    filter: saturate(1.1) contrast(1.05) brightness(0.7);
+    z-index: -2;
+}
+.stApp::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    background:
+        radial-gradient(circle at top left, rgba(15,40,85,0.9), transparent 50%),
+        radial-gradient(circle at bottom right, rgba(2,4,15,0.96), #020309);
+    z-index: -1;
+}
+.block-container {
+    padding-top: 0.5rem;
+    padding-bottom: 0.8rem;
+}
+
+/* Sidebar em glass azul */
+[data-testid="stSidebar"] {
+    background: linear-gradient(
+        155deg,
+        rgba(3, 9, 30, 0.96),
+        rgba(3, 11, 40, 0.96)
+    );
+    border-right: 1px solid rgba(255,255,255,0.12);
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+}
+
+/* Cartões glass principais */
+.glass-main {
+    backdrop-filter: blur(28px);
+    -webkit-backdrop-filter: blur(28px);
+    background: radial-gradient(circle at top, rgba(255,255,255,0.06), transparent 55%),
+                rgba(8, 14, 38, 0.96);
+    border-radius: 22px;
+    border: 1px solid rgba(255,255,255,0.18);
+    box-shadow: 0 28px 80px rgba(0,0,0,0.75);
+    padding: 18px 22px;
+}
+
+/* Seções internas */
+.glass-section {
+    backdrop-filter: blur(24px);
+    -webkit-backdrop-filter: blur(24px);
+    background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(1,4,18,0.96));
+    border-radius: 18px;
+    border: 1px solid rgba(255,255,255,0.12);
+    padding: 14px 16px;
+}
+
+/* Título / badge tipo rede social */
+.pqr-logo-line {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.pqr-logo-avatar {
+    width: 36px;
+    height: 36px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 30% 20%, #55d6ff, #1960ff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #02030a;
+    font-weight: 700;
+    font-size: 0.9rem;
+    border: 2px solid rgba(255,255,255,0.6);
+}
+.pqr-title-text {
+    display: flex;
+    flex-direction: column;
+}
+.pqr-title-main {
+    font-size: 1.55rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+}
+.pqr-title-sub {
+    font-size: 0.82rem;
+    color: var(--pqr-text-soft);
+}
+
+/* “Ficha” de usuário tipo perfil */
+.user-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    border-radius: 999px;
+    background: rgba(3,10,30,0.92);
+    border: 1px solid rgba(255,255,255,0.18);
+    font-size: 0.82rem;
+}
+.user-pill-avatar {
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    background: radial-gradient(circle at 30% 20%, #55d6ff, #1960ff);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #02030a;
+    font-weight: 600;
+}
+
+/* Botões pill glass */
+.pqr-btn {
+    border-radius: 999px !important;
+    border: 1px solid rgba(255,255,255,0.16) !important;
+    background: radial-gradient(circle at top left, rgba(255,255,255,0.15), transparent 45%),
+                rgba(3,7,24,0.92) !important;
+    color: var(--pqr-text-main) !important;
+    font-size: 0.82rem !important;
+    padding: 6px 14px !important;
+}
+.pqr-btn-primary {
+    border: none !important;
+    background: linear-gradient(135deg, #55d6ff, #1f7afe) !important;
+    color: #02030a !important;
+    box-shadow: 0 10px 24px rgba(42,168,255,0.55);
+}
+.pqr-btn-danger {
+    border: none !important;
+    background: linear-gradient(135deg, #ff6b81, #f03e5a) !important;
+    color: #02030a !important;
+    box-shadow: 0 10px 26px rgba(255,107,129,0.7);
+}
+
+/* Ajeitar botões padrão do Streamlit */
+.stButton > button {
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.16);
+    background: radial-gradient(circle at top left, rgba(255,255,255,0.12), transparent 45%),
+                rgba(3,7,24,0.92);
+    color: var(--pqr-text-main);
+    font-size: 0.84rem;
+}
+
+/* “Timeline card” estilo social feed */
+.timeline-card {
+    border-radius: 16px;
+    padding: 8px 10px;
+    margin-bottom: 6px;
+    background: rgba(5,10,30,0.92);
+    border: 1px solid rgba(255,255,255,0.16);
+    font-size: 0.8rem;
+}
+.timeline-card-header {
+    display: flex;
+    justify-content: space-between;
+    font-weight: 500;
+    margin-bottom: 3px;
+}
+.timeline-card-body {
+    color: var(--pqr-text-soft);
+    font-size: 0.78rem;
+}
+.timeline-card-footer {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.7rem;
+    color: var(--pqr-text-soft);
+    margin-top: 4px;
+}
+
+/* Chat estilo feed */
+.chat-bubble {
+    padding: 7px 9px;
+    border-radius: 14px;
+    margin-bottom: 6px;
+    font-size: 0.84rem;
+    background: rgba(3, 8, 26, 0.98);
+    border: 1px solid rgba(255,255,255,0.14);
+}
+.chat-meta {
+    font-size: 0.70rem;
+    color: var(--pqr-text-soft);
+    margin-bottom: 2px;
+}
+
+/* Mindmap como lista visual */
+.mind-node {
+    font-size: 0.84rem;
+    margin: 2px 0;
+}
+.mind-node-label {
+    padding: 2px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.06);
+}
+.mind-node-selected {
+    background: var(--pqr-accent-soft);
+    color: var(--pqr-accent);
+    border: 1px solid var(--pqr-accent);
+}
+
+/* Tabs para navegação de “pastas” tipo rede social */
+.pqr-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.pqr-tab {
+    padding: 4px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255,255,255,0.14);
+    font-size: 0.8rem;
+    cursor: pointer;
+    background: rgba(3,7,24,0.8);
+    color: var(--pqr-text-soft);
+}
+.pqr-tab-active {
+    background: linear-gradient(135deg, rgba(85,214,255,0.18), rgba(38,105,255,0.4));
+    border-color: rgba(85,214,255,0.75);
+    color: var(--pqr-accent);
+}
+
+/* Pequenos ajustes de inputs */
+textarea, input, select {
+    border-radius: 12px !important;
+    border: 1px solid rgba(255,255,255,0.18) !important;
+    background: rgba(2,5,20,0.9) !important;
+    color: var(--pqr-text-main) !important;
+    font-size: 0.85rem !important;
+}
+
+/* Badge simples */
+.pqr-badge {
+    display:inline-block;
+    padding:3px 10px;
+    border-radius:999px;
+    font-size:0.72rem;
+    letter-spacing:0.08em;
+    text-transform:uppercase;
+    background:rgba(85,214,255,0.12);
+    border:1px solid rgba(85,214,255,0.7);
+    color:var(--pqr-accent);
+}
+</style>
+"""
+
+st.markdown(LIQUID_CSS, unsafe_allow_html=True)
+
+# ======================================================
+# MODELOS DE DADOS
+# ======================================================
+@dataclass
+class User:
+    name: str
+    email: str
+    type: str
+    password: str
+
+
+@dataclass
+class Card:
+    id: str
+    title: str
+    description: str
+    status: str
+    deadline: Optional[str] = None
+    created_at: str = ""
+
+
+@dataclass
+class ChatMessage:
+    id: str
+    user_name: str
+    topic: str
+    text: str
+    time: str
+
+
+@dataclass
+class MindNode:
+    id: str
+    label: str
+    children: List["MindNode"] = field(default_factory=list)
+
+# ======================================================
+# PERSISTÊNCIA EM ARQUIVO (SALVAR / CARREGAR)
+# ======================================================
+def default_state_dict() -> Dict[str, Any]:
+    return {
+        "users": [],
+        "current_user_email": None,
+        "cards": [],
+        "research_summary": "",
+        "research_notes": "",
+        "mind_root": {"id": "root", "label": "Tema central", "children": []},
+        "mind_selected_id": "root",
+        "chat_messages": [],
+        "chat_topic": "metodologia",
+    }
+
+
+def load_persistent_state():
+    if not os.path.exists(STATE_FILE):
+        return default_state_dict()
+    try:
+        with open(STATE_FILE, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        return {**default_state_dict(), **data}
+    except Exception:
+        return default_state_dict()
+
+
+def mindnode_to_dict(n: MindNode) -> Dict[str, Any]:
+    return {"id": n.id, "label": n.label, "children": [mindnode_to_dict(c) for c in n.children]}
+
+
+def dict_to_mindnode(d: Dict[str, Any]) -> MindNode:
+    return MindNode(
+        id=d.get("id", "no-id"),
+        label=d.get("label", ""),
+        children=[dict_to_mindnode(c) for c in d.get("children", [])],
+    )
+
+
+def save_persistent_state():
+    data = {
+        "users": [asdict(u) for u in st.session_state.users],
+        "current_user_email": st.session_state.current_user_email,
+        "cards": [asdict(c) for c in st.session_state.cards],
+        "research_summary": st.session_state.research_summary,
+        "research_notes": st.session_state.research_notes,
+        "mind_root": mindnode_to_dict(st.session_state.mind_root),
+        "mind_selected_id": st.session_state.mind_selected_id,
+        "chat_messages": [asdict(m) for m in st.session_state.chat_messages],
+        "chat_topic": st.session_state.chat_topic,
+    }
+    try:
+        with open(STATE_FILE, "w", encoding="utf-8") as f:
+            json.dump(data, f, ensure_ascii=False, indent=2)
+        st.success("Dados salvos com sucesso.")
+    except Exception as e:
+        st.warning(f"Não foi possível salvar em arquivo: {e}")
+
+# ======================================================
+# SESSION STATE
+# ======================================================
+def init_state():
+    if "initialized" in st.session_state:
+        return
+    persisted = load_persistent_state()
+
+    st.session_state.users = [User(**u) for u in persisted["users"]]
+    st.session_state.current_user_email = persisted["current_user_email"]
+    st.session_state.cards = [Card(**c) for c in persisted["cards"]]
+    st.session_state.research_summary = persisted["research_summary"]
+    st.session_state.research_notes = persisted["research_notes"]
+    st.session_state.mind_root = dict_to_mindnode(persisted["mind_root"])
+    st.session_state.mind_selected_id = persisted["mind_selected_id"]
+    st.session_state.chat_messages = [ChatMessage(**m) for m in persisted["chat_messages"]]
+    st.session_state.chat_topic = persisted["chat_topic"]
+
+    st.session_state.initialized = True
+
+
+init_state()
+
+# ======================================================
+# HELPERS
+# ======================================================
+def get_current_user() -> Optional[User]:
+    if not st.session_state.current_user_email:
+        return None
+    for u in st.session_state.users:
+        if u.email == st.session_state.current_user_email:
+            return u
+    return None
 
 
 def map_type_label(t: str) -> str:
-  return {
-    "ic": "Iniciação Científica",
-    "extensao": "Extensão",
-    "doutorando": "Doutorando",
-    "voluntario": "Voluntário",
-    "prodig": "PRODIG",
-    "mentoria": "Mentoria",
-  }.get(t, "Bolsista")
+    return {
+        "ic": "Iniciação Científica",
+        "extensao": "Extensão",
+        "doutorando": "Doutorando",
+        "voluntario": "Voluntário",
+        "prodig": "PRODIG",
+        "mentoria": "Mentoria",
+    }.get(t, "Bolsista")
 
 
 def extract_keywords(text: str, max_n: int = 6) -> List[str]:
-  if not text:
-    return []
-  text_norm = (
-    text.lower()
-    .replace("á", "a").replace("à", "a").replace("ã", "a").replace("â", "a")
-    .replace("é", "e").replace("ê", "e")
-    .replace("í", "i")
-    .replace("ó", "o").replace("ô", "o").replace("õ", "o")
-    .replace("ú", "u")
-  )
-  words = re.findall(r"[a-z]{4,}", text_norm)
-  stop = {
-    "como","para","onde","entre","sobre","dentro","dados",
-    "estudo","pesquisa","analise","resultado","resultados",
-    "qualitativa","qualitativo","uma","essa","esse","sera",
-    "pelo","pela","com","tambem","que","isso","nao",
-    "mais","menos","muito","pouco","sendo","assim"
-  }
-  words = [w for w in words if w not in stop]
-  if not words:
-    return []
-  freq = Counter(words)
-  return [w for w, _ in freq.most_common(max_n)]
+    if not text:
+        return []
+    text_norm = (
+        text.lower()
+        .replace("á", "a").replace("à", "a").replace("ã", "a").replace("â", "a")
+        .replace("é", "e").replace("ê", "e")
+        .replace("í", "i")
+        .replace("ó", "o").replace("ô", "o").replace("õ", "o")
+        .replace("ú", "u")
+    )
+    words = re.findall(r"[a-z]{4,}", text_norm)
+    stop = set(
+        [
+            "como","para","onde","entre","sobre","dentro","dados",
+            "estudo","pesquisa","analise","resultado","resultados",
+            "qualitativa","qualitativo","uma","essa","esse","sera",
+            "pelo","pela","com","tambem","que","isso","nao",
+            "mais","menos","muito","pouco","sendo","assim",
+        ]
+    )
+    words = [w for w in words if w not in stop]
+    if not words:
+        return []
+    freq = Counter(words)
+    return [w for w, _ in freq.most_common(max_n)]
 
 
-def mind_find_node(node: MindNodeData, target_id: str) -> Optional[MindNodeData]:
-  if node.id == target_id:
-    return node
-  for ch in node.children:
-    found = mind_find_node(ch, target_id)
-    if found:
-      return found
-  return None
+def mind_list_nodes(node: MindNode, prefix: str = "") -> List[MindNode]:
+    nodes = [MindNode(id=node.id, label=prefix + node.label, children=[])]
+    for ch in node.children:
+        nodes += mind_list_nodes(ch, prefix + " ")
+    return nodes
 
 
-def mind_remove_node(node: MindNodeData, target_id: str) -> bool:
-  for i, ch in enumerate(node.children):
-    if ch.id == target_id:
-      node.children.pop(i)
-      return True
-    if mind_remove_node(ch, target_id):
-      return True
-  return False
-
-
-def mind_list_nodes(node: MindNodeData, prefix: str = "") -> List[MindNodeData]:
-  nodes = [MindNodeData(id=node.id, label=prefix + node.label)]
-  for ch in node.children:
-    nodes += mind_list_nodes(ch, prefix + "  ")
-  return nodes
-
-
-def timeline_completion(cards: List[Dict[str, Any]]) -> int:
-  total = len(cards)
-  if total == 0:
-    return 0
-  done = len([c for c in cards if c["status"] == "redacao"])
-  return round(done / total * 100)
-
-
-# ======================================================
-# FORM PRINCIPAL
-# ======================================================
-
-class Form1(Form1Template):
-
-  def __init__(self, **properties):
-    self.init_components(**properties)
-
-    # Estado "global" da aplicação (em memória, tipo session_state)
-    self.state: Dict[str, Any] = default_state()
-
-    # Painel principal onde tudo vai ser desenhado
-    # Crie um ColumnPanel chamado content_panel no designer, ou:
-    if not hasattr(self, "content_panel"):
-      self.content_panel = ColumnPanel()
-      self.add_component(self.content_panel)
-
-    self.build_layout()
-
-  # ====================================================
-  # AUX: Usuário atual
-  # ====================================================
-
-  def get_current_user(self) -> Optional[Dict[str, Any]]:
-    email = self.state.get("current_user_email")
-    if not email:
-      return None
-    for u in self.state["users"]:
-      if u["email"] == email:
-        return u
+def mind_find_node(node: MindNode, target_id: str) -> Optional[MindNode]:
+    if node.id == target_id:
+        return node
+    for ch in node.children:
+        found = mind_find_node(ch, target_id)
+        if found:
+            return found
     return None
 
-  # ====================================================
-  # Decisão entre login e app principal
-  # ====================================================
 
-  def build_layout(self):
-    self.content_panel.clear()
-    user = self.get_current_user()
-    if not user:
-      self.auth_screen()
-    else:
-      self.main_app()
+def mind_remove_node(node: MindNode, target_id: str) -> bool:
+    for i, ch in enumerate(node.children):
+        if ch.id == target_id:
+            node.children.pop(i)
+            return True
+        if mind_remove_node(ch, target_id):
+            return True
+    return False
 
-  # ====================================================
-  # TELA DE AUTENTICAÇÃO
-  # ====================================================
 
-  def auth_screen(self):
-    col = ColumnPanel()
-    self.content_panel.add_component(col)
-
-    col.add_component(
-      Label(text="PQR – Pesquisa Qualitativa de Resultados",
-            bold=True,
-            align="center",
-            role="headline")
+def mind_print_tree(node: MindNode, indent: int = 0):
+    pad = "&nbsp;" * indent
+    sel_class = "mind-node-label"
+    if node.id == st.session_state.mind_selected_id:
+        sel_class += " mind-node-selected"
+    st.markdown(
+        f'<div class="mind-node">{pad}<span class="{sel_class}">{node.label}</span></div>',
+        unsafe_allow_html=True,
     )
+    for ch in node.children:
+        mind_print_tree(ch, indent + 4)
 
-    # Dois botões simples funcionando como abas
-    btn_row = FlowPanel(spacing="medium")
-    col.add_component(btn_row)
 
-    btn_login = Button(text="Entrar")
-    btn_signup = Button(text="Criar conta")
+def cards_count_by_status(status: str) -> int:
+    return len([c for c in st.session_state.cards if c.status == status])
 
-    btn_row.add_component(btn_login)
-    btn_row.add_component(btn_signup)
 
-    self.auth_inner_panel = ColumnPanel()
-    col.add_component(self.auth_inner_panel)
+def timeline_completion() -> int:
+    total = len(st.session_state.cards)
+    if total == 0:
+        return 0
+    done = len([c for c in st.session_state.cards if c.status == "redacao"])
+    return round(done / total * 100)
 
-    def show_login(**e):
-      self.auth_inner_panel.clear()
-      self.build_login_panel(self.auth_inner_panel)
+# ======================================================
+# AUTENTICAÇÃO
+# ======================================================
+def auth_screen():
+    _, col, _ = st.columns([1, 2.3, 1])
+    with col:
+        st.markdown('<div class="glass-main">', unsafe_allow_html=True)
 
-    def show_signup(**e):
-      self.auth_inner_panel.clear()
-      self.build_signup_panel(self.auth_inner_panel)
+        st.markdown(
+            """
+            <div class="pqr-logo-line">
+                <div class="pqr-logo-avatar">PQR</div>
+                <div class="pqr-title-text">
+                    <div class="pqr-title-main">PQR</div>
+                    <div class="pqr-title-sub">Pesquisa Qualitativa de Resultados</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        tabs = st.tabs(["Entrar", "Criar conta"])
 
-    btn_login.set_event_handler("click", show_login)
-    btn_signup.set_event_handler("click", show_signup)
+        # LOGIN
+        with tabs[0]:
+            email = st.text_input("Email", key="login_email")
+            password = st.text_input("Senha", type="password", key="login_password")
+            if st.button("Entrar", key="login_btn", help="Acessar sua pasta PQR"):
+                user = next((u for u in st.session_state.users if u.email == email), None)
+                if not user or user.password != password:
+                    st.error("Credenciais inválidas.")
+                else:
+                    st.session_state.current_user_email = email
+                    st.experimental_rerun()
 
-    show_login()
+        # CADASTRO
+        with tabs[1]:
+            name = st.text_input("Nome completo", key="cad_nome")
+            email_c = st.text_input("Email institucional", key="cad_email")
+            type_label = st.selectbox(
+                "Tipo de bolsa",
+                [
+                    "Selecione…",
+                    "IC – Iniciação Científica",
+                    "Extensão",
+                    "Doutorando",
+                    "Voluntário",
+                    "PRODIG",
+                    "Mentoria",
+                ],
+                key="cad_tipo",
+            )
+            password_c = st.text_input("Senha (mín. 6 caracteres)", type="password", key="cad_senha")
 
-  def build_login_panel(self, parent: ColumnPanel):
-    self.login_email_tb = TextBox(placeholder="Email")
-    self.login_password_tb = TextBox(placeholder="Senha", hide_text=True)
-    btn = Button(text="Entrar", role="primary-color")
+            if st.button("Criar conta", key="cad_btn"):
+                if type_label == "Selecione…":
+                    st.warning("Escolha um tipo de bolsa.")
+                elif len(password_c) < 6:
+                    st.warning("Senha muito curta. Use ao menos 6 caracteres.")
+                elif any(u.email == email_c for u in st.session_state.users):
+                    st.error("Já existe usuário com este email.")
+                else:
+                    type_map = {
+                        "IC – Iniciação Científica": "ic",
+                        "Extensão": "extensao",
+                        "Doutorando": "doutorando",
+                        "Voluntário": "voluntario",
+                        "PRODIG": "prodig",
+                        "Mentoria": "mentoria",
+                    }
+                    t = type_map.get(type_label, "ic")
+                    st.session_state.users.append(
+                        User(name=name, email=email_c, type=t, password=password_c)
+                    )
+                    st.session_state.current_user_email = email_c
+                    save_persistent_state()
+                    st.success("Conta criada. Bem‑vindo(a) ao PQR!")
+                    st.experimental_rerun()
 
-    parent.add_component(self.login_email_tb)
-    parent.add_component(self.login_password_tb)
-    parent.add_component(btn)
+        st.markdown("</div>", unsafe_allow_html=True)
 
-    btn.set_event_handler("click", self.login_action)
+# ======================================================
+# VIEW: BOARD – COMO FEED DE PROGRESSO
+# ======================================================
+def view_board():
+    st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+    top_l, top_c, top_r = st.columns([2.6, 3.5, 2.2])
 
-  def build_signup_panel(self, parent: ColumnPanel):
-    self.signup_name_tb = TextBox(placeholder="Nome completo")
-    self.signup_email_tb = TextBox(placeholder="Email institucional")
-    self.signup_type_dd = DropDown(
-      items=[
-        ("Selecione…", ""),
-        ("IC – Iniciação Científica", "ic"),
-        ("Extensão", "extensao"),
-        ("Doutorando", "doutorando"),
-        ("Voluntário", "voluntario"),
-        ("PRODIG", "prodig"),
-        ("Mentoria", "mentoria"),
-      ]
-    )
-    self.signup_password_tb = TextBox(placeholder="Senha (mín. 6 caracteres)", hide_text=True)
-    btn = Button(text="Criar conta", role="primary-color")
+    with top_l:
+        st.markdown("#### Timeline de pesquisa")
+        st.caption("Sua jornada de pesquisa organizada em etapas, como um feed de progresso.")
+        st.markdown(
+            '<span class="pqr-badge">PQR – PESQUISA QUALITATIVA DE RESULTADOS</span>',
+            unsafe_allow_html=True,
+        )
 
-    parent.add_component(self.signup_name_tb)
-    parent.add_component(self.signup_email_tb)
-    parent.add_component(self.signup_type_dd)
-    parent.add_component(self.signup_password_tb)
-    parent.add_component(btn)
+    with top_c:
+        st.write("")
+        query = st.text_input(
+            "Busca global na sua pasta (protótipo de IA interna)",
+            key="global_search",
+            placeholder="Procure termos em resumo, anotações e etapas…",
+        )
+        if st.button("Buscar", key="btn_search"):
+            haystack = (
+                st.session_state.research_summary
+                + "\n"
+                + st.session_state.research_notes
+                + "\n"
+                + "\n".join(f"{c.title} {c.description}" for c in st.session_state.cards)
+            )
+            found = query.strip() and query.lower() in haystack.lower()
+            if not query.strip():
+                st.warning("Digite um termo para buscar.")
+            elif found:
+                st.success(
+                    f'A pasta contém referências a **"{query}"**. '
+                    "Agora revise as seções para ver em que contexto isso aparece."
+                )
+            else:
+                st.info(
+                    f'Nenhuma ocorrência clara de **"{query}"** foi encontrada nas notas/etapas atuais.'
+                )
 
-    btn.set_event_handler("click", self.signup_action)
+    with top_r:
+        st.write("")
+        with st.expander("Nova etapa / atualização"):
+            title = st.text_input("Título da etapa", key="new_card_title")
+            desc = st.text_area("Descrição", key="new_card_desc")
+            deadline = st.date_input("Prazo", key="new_card_deadline")
+            status = st.selectbox(
+                "Fase",
+                [
+                    ("ideia", "Ideia / Delimitação"),
+                    ("revisao", "Revisão de literatura"),
+                    ("coleta", "Coleta de dados"),
+                    ("analise", "Análise"),
+                    ("redacao", "Redação / Resultados"),
+                ],
+                format_func=lambda x: x[1],
+                key="new_card_status",
+            )
+            if st.button("Publicar etapa na timeline", key="btn_add_card"):
+                if not title.strip():
+                    st.warning("Dê um título para a etapa.")
+                else:
+                    st.session_state.cards.append(
+                        Card(
+                            id=str(uuid.uuid4()),
+                            title=title.strip(),
+                            description=desc.strip(),
+                            status=status[0],
+                            deadline=str(deadline),
+                            created_at=datetime.datetime.now().isoformat(),
+                        )
+                    )
+                    save_persistent_state()
+                    st.success("Etapa adicionada à timeline.")
 
-  def login_action(self, **event_args):
-    email = (self.login_email_tb.text or "").strip()
-    password = (self.login_password_tb.text or "").strip()
-    user = next((u for u in self.state["users"] if u["email"] == email), None)
-    if not user or user["password"] != password:
-      Notification("Credenciais inválidas.", style="danger").show()
-      return
-    self.state["current_user_email"] = email
-    self.build_layout()
-
-  def signup_action(self, **event_args):
-    name = (self.signup_name_tb.text or "").strip()
-    email = (self.signup_email_tb.text or "").strip()
-    tipo = self.signup_type_dd.selected_value or ""
-    password = (self.signup_password_tb.text or "").strip()
-
-    if not name or not email or not tipo:
-      Notification("Preencha todos os campos.", style="warning").show()
-      return
-    if len(password) < 6:
-      Notification("Senha muito curta (mín. 6).", style="warning").show()
-      return
-    if any(u["email"] == email for u in self.state["users"]):
-      Notification("Já existe usuário com este email.", style="danger").show()
-      return
-
-    self.state["users"].append(
-      {"name": name, "email": email, "type": tipo, "password": password}
-    )
-    self.state["current_user_email"] = email
-    Notification("Conta criada. Bem‑vinda ao PQR!", style="success").show()
-    self.build_layout()
-
-  # ====================================================
-  # APP PRINCIPAL
-  # ====================================================
-
-  def main_app(self):
-    user = self.get_current_user()
-    main_panel = ColumnPanel()
-    self.content_panel.add_component(main_panel)
-
-    # "Perfil"
-    main_panel.add_component(
-      Label(text=f"{user['name']} • {map_type_label(user['type'])}",
-            bold=True)
-    )
-
-    # Navegação por DropDown (equivalente às radios do sidebar)
-    self.nav_dd = DropDown(
-      items=[
-        ("Timeline / Feed", "timeline"),
-        ("Pasta da pesquisa", "research"),
-        ("Mapa mental", "mindmap"),
-        ("Análise inteligente", "analysis"),
-        ("Chat", "chat"),
-        ("Cadeia de ligação", "network"),
-        ("Configurações", "settings"),
-      ],
-      selected_value="timeline"
-    )
-    main_panel.add_component(self.nav_dd)
-    self.nav_dd.set_event_handler("change", self.render_view)
-
-    # Painel de conteúdo
-    self.view_panel = ColumnPanel()
-    main_panel.add_component(self.view_panel)
-
-    self.render_view()
-
-  def render_view(self, **event_args):
-    self.view_panel.clear()
-    view = self.nav_dd.selected_value
-
-    if view == "timeline":
-      self.view_board()
-    elif view == "research":
-      self.view_research()
-    elif view == "mindmap":
-      self.view_mindmap()
-    elif view == "analysis":
-      self.view_analysis()
-    elif view == "chat":
-      self.view_chat()
-    elif view == "network":
-      self.view_network()
-    elif view == "settings":
-      self.view_settings()
-    else:
-      self.view_board()
-
-  # ====================================================
-  # VIEW: TIMELINE / FEED
-  # ====================================================
-
-  def view_board(self):
-    p = self.view_panel
-    p.add_component(Label(text="Timeline de pesquisa", bold=True))
-
-    # Nova etapa
-    title_tb = TextBox(placeholder="Título da etapa")
-    desc_ta = TextArea(placeholder="Descrição")
-    deadline_dp = DatePicker()
-    status_dd = DropDown(
-      items=[
-        ("Ideia / Delimitação", "ideia"),
-        ("Revisão de literatura", "revisao"),
-        ("Coleta de dados", "coleta"),
-        ("Análise", "analise"),
-        ("Redação / Resultados", "redacao"),
-      ],
-      selected_value="ideia",
-    )
-    add_btn = Button(text="Publicar etapa na timeline", role="primary-color")
-
-    p.add_component(title_tb)
-    p.add_component(desc_ta)
-    p.add_component(deadline_dp)
-    p.add_component(status_dd)
-    p.add_component(add_btn)
-
-    def add_card(**e):
-      title = (title_tb.text or "").strip()
-      desc = (desc_ta.text or "").strip()
-      if not title:
-        Notification("Dê um título para a etapa.", style="warning").show()
-        return
-      deadline_str = str(deadline_dp.date) if deadline_dp.date else ""
-      card = CardData(
-        id=str(uuid.uuid4()),
-        title=title,
-        description=desc,
-        status=status_dd.selected_value,
-        deadline=deadline_str,
-        created_at=datetime.datetime.now().isoformat(),
-      )
-      self.state["cards"].append(asdict(card))
-      Notification("Etapa adicionada à timeline.", style="success").show()
-      self.render_view()
-
-    add_btn.set_event_handler("click", add_card)
-
-    p.add_component(Label(text="Etapas por fase:", bold=True))
+    st.write("---")
 
     statuses = [
-      ("ideia", "Ideia / Delimitação"),
-      ("revisao", "Revisão de literatura"),
-      ("coleta", "Coleta de dados"),
-      ("analise", "Análise"),
-      ("redacao", "Redação / Resultados"),
+        ("ideia", "Ideia / Delimitação"),
+        ("revisao", "Revisão de literatura"),
+        ("coleta", "Coleta de dados"),
+        ("analise", "Análise"),
+        ("redacao", "Redação / Resultados"),
     ]
 
-    for status_key, status_label in statuses:
-      cards = [c for c in self.state["cards"] if c["status"] == status_key]
-      p.add_component(Label(text=f"{status_label} ({len(cards)})", bold=True))
-      for c in cards:
-        card_panel = ColumnPanel(border="1px solid #ccc", spacing="tiny")
-        card_panel.add_component(Label(text=c["title"], bold=True))
-        card_panel.add_component(Label(text=c["description"] or "(sem descrição)"))
-        card_panel.add_component(Label(text=f"Prazo: {c['deadline']}"))
+    cols = st.columns(len(statuses))
+    for (status_key, status_label), col in zip(statuses, cols):
+        with col:
+            st.markdown(f"**{status_label}**")
+            st.caption(f"{cards_count_by_status(status_key)} etapa(s)")
+            for c in st.session_state.cards:
+                if c.status == status_key:
+                    created_str = ""
+                    if c.created_at:
+                        try:
+                            dt = datetime.datetime.fromisoformat(c.created_at)
+                            created_str = dt.strftime("%d/%m %H:%M")
+                        except Exception:
+                            pass
+                    st.markdown(
+                        f"""
+                        <div class="timeline-card">
+                            <div class="timeline-card-header">
+                                <span>{c.title}</span>
+                                <span>{created_str}</span>
+                            </div>
+                            <div class="timeline-card-body">
+                                {c.description or "<i>(sem descrição)</i>"}
+                            </div>
+                            <div class="timeline-card-footer">
+                                <span>Prazo: {c.deadline}</span>
+                                <span>{status_label}</span>
+                            </div>
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                    novo_status = st.selectbox(
+                        "Mover para",
+                        statuses,
+                        index=[s[0] for s in statuses].index(status_key),
+                        format_func=lambda x: x[1],
+                        key=f"move_{c.id}",
+                    )
+                    if novo_status[0] != c.status:
+                        c.status = novo_status[0]
+                        save_persistent_state()
+                        st.info("Etapa movida na timeline.")
 
-        move_dd = DropDown(
-          items=statuses,
-          selected_value=c["status"]
+    st.write("---")
+    st.subheader("Progresso global da pesquisa")
+    comp = timeline_completion()
+    st.progress(comp / 100)
+    st.caption(f"{comp}% concluído (estimativa via etapas em “Redação / Resultados”).")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ======================================================
+# VIEW: PESQUISA / PASTA PRINCIPAL
+# ======================================================
+def view_research():
+    st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+    st.markdown("#### Pasta principal da sua pesquisa")
+
+    tabs_html = """
+    <div class="pqr-tabs">
+        <div class="pqr-tab pqr-tab-active">Resumo & notas</div>
+        <div class="pqr-tab">Artigos & buscas</div>
+    </div>
+    """
+    st.markdown(tabs_html, unsafe_allow_html=True)
+
+    col1, col2 = st.columns(2)
+
+    with col1:
+        st.subheader("Resumo da pesquisa")
+        st.session_state.research_summary = st.text_area(
+            "Tema, objetivos, perguntas, contexto…",
+            value=st.session_state.research_summary,
+            height=240,
         )
-        card_panel.add_component(move_dd)
 
-        def mover(widget=move_dd, card=c, **e):
-          new_status = widget.selected_value
-          if new_status != card["status"]:
-            card["status"] = new_status
-            Notification("Etapa movida na timeline.", style="info").show()
-            self.render_view()
+    with col2:
+        st.subheader("Anotações rápidas (tipo mural privado)")
+        st.session_state.research_notes = st.text_area(
+            "Citações, ideias soltas, lembretes para você mesmo(a)…",
+            value=st.session_state.research_notes,
+            height=240,
+        )
 
-        move_dd.set_event_handler("change", mover)
+        st.write("")
+        st.subheader("Atalhos para Google Acadêmico")
+        keywords = st.text_input(
+            "Palavras‑chave principais",
+            key="ga_kw",
+            placeholder="ex.: inclusão digital, aprendizagem ativa",
+        )
+        c1, c2 = st.columns(2)
+        with c1:
+            if st.button("Artigos gerais"):
+                if keywords.strip():
+                    url = "https://scholar.google.com/scholar?q=" + keywords.replace(" ", "+")
+                    st.markdown(f"[Abrir Google Acadêmico]({url})")
+        with c2:
+            if st.button("Últimos 5 anos"):
+                if keywords.strip():
+                    year = datetime.date.today().year - 5
+                    url = (
+                        "https://scholar.google.com/scholar?q="
+                        + keywords.replace(" ", "+")
+                        + f"&as_ylo={year}"
+                    )
+                    st.markdown(f"[Abrir (últimos 5 anos)]({url})")
 
-        p.add_component(card_panel)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    comp = timeline_completion(self.state["cards"])
-    p.add_component(Label(text=f"Progresso global estimado: {comp}%"))
+# ======================================================
+# VIEW: MAPA MENTAL
+# ======================================================
+def view_mindmap():
+    st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+    st.markdown("#### Mapa mental da sua pesquisa")
 
-  # ====================================================
-  # VIEW: PASTA DA PESQUISA
-  # ====================================================
+    st.markdown("Visualização hierárquica (protótipo textual em liquid glass):")
+    mind_print_tree(st.session_state.mind_root)
 
-  def view_research(self):
-    p = self.view_panel
-    p.add_component(Label(text="Pasta principal da sua pesquisa", bold=True))
+    st.write("---")
+    st.markdown("##### Editar nós do mapa")
 
-    self.summary_ta = TextArea(
-      text=self.state["research_summary"],
-      placeholder="Tema, objetivos, perguntas, contexto…",
-      height=200
-    )
-    self.notes_ta = TextArea(
-      text=self.state["research_notes"],
-      placeholder="Citações, ideias, lembretes…",
-      height=200
-    )
-
-    p.add_component(Label(text="Resumo da pesquisa", bold=True))
-    p.add_component(self.summary_ta)
-    p.add_component(Label(text="Anotações rápidas", bold=True))
-    p.add_component(self.notes_ta)
-
-    save_btn = Button(text="Salvar", role="primary-color")
-
-    def save_notes(**e):
-      self.state["research_summary"] = self.summary_ta.text or ""
-      self.state["research_notes"] = self.notes_ta.text or ""
-      Notification("Resumo e notas salvos.", style="success").show()
-
-    save_btn.set_event_handler("click", save_notes)
-    p.add_component(save_btn)
-
-  # ====================================================
-  # VIEW: MAPA MENTAL
-  # ====================================================
-
-  def view_mindmap(self):
-    p = self.view_panel
-    p.add_component(Label(text="Mapa mental da sua pesquisa", bold=True))
-
-    root: MindNodeData = self.state["mind_root"]
-
-    nodes_list = mind_list_nodes(root)
+    nodes_list = mind_list_nodes(st.session_state.mind_root)
     ids = [n.id for n in nodes_list]
-    labels = {n.id: n.label for n in nodes_list}
+    label_map = {n.id: n.label for n in nodes_list}
 
-    selected_id = self.state.get("mind_selected_id", "root")
-    if selected_id not in ids:
-      selected_id = "root"
-    self.mind_select_dd = DropDown(
-      items=[(labels[i], i) for i in ids],
-      selected_value=selected_id
+    selected = st.selectbox(
+        "Nó selecionado",
+        ids,
+        index=ids.index(st.session_state.mind_selected_id)
+        if st.session_state.mind_selected_id in ids
+        else 0,
+        format_func=lambda x: label_map.get(x, x),
     )
-    p.add_component(self.mind_select_dd)
+    st.session_state.mind_selected_id = selected
 
-    self.mind_new_tb = TextBox(placeholder="Novo tópico / sub‑tópico")
-    p.add_component(self.mind_new_tb)
+    new_label = st.text_input("Novo tópico / sub‑tópico", key="mind_new_label")
+    col_a, col_b = st.columns(2)
 
-    add_btn = Button(text="Adicionar sub‑tópico ao nó selecionado",
-                     role="primary-color")
-    del_btn = Button(text="Remover nó selecionado")
+    with col_a:
+        if st.button("Adicionar sub‑tópico ao nó selecionado"):
+            if new_label.strip():
+                parent = mind_find_node(st.session_state.mind_root, selected)
+                if parent:
+                    parent.children.append(
+                        MindNode(
+                            id=str(uuid.uuid4()),
+                            label=new_label.strip(),
+                            children=[],
+                        )
+                    )
+                    save_persistent_state()
+                    st.success("Tópico adicionado ao mapa.")
+                else:
+                    st.error("Nó pai não encontrado.")
 
-    p.add_component(add_btn)
-    p.add_component(del_btn)
+    with col_b:
+        if st.button("Remover nó selecionado"):
+            if selected == "root":
+                st.warning("Não é possível remover o nó raiz.")
+            else:
+                removed = mind_remove_node(st.session_state.mind_root, selected)
+                if removed:
+                    st.session_state.mind_selected_id = "root"
+                    save_persistent_state()
+                    st.info("Nó removido do mapa mental.")
+                else:
+                    st.error("Não foi possível remover o nó.")
 
-    def add_topic(**e):
-      label = (self.mind_new_tb.text or "").strip()
-      if not label:
-        Notification("Digite o texto do tópico.", style="warning").show()
-        return
-      target = self.mind_select_dd.selected_value
-      parent = mind_find_node(root, target)
-      if not parent:
-        Notification("Nó pai não encontrado.", style="danger").show()
-        return
-      parent.children.append(MindNodeData(id=str(uuid.uuid4()), label=label))
-      self.state["mind_selected_id"] = target
-      Notification("Tópico adicionado ao mapa.", style="success").show()
-      self.render_view()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    def del_topic(**e):
-      target = self.mind_select_dd.selected_value
-      if target == "root":
-        Notification("Não é possível remover o nó raiz.", style="warning").show()
-        return
-      removed = mind_remove_node(root, target)
-      if removed:
-        self.state["mind_selected_id"] = "root"
-        Notification("Nó removido do mapa mental.", style="info").show()
-        self.render_view()
-      else:
-        Notification("Não foi possível remover o nó.", style="danger").show()
+# ======================================================
+# VIEW: ANÁLISE INTELIGENTE (MOCK)
+# ======================================================
+def view_analysis():
+    st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+    st.markdown("#### Análise inteligente (protótipo local)")
 
-    add_btn.set_event_handler("click", add_topic)
-    del_btn.set_event_handler("click", del_topic)
+    if st.button("Rodar análise qualitativa agora"):
+        summary = st.session_state.research_summary or ""
+        notes = st.session_state.research_notes or ""
+        total_cards = len(st.session_state.cards) or 1
+        done_cards = len([c for c in st.session_state.cards if c.status == "redacao"])
+        completion = round(done_cards / total_cards * 100)
 
-  # ====================================================
-  # VIEW: ANÁLISE INTELIGENTE
-  # ====================================================
+        st.subheader("Síntese do que você já escreveu")
+        if len(summary.strip()) < 60:
+            st.write(
+                "- O resumo ainda está enxuto. Tente explicitar: (1) contexto, (2) problema, (3) "
+                "objetivos, (4) perguntas de pesquisa."
+            )
+        else:
+            st.write(
+                "- O resumo já tem um corpo interessante. Revise se está claro o recorte qualitativo "
+                "(quem, onde, como, por quê)."
+            )
 
-  def view_analysis(self):
-    p = self.view_panel
-    p.add_component(Label(text="Análise inteligente (protótipo local)", bold=True))
+        st.subheader("Andamento do projeto")
+        st.write(f"- Etapas concluídas (redação/resultados): {done_cards}/{total_cards}.")
+        if completion < 30:
+            st.write(
+                "- Fase inicial: foque em consolidar problema, referencial e possíveis caminhos "
+                "metodológicos."
+            )
+        elif completion < 70:
+            st.write(
+                "- Fase intermediária: revise se a forma de coleta (entrevista, grupo focal, "
+                "observação etc.) está coerente com o que você quer responder."
+            )
+        else:
+            st.write(
+                "- Fase avançada: agora é hora de conectar dados, categorias e discussões com a literatura."
+            )
 
-    run_btn = Button(text="Rodar análise qualitativa agora",
-                     role="primary-color")
-    p.add_component(run_btn)
+        st.subheader("Pistas qualitativas encontradas")
+        concat = (summary + " " + notes).lower()
+        if "entrevista" in concat:
+            st.write(
+                "- Há entrevistas: explore estratégias como análise temática, análise de conteúdo "
+                "ou análise narrativa."
+            )
+        if "grupo focal" in concat or "focal" in concat:
+            st.write(
+                "- Menciona grupo focal: pense em como a interação entre participantes impacta os "
+                "sentidos produzidos."
+            )
+        if "questionário" in concat or "questionario" in concat:
+            st.write(
+                "- Questionários aparecem no texto: se houver questões abertas, trate-as como "
+                "narrativas/dizeres a serem categorizados."
+            )
+        if len(notes) > 200:
+            st.write(
+                "- Muitas anotações: excelente. Talvez seja momento de criar um quadro de códigos/"
+                "categorias preliminares."
+            )
+        if not summary.strip() and not notes.strip():
+            st.info(
+                "Ainda não há conteúdo suficiente para análise. Escreva pelo menos um parágrafo de "
+                "resumo e algumas notas."
+            )
 
-    self.analysis_output = TextArea(read_only=True, height=200)
-    p.add_component(self.analysis_output)
+        st.write("---")
+        st.subheader("Progresso estimado")
+        st.progress(completion / 100)
+        st.caption(f"{completion}% concluído (estimativa via timeline).")
+    else:
+        st.info(
+            "Clique em **Rodar análise qualitativa agora** para gerar um diagnóstico textual com "
+            "base no que você já registrou."
+        )
 
-    def run_analysis(**e):
-      summary = self.state["research_summary"] or ""
-      notes = self.state["research_notes"] or ""
-      cards = self.state["cards"]
-      total = len(cards) or 1
-      done = len([c for c in cards if c["status"] == "redacao"])
-      completion = round(done / total * 100)
+    st.markdown("</div>", unsafe_allow_html=True)
 
-      lines = []
-
-      if len(summary.strip()) < 60:
-        lines.append("- O resumo está curto; explicite contexto, problema e objetivos.")
-      else:
-        lines.append("- O resumo já tem um corpo interessante; verifique clareza do recorte qualitativo.")
-
-      if completion < 30:
-        lines.append("- Fase inicial: foque em consolidar problema, referencial e caminhos metodológicos.")
-      elif completion < 70:
-        lines.append("- Fase intermediária: revise se a forma de coleta está coerente com o que você quer responder.")
-      else:
-        lines.append("- Fase avançada: conecte dados, categorias e discussões com a literatura.")
-
-      concat = (summary + " " + notes).lower()
-      if "entrevista" in concat:
-        lines.append("- Há entrevistas: explore análise temática, de conteúdo ou narrativa.")
-      if not summary.strip() and not notes.strip():
-        lines.append("- Ainda não há conteúdo suficiente. Escreva um parágrafo de resumo e algumas notas.")
-
-      self.analysis_output.text = "\n".join(lines) or "Sem dados suficientes."
-
-    run_btn.set_event_handler("click", run_analysis)
-
-  # ====================================================
-  # VIEW: CHAT
-  # ====================================================
-
-  def view_chat(self):
-    p = self.view_panel
-    p.add_component(Label(text="Chat entre bolsistas (estilo feed)", bold=True))
+# ======================================================
+# VIEW: CHAT ESTILO REDE SOCIAL
+# ======================================================
+def view_chat():
+    st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+    st.markdown("#### Chat entre bolsistas (estilo feed)")
 
     topics = {
-      "metodologia": "Metodologia qualitativa",
-      "referencias": "Referências e artigos",
-      "duvidas-eticas": "Dúvidas éticas",
-      "off-topic": "Off‑topic / descompressão",
+        "metodologia": "Metodologia qualitativa",
+        "referencias": "Referências e artigos",
+        "duvidas-eticas": "Dúvidas éticas",
+        "off-topic": "Off‑topic / descompressão",
     }
 
-    current_topic = self.state.get("chat_topic", "metodologia")
-    self.chat_topic_dd = DropDown(
-      items=list(topics.items()),
-      selected_value=current_topic
+    col_topics, col_chat = st.columns([1.1, 2.3])
+
+    with col_topics:
+        st.markdown("**Canais temáticos**")
+        for key, label in topics.items():
+            if st.button(label, key=f"topic_{key}"):
+                st.session_state.chat_topic = key
+        st.caption(
+            f"Canal ativo: **{topics.get(st.session_state.chat_topic, 'Metodologia qualitativa')}**"
+        )
+
+    with col_chat:
+        user = get_current_user()
+        if not user:
+            st.warning("Entre na sua conta para participar do chat.")
+        else:
+            st.subheader("Timeline de mensagens")
+            topic = st.session_state.chat_topic
+            msgs = [m for m in st.session_state.chat_messages if m.topic == topic]
+            if not msgs:
+                st.caption("Ainda não há mensagens neste canal. Que tal iniciar a conversa?")
+            for m in msgs:
+                try:
+                    dt = datetime.datetime.fromisoformat(m.time)
+                    time_str = dt.strftime("%d/%m %H:%M")
+                except Exception:
+                    time_str = m.time
+                st.markdown(
+                    f'<div class="chat-bubble">'
+                    f'<div class="chat-meta">{m.user_name} • {time_str}</div>'
+                    f'{m.text}'
+                    f'</div>',
+                    unsafe_allow_html=True,
+                )
+
+            st.write("---")
+            with st.form("chat_form"):
+                text = st.text_input("Escreva uma mensagem…", key="chat_text")
+                send = st.form_submit_button("Publicar")
+                if send and text.strip():
+                    st.session_state.chat_messages.append(
+                        ChatMessage(
+                            id=str(uuid.uuid4()),
+                            user_name=user.name.split(" ")[0] or user.name,
+                            topic=topic,
+                            text=text.strip(),
+                            time=datetime.datetime.now().isoformat(),
+                        )
+                    )
+                    save_persistent_state()
+                    st.experimental_rerun()
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ======================================================
+# VIEW: CADEIA DE LIGAÇÃO / REDE DE INTERESSES
+# ======================================================
+def view_network():
+    st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+    st.markdown("#### Cadeia de ligação de pesquisas (rede conceitual)")
+
+    interest = st.text_input(
+        "Interesse principal (tema eixo da rede)",
+        key="net_interest",
+        placeholder="ex.: inclusão digital, saúde mental, aprendizagem ativa",
     )
-    p.add_component(self.chat_topic_dd)
 
-    def change_topic(**e):
-      self.state["chat_topic"] = self.chat_topic_dd.selected_value
-      self.render_view()
+    if st.button("Gerar rede textual"):
+        base_interest = interest.strip() or "Tema central"
+        text = st.session_state.research_summary + " " + st.session_state.research_notes
+        keywords = extract_keywords(text, max_n=8)
 
-    self.chat_topic_dd.set_event_handler("change", change_topic)
+        st.subheader("Nós principais da rede")
+        st.write(f"- **{base_interest}** (nó central)")
+        if not keywords:
+            st.warning(
+                "Não identifiquei palavras‑chave suficientes. Escreva mais no resumo e nas anotações."
+            )
+        else:
+            for kw in keywords:
+                st.write(f"- {kw}")
 
-    topic = self.state.get("chat_topic", "metodologia")
-    msgs = [m for m in self.state["chat_messages"] if m["topic"] == topic]
+            st.write("---")
+            st.subheader("Ligações sugeridas")
+            for kw in keywords:
+                st.markdown(
+                    f"- **{base_interest} ↔ {kw}** – analisar como esse conceito aparece nos dados, "
+                    "como se relaciona a outras categorias e que tensões/contradições emergem."
+                )
 
-    if not msgs:
-      p.add_component(Label(text="Ainda não há mensagens neste canal. Inicie a conversa!"))
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    for m in msgs:
-      p.add_component(
-        Label(text=f"{m['user_name']} • {m['time']}\n{m['text']}")
-      )
+# ======================================================
+# VIEW: CONFIGURAÇÕES, SALVAR & SAIR
+# ======================================================
+def view_settings():
+    st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+    st.markdown("#### Configurações, salvar & sair")
 
-    self.chat_text_tb = TextBox(placeholder="Escreva uma mensagem…", width="100%")
-    send_btn = Button(text="Publicar", role="primary-color")
-    p.add_component(self.chat_text_tb)
-    p.add_component(send_btn)
-
-    def send_msg(**e):
-      text = (self.chat_text_tb.text or "").strip()
-      if not text:
-        Notification("Escreva uma mensagem.", style="warning").show()
-        return
-      user = self.get_current_user()
-      msg = ChatMessageData(
-        id=str(uuid.uuid4()),
-        user_name=user["name"].split(" ")[0],
-        topic=topic,
-        text=text,
-        time=datetime.datetime.now().strftime("%d/%m %H:%M"),
-      )
-      self.state["chat_messages"].append(asdict(msg))
-      Notification("Mensagem publicada.", style="success").show()
-      self.render_view()
-
-    send_btn.set_event_handler("click", send_msg)
-
-  # ====================================================
-  # VIEW: CADEIA DE LIGAÇÃO / REDE
-  # ====================================================
-
-  def view_network(self):
-    p = self.view_panel
-    p.add_component(Label(text="Cadeia de ligação de pesquisas (rede conceitual)", bold=True))
-
-    self.net_interest_tb = TextBox(placeholder="Interesse principal (tema eixo da rede)")
-    p.add_component(self.net_interest_tb)
-
-    self.net_output_ta = TextArea(read_only=True, height=200)
-    p.add_component(self.net_output_ta)
-
-    run_btn = Button(text="Gerar rede textual", role="primary-color")
-    p.add_component(run_btn)
-
-    def run_network(**e):
-      interest = (self.net_interest_tb.text or "").strip() or "Tema central"
-      text = self.state["research_summary"] + " " + self.state["research_notes"]
-      keywords = extract_keywords(text, max_n=8)
-      if not keywords:
-        self.net_output_ta.text = "Não identifiquei palavras‑chave suficientes. Escreva mais no resumo e nas anotações."
-        return
-      lines = [f"{interest} ↔ {kw}" for kw in keywords]
-      self.net_output_ta.text = "\n".join(lines)
-
-    run_btn.set_event_handler("click", run_network)
-
-  # ====================================================
-  # VIEW: CONFIGURAÇÕES
-  # ====================================================
-
-  def view_settings(self):
-    p = self.view_panel
-    p.add_component(Label(text="Configurações, salvar & sair", bold=True))
-
-    user = self.get_current_user()
+    user = get_current_user()
     if user:
-      p.add_component(
-        Label(text=f"{user['name']} – {user['email']} – {map_type_label(user['type'])}")
-      )
+        st.markdown(
+            f"""
+            <div class="user-pill">
+                <div class="user-pill-avatar">{user.name[:1].upper()}</div>
+                <div>
+                    <strong>{user.name}</strong><br/>
+                    <span style="font-size:0.78rem;color:#a6aec9;">
+                        {user.email} – {map_type_label(user.type)}
+                    </span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
 
-    save_btn = Button(text="Salvar tudo (protótipo em memória)", role="primary-color")
-    logout_btn = Button(text="Salvar e sair")
+    st.write("---")
+    st.subheader("Sessão")
 
-    p.add_component(save_btn)
-    p.add_component(logout_btn)
+    col_a, col_b = st.columns(2)
+    with col_a:
+        if st.button("Salvar tudo agora e continuar", key="btn_save_only"):
+            save_persistent_state()
+    with col_b:
+        if st.button("Salvar e sair", key="btn_save_logout"):
+            save_persistent_state()
+            st.session_state.current_user_email = None
+            st.success("Dados salvos. Sessão encerrada.")
+            st.experimental_rerun()
 
-    def save_all(**e):
-      # Aqui você poderia chamar server functions e Data Tables para salvar de verdade
-      Notification("Neste protótipo, os dados ficam apenas em memória.", style="info").show()
+    st.write("---")
+    st.caption(
+        "O PQR salva os dados em um arquivo `pqr_state.json` (quando o ambiente permite gravação em disco)."
+    )
 
-    def logout(**e):
-      self.state["current_user_email"] = None
-      Notification("Sessão encerrada.", style="info").show()
-      self.build_layout()
+    st.markdown("</div>", unsafe_allow_html=True)
 
-    save_btn.set_event_handler("click", save_all)
-    logout_btn.set_event_handler("click", logout)
+# ======================================================
+# MAIN
+# ======================================================
+def main():
+    user = get_current_user()
+
+    if not user:
+        auth_screen()
+        return
+
+    with st.sidebar:
+        st.markdown(
+            """
+            <div class="pqr-logo-line">
+                <div class="pqr-logo-avatar">P</div>
+                <div class="pqr-title-text">
+                    <div class="pqr-title-main">PQR</div>
+                    <div class="pqr-title-sub">sua rede de pesquisa qualitativa</div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        st.markdown(
+            f"""
+            <div class="user-pill">
+                <div class="user-pill-avatar">{user.name[:1].upper()}</div>
+                <div style="font-size:0.78rem;">
+                    {user.name.split(" ")[0]}<br/>
+                    <span style="color:#a6aec9;">{map_type_label(user.type)}</span>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+        st.write("")
+        view = st.radio(
+            "Navegação",
+            [
+                "Timeline / Feed",
+                "Pasta da pesquisa",
+                "Mapa mental",
+                "Análise inteligente",
+                "Chat",
+                "Cadeia de ligação",
+                "Configurações",
+            ],
+        )
+
+    if view == "Timeline / Feed":
+        view_board()
+    elif view == "Pasta da pesquisa":
+        view_research()
+    elif view == "Mapa mental":
+        view_mindmap()
+    elif view == "Análise inteligente":
+        view_analysis()
+    elif view == "Chat":
+        view_chat()
+    elif view == "Cadeia de ligação":
+        view_network()
+    elif view == "Configurações":
+        view_settings()
+
+
+if __name__ == "__main__":
+    main()
