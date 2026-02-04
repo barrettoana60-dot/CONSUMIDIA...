@@ -300,7 +300,7 @@ textarea, input, select {
     border-color: rgba(37,99,235,0.6);
 }
 
-/* radio nativo do Streamlit (não usamos mais para nav, mas deixo bonito) */
+/* radio nativo do Streamlit (caso usemos) */
 [data-baseweb="radio"] > div {
     gap: 4px;
 }
@@ -386,6 +386,7 @@ def default_state_dict() -> Dict[str, Any]:
         "chat_topic": "metodologia",
         "posts": [],
         "slides": [],
+        "current_view": "Feed social",
     }
 
 def load_persistent_state():
@@ -431,6 +432,7 @@ def save_persistent_state():
         "chat_topic": st.session_state.chat_topic,
         "posts": [asdict(p) for p in st.session_state.posts],
         "slides": [asdict(s) for s in st.session_state.slides],
+        "current_view": st.session_state.get("current_view", "Feed social"),
     }
     try:
         with open(STATE_FILE, "w", encoding="utf-8") as f:
@@ -456,10 +458,10 @@ def init_state():
         users_norm.append(User(**u2))
     st.session_state.users = users_norm
 
-    st.session_state.current_user_email = persisted["current_user_email"]
-    st.session_state.cards = [Card(**c) for c in persisted["cards"]]
-    st.session_state.research_summary = persisted["research_summary"]
-    st.session_state.research_notes = persisted["research_notes"]
+    st.session_state.current_user_email = persisted.get("current_user_email")
+    st.session_state.cards = [Card(**c) for c in persisted.get("cards", [])]
+    st.session_state.research_summary = persisted.get("research_summary", "")
+    st.session_state.research_notes = persisted.get("research_notes", "")
 
     # mind_root normalizado
     raw_root = persisted.get("mind_root", {})
@@ -475,12 +477,12 @@ def init_state():
             d2["children"] = [normalize_mind_dict(c) for c in d2["children"]]
         return d2
 
-    raw_root_norm = normalize_mind_dict(raw_root)
+    raw_root_norm = normalize_mind_dict(raw_root) if raw_root else default_state_dict()["mind_root"]
     st.session_state.mind_root = dict_to_mindnode(raw_root_norm)
 
-    st.session_state.mind_selected_id = persisted["mind_selected_id"]
-    st.session_state.chat_messages = [ChatMessage(**m) for m in persisted["chat_messages"]]
-    st.session_state.chat_topic = persisted["chat_topic"]
+    st.session_state.mind_selected_id = persisted.get("mind_selected_id", "root")
+    st.session_state.chat_messages = [ChatMessage(**m) for m in persisted.get("chat_messages", [])]
+    st.session_state.chat_topic = persisted.get("chat_topic", "metodologia")
 
     # posts
     raw_posts = persisted.get("posts", [])
@@ -499,8 +501,8 @@ def init_state():
     slides_norm = [Slide(**s) for s in raw_slides]
     st.session_state.slides = slides_norm
 
-    # view atual (navegação topo)
-    st.session_state.current_view = st.session_state.get("current_view", "Feed social")
+    # view atual
+    st.session_state.current_view = persisted.get("current_view", "Feed social")
 
     st.session_state.initialized = True
 
@@ -604,7 +606,7 @@ def timeline_completion() -> int:
     return round(done / total * 100)
 
 # ======================================================
-# AUTENTICAÇÃO (TELA INICIAL)
+# AUTENTICAÇÃO
 # ======================================================
 
 def auth_screen():
@@ -1334,6 +1336,10 @@ VIEWS = [
 ]
 
 def render_header(user: User):
+    # garante que current_view exista
+    if "current_view" not in st.session_state:
+        st.session_state.current_view = "Feed social"
+
     st.markdown('<div class="pqr-header">', unsafe_allow_html=True)
     colL, colR = st.columns([3, 2])
 
@@ -1382,7 +1388,9 @@ def render_header(user: User):
         with col:
             active = (st.session_state.current_view == view_name)
             cls = "pqr-nav-item-active" if active else "pqr-nav-item"
-            if st.button(view_name, key=f"nav_{i}"):
+            # usamos o botão do Streamlit para clique,
+            # o div com classe só serve pra CSS (display:none)
+            if st.button(view_name, key=f"nav_btn_{i}"):
                 st.session_state.current_view = view_name
                 st.experimental_rerun()
             st.markdown(
