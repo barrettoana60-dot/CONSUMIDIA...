@@ -27,17 +27,16 @@ STATE_FILE = "pqr_state.json"
 MODERN_CSS = """
 <style>
 :root {
-    --pqr-primary: #2563eb;      /* azul */
+    --pqr-primary: #2563eb;
     --pqr-primary-soft: rgba(37, 99, 235, 0.08);
-    --pqr-accent: #10b981;       /* verde */
-    --pqr-bg: #f3f4f6;           /* cinza claro */
+    --pqr-accent: #10b981;
+    --pqr-bg: #f3f4f6;
     --pqr-bg-card: #ffffff;
     --pqr-border-soft: rgba(15, 23, 42, 0.08);
     --pqr-text-main: #0f172a;
     --pqr-text-soft: #64748b;
 }
 
-/* fundo */
 .stApp {
     background: var(--pqr-bg);
     color: var(--pqr-text-main);
@@ -49,13 +48,11 @@ MODERN_CSS = """
     padding-bottom: 0.8rem;
 }
 
-/* sidebar estilo linkedin */
 [data-testid="stSidebar"] {
     background: #ffffff;
     border-right: 1px solid rgba(15,23,42,0.08);
 }
 
-/* cartões principais */
 .glass-main {
     background: var(--pqr-bg-card);
     border-radius: 16px;
@@ -64,7 +61,6 @@ MODERN_CSS = """
     padding: 18px 22px;
 }
 
-/* seções internas */
 .glass-section {
     background: #f9fafb;
     border-radius: 14px;
@@ -72,7 +68,6 @@ MODERN_CSS = """
     padding: 12px 14px;
 }
 
-/* logo / título */
 .pqr-logo-line {
     display: flex;
     align-items: center;
@@ -165,7 +160,7 @@ MODERN_CSS = """
     color: var(--pqr-text-soft);
 }
 
-/* chat bubble mais clean */
+/* chat bubble */
 .chat-bubble {
     padding: 7px 9px;
     border-radius: 10px;
@@ -269,7 +264,7 @@ class User:
     email: str
     type: str
     password: str
-    avatar_url: Optional[str] = None  # NOVO: foto de avatar por URL
+    avatar_url: Optional[str] = None  # avatar opcional
 
 @dataclass
 class Card:
@@ -292,8 +287,8 @@ class ChatMessage:
 class MindNode:
     id: str
     label: str
-    note: str = ""              # NOVO: nota para o nó
-    tags: List[str] = field(default_factory=list)  # NOVO: tags
+    note: str = ""
+    tags: List[str] = field(default_factory=list)
     children: List["MindNode"] = field(default_factory=list)
 
 @dataclass
@@ -334,8 +329,8 @@ def default_state_dict() -> Dict[str, Any]:
         "mind_selected_id": "root",
         "chat_messages": [],
         "chat_topic": "metodologia",
-        "posts": [],          # NOVO: feed social
-        "slides": [],         # NOVO: slides / canvas
+        "posts": [],
+        "slides": [],
     }
 
 def load_persistent_state():
@@ -397,7 +392,16 @@ def init_state():
     if "initialized" in st.session_state:
         return
     persisted = load_persistent_state()
-    st.session_state.users = [User(**u) for u in persisted["users"]]
+
+    # normalizar users para ter avatar_url
+    users_norm = []
+    for u in persisted["users"]:
+        u2 = dict(u)
+        if "avatar_url" not in u2:
+            u2["avatar_url"] = None
+        users_norm.append(User(**u2))
+    st.session_state.users = users_norm
+
     st.session_state.current_user_email = persisted["current_user_email"]
     st.session_state.cards = [Card(**c) for c in persisted["cards"]]
     st.session_state.research_summary = persisted["research_summary"]
@@ -565,7 +569,7 @@ def auth_screen():
                 "Senha (mín. 6 caracteres)", type="password", key="cad_senha"
             )
             avatar_url = st.text_input(
-                "URL da foto de perfil (opcional, pode ser de Google Drive público, Imgur etc.)",
+                "URL da foto de perfil (opcional)",
                 key="cad_avatar",
             )
 
@@ -603,21 +607,20 @@ def auth_screen():
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: FEED SOCIAL (POSTS + CURTIR)
+# VIEW: FEED SOCIAL
 # ======================================================
 
 def view_social_feed():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("### Feed da rede (posts, curtidas, comentários simples)")
+    st.markdown("### Feed da rede (posts, curtidas)")
     user = get_current_user()
     if not user:
         st.warning("Entre na sua conta para ver e publicar no feed.")
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
-    # Criar novo post
     with st.expander("Criar novo post", expanded=True):
-        text = st.text_area("Compartilhe um avanço, dúvida ou insight de pesquisa…", key="new_post_text")
+        text = st.text_area("Compartilhe um avanço, dúvida ou insight…", key="new_post_text")
         if st.button("Publicar no feed", key="btn_new_post"):
             if not text.strip():
                 st.warning("Escreva algo antes de publicar.")
@@ -627,7 +630,7 @@ def view_social_feed():
                     Post(
                         id=str(uuid.uuid4()),
                         user_name=user.name.split(" ")[0] or user.name,
-                        user_avatar_url=user.avatar_url,
+                        user_avatar_url=getattr(user, "avatar_url", None),
                         text=text.strip(),
                         created_at=datetime.datetime.now().isoformat(),
                     ),
@@ -639,15 +642,15 @@ def view_social_feed():
     if not st.session_state.posts:
         st.info("Ainda não há posts no feed. Publique o primeiro.")
     else:
-        for idx, p in enumerate(st.session_state.posts):
-            # header
+        for p in st.session_state.posts:
             colA, colB = st.columns([0.13, 3])
             with colA:
-                if p.user_avatar_url:
+                avatar_url = p.user_avatar_url
+                if avatar_url:
                     st.markdown(
                         f"""
                         <div class="user-pill-avatar">
-                            <img src="{p.user_avatar_url}">
+                            <img src="{avatar_url}">
                         </div>
                         """,
                         unsafe_allow_html=True,
@@ -679,8 +682,6 @@ def view_social_feed():
                     """,
                     unsafe_allow_html=True,
                 )
-
-                # ações (curtir)
                 col_like, col_meta = st.columns([0.26, 3])
                 with col_like:
                     liked_label = "💙 Curtido" if p.liked_by_me else "🤍 Curtir"
@@ -702,7 +703,7 @@ def view_social_feed():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: TIMELINE / FEED DE PESQUISA (já existia, levemente adaptado)
+# VIEW: TIMELINE / ETAPAS
 # ======================================================
 
 def view_board():
@@ -890,7 +891,7 @@ def view_research():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: MAPA MENTAL MAIS PODEROSO
+# VIEW: MAPA MENTAL
 # ======================================================
 
 def view_mindmap():
@@ -935,20 +936,18 @@ def view_mindmap():
         st.markdown("#### Criar / remover nós")
         new_child_label = st.text_input("Adicionar sub‑tópico", key="mind_new_label")
         if st.button("Adicionar sub‑tópico ao nó selecionado"):
-            if new_child_label.strip():
-                parent = node
-                if parent:
-                    parent.children.append(
-                        MindNode(
-                            id=str(uuid.uuid4()),
-                            label=new_child_label.strip(),
-                            note="",
-                            tags=[],
-                            children=[],
-                        )
+            if new_child_label.strip() and node:
+                node.children.append(
+                    MindNode(
+                        id=str(uuid.uuid4()),
+                        label=new_child_label.strip(),
+                        note="",
+                        tags=[],
+                        children=[],
                     )
-                    save_persistent_state()
-                    st.success("Sub‑tópico adicionado.")
+                )
+                save_persistent_state()
+                st.success("Sub‑tópico adicionado.")
         st.write("")
         if st.button("Remover nó selecionado"):
             if selected == "root":
@@ -965,7 +964,7 @@ def view_mindmap():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: SLIDES / CANVAS SIMPLES
+# VIEW: SLIDES / CANVAS
 # ======================================================
 
 def view_slides():
@@ -1038,7 +1037,7 @@ def view_slides():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: ANÁLISE INTELIGENTE (igual, com layout novo)
+# VIEW: ANÁLISE INTELIGENTE
 # ======================================================
 
 def view_analysis():
@@ -1084,7 +1083,7 @@ def view_analysis():
         if "grupo focal" in concat or "focal" in concat:
             st.write("- Grupo focal: considere o papel da interação na produção de sentidos.")
         if "questionário" in concat or "questionario" in concat:
-            st.write("- Questionários com questões abertas: trate respostas como narrativas a categorizar.")
+            st.write("- Questionários abertos: trate respostas como narrativas a categorizAR.")
         if len(notes) > 200:
             st.write("- Muitas anotações: hora de estruturar códigos/categorias preliminares.")
         if not summary.strip() and not notes.strip():
@@ -1214,9 +1213,10 @@ def view_settings():
     st.markdown("### Configurações, perfil & sessão")
     user = get_current_user()
     if user:
+        avatar_url = getattr(user, "avatar_url", None)
         avatar_html = (
-            f'<img src="{user.avatar_url}">'
-            if user.avatar_url
+            f'<img src="{avatar_url}">'
+            if avatar_url
             else user.name[:1].upper()
         )
         st.markdown(
@@ -1235,7 +1235,8 @@ def view_settings():
         )
         st.write("")
         with st.expander("Atualizar foto de perfil"):
-            new_url = st.text_input("URL da nova foto de avatar", value=user.avatar_url or "")
+            current_avatar = getattr(user, "avatar_url", None)
+            new_url = st.text_input("URL da nova foto de avatar", value=current_avatar or "")
             if st.button("Salvar avatar"):
                 user.avatar_url = new_url.strip() or None
                 save_persistent_state()
@@ -1270,7 +1271,6 @@ def main():
         auth_screen()
         return
 
-    # sidebar com cara de linkedin
     with st.sidebar:
         st.markdown(
             """
@@ -1285,9 +1285,10 @@ def main():
             unsafe_allow_html=True,
         )
         st.write("")
+        avatar_url = getattr(user, "avatar_url", None)
         avatar_html = (
-            f'<img src="{user.avatar_url}">'
-            if user.avatar_url
+            f'<img src="{avatar_url}">'
+            if avatar_url
             else user.name[:1].upper()
         )
         st.markdown(
