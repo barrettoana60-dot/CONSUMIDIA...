@@ -13,7 +13,7 @@ import uuid
 # ======================================================
 
 st.set_page_config(
-    page_title="PQR – Pesquisa Qualitativa de Resultados",
+    page_title="PQR – Rede de Pesquisa Qualitativa",
     layout="wide",
     initial_sidebar_state="expanded",
 )
@@ -21,47 +21,27 @@ st.set_page_config(
 STATE_FILE = "pqr_state.json"
 
 # ======================================================
-# CSS – LIQUID GLASS + AZUL ESCURO
+# CSS – TEMA MAIS CLARO, ESTILO INSTAGRAM / LINKEDIN MODERNO
 # ======================================================
 
-LIQUID_CSS = """
+MODERN_CSS = """
 <style>
 :root {
-    --pqr-accent: #55d6ff;
-    --pqr-accent-soft: rgba(85, 214, 255, 0.18);
-    --pqr-bg-dark: #050814;
-    --pqr-bg-glass: rgba(5, 10, 25, 0.85);
-    --pqr-border-soft: rgba(255,255,255,0.16);
-    --pqr-text-main: #f7f9ff;
-    --pqr-text-soft: #a6aec9;
+    --pqr-primary: #2563eb;      /* azul */
+    --pqr-primary-soft: rgba(37, 99, 235, 0.08);
+    --pqr-accent: #10b981;       /* verde */
+    --pqr-bg: #f3f4f6;           /* cinza claro */
+    --pqr-bg-card: #ffffff;
+    --pqr-border-soft: rgba(15, 23, 42, 0.08);
+    --pqr-text-main: #0f172a;
+    --pqr-text-soft: #64748b;
 }
 
-/* Fundo geral */
+/* fundo */
 .stApp {
-    background: var(--pqr-bg-dark);
+    background: var(--pqr-bg);
     color: var(--pqr-text-main);
     font-family: system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
-}
-
-.stApp::before {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background-image: url("https://images.pexels.com/photos/237272/pexels-photo-237272.jpeg?auto=compress&cs=tinysrgb&w=1600");
-    background-size: cover;
-    background-position: center;
-    filter: saturate(1.1) contrast(1.05) brightness(0.7);
-    z-index: -2;
-}
-
-.stApp::after {
-    content: "";
-    position: fixed;
-    inset: 0;
-    background:
-        radial-gradient(circle at top left, rgba(15,40,85,0.9), transparent 50%),
-        radial-gradient(circle at bottom right, rgba(2,4,15,0.96), #020309);
-    z-index: -1;
 }
 
 .block-container {
@@ -69,41 +49,30 @@ LIQUID_CSS = """
     padding-bottom: 0.8rem;
 }
 
-/* Sidebar */
+/* sidebar estilo linkedin */
 [data-testid="stSidebar"] {
-    background: linear-gradient(
-        155deg,
-        rgba(3, 9, 30, 0.96),
-        rgba(3, 11, 40, 0.96)
-    );
-    border-right: 1px solid rgba(255,255,255,0.12);
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
+    background: #ffffff;
+    border-right: 1px solid rgba(15,23,42,0.08);
 }
 
-/* Cartões glass principais */
+/* cartões principais */
 .glass-main {
-    backdrop-filter: blur(28px);
-    -webkit-backdrop-filter: blur(28px);
-    background: radial-gradient(circle at top, rgba(255,255,255,0.06), transparent 55%),
-                rgba(8, 14, 38, 0.96);
-    border-radius: 22px;
-    border: 1px solid rgba(255,255,255,0.18);
-    box-shadow: 0 28px 80px rgba(0,0,0,0.75);
+    background: var(--pqr-bg-card);
+    border-radius: 16px;
+    border: 1px solid var(--pqr-border-soft);
+    box-shadow: 0 10px 30px rgba(15,23,42,0.08);
     padding: 18px 22px;
 }
 
-/* Seções internas */
+/* seções internas */
 .glass-section {
-    backdrop-filter: blur(24px);
-    -webkit-backdrop-filter: blur(24px);
-    background: linear-gradient(145deg, rgba(255,255,255,0.03), rgba(1,4,18,0.96));
-    border-radius: 18px;
-    border: 1px solid rgba(255,255,255,0.12);
-    padding: 14px 16px;
+    background: #f9fafb;
+    border-radius: 14px;
+    border: 1px solid rgba(15,23,42,0.04);
+    padding: 12px 14px;
 }
 
-/* Logo / título */
+/* logo / título */
 .pqr-logo-line {
     display: flex;
     align-items: center;
@@ -113,23 +82,22 @@ LIQUID_CSS = """
     width: 36px;
     height: 36px;
     border-radius: 999px;
-    background: radial-gradient(circle at 30% 20%, #55d6ff, #1960ff);
+    background: linear-gradient(135deg, #2563eb, #38bdf8);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #02030a;
+    color: #f9fafb;
     font-weight: 700;
     font-size: 0.9rem;
-    border: 2px solid rgba(255,255,255,0.6);
 }
 .pqr-title-text {
     display: flex;
     flex-direction: column;
 }
 .pqr-title-main {
-    font-size: 1.55rem;
+    font-size: 1.4rem;
     font-weight: 700;
-    letter-spacing: 0.14em;
+    letter-spacing: 0.08em;
     text-transform: uppercase;
 }
 .pqr-title-sub {
@@ -137,46 +105,88 @@ LIQUID_CSS = """
     color: var(--pqr-text-soft);
 }
 
-/* User pill */
+/* user pill / perfil */
 .user-pill {
-    display: inline-flex;
+    display: flex;
     align-items: center;
-    gap: 8px;
-    padding: 6px 12px;
-    border-radius: 999px;
-    background: rgba(3,10,30,0.92);
-    border: 1px solid rgba(255,255,255,0.18);
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 12px;
+    background: #f9fafb;
+    border: 1px solid var(--pqr-border-soft);
     font-size: 0.82rem;
 }
 .user-pill-avatar {
-    width: 24px;
-    height: 24px;
+    width: 32px;
+    height: 32px;
     border-radius: 999px;
-    background: radial-gradient(circle at 30% 20%, #55d6ff, #1960ff);
+    background: #e5e7eb;
     display: flex;
     align-items: center;
     justify-content: center;
-    color: #02030a;
+    color: #111827;
     font-weight: 600;
+    overflow: hidden;
 }
-
-/* Botões padrão */
-.stButton > button {
+.user-pill-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
     border-radius: 999px;
-    border: 1px solid rgba(255,255,255,0.16);
-    background: radial-gradient(circle at top left, rgba(255,255,255,0.12), transparent 45%),
-                rgba(3,7,24,0.92);
-    color: var(--pqr-text-main);
-    font-size: 0.84rem;
 }
 
-/* Timeline card */
+/* posts estilo feed */
+.post-card {
+    background: #ffffff;
+    border-radius: 12px;
+    border: 1px solid var(--pqr-border-soft);
+    padding: 10px 12px;
+    margin-bottom: 8px;
+}
+.post-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    font-size: 0.83rem;
+}
+.post-meta {
+    font-size: 0.75rem;
+    color: var(--pqr-text-soft);
+}
+.post-body {
+    font-size: 0.86rem;
+    margin: 4px 0 6px;
+}
+.post-actions {
+    display: flex;
+    gap: 12px;
+    font-size: 0.78rem;
+    color: var(--pqr-text-soft);
+}
+
+/* chat bubble mais clean */
+.chat-bubble {
+    padding: 7px 9px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    font-size: 0.84rem;
+    background: #f3f4f6;
+    border: 1px solid rgba(15,23,42,0.06);
+}
+.chat-meta {
+    font-size: 0.70rem;
+    color: var(--pqr-text-soft);
+    margin-bottom: 2px;
+}
+
+/* timeline */
 .timeline-card {
-    border-radius: 16px;
+    border-radius: 12px;
     padding: 8px 10px;
     margin-bottom: 6px;
-    background: rgba(5,10,30,0.92);
-    border: 1px solid rgba(255,255,255,0.16);
+    background: #ffffff;
+    border: 1px solid var(--pqr-border-soft);
     font-size: 0.8rem;
 }
 .timeline-card-header {
@@ -197,22 +207,7 @@ LIQUID_CSS = """
     margin-top: 4px;
 }
 
-/* Chat */
-.chat-bubble {
-    padding: 7px 9px;
-    border-radius: 14px;
-    margin-bottom: 6px;
-    font-size: 0.84rem;
-    background: rgba(3, 8, 26, 0.98);
-    border: 1px solid rgba(255,255,255,0.14);
-}
-.chat-meta {
-    font-size: 0.70rem;
-    color: var(--pqr-text-soft);
-    margin-bottom: 2px;
-}
-
-/* Mindmap */
+/* mapa mental */
 .mind-node {
     font-size: 0.84rem;
     margin: 2px 0;
@@ -220,45 +215,15 @@ LIQUID_CSS = """
 .mind-node-label {
     padding: 2px 8px;
     border-radius: 999px;
-    background: rgba(255,255,255,0.06);
+    background: #e5e7eb;
 }
 .mind-node-selected {
-    background: var(--pqr-accent-soft);
-    color: var(--pqr-accent);
-    border: 1px solid var(--pqr-accent);
+    background: var(--pqr-primary-soft);
+    color: var(--pqr-primary);
+    border: 1px solid rgba(37,99,235,0.7);
 }
 
-/* Tabs */
-.pqr-tabs {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 10px;
-}
-.pqr-tab {
-    padding: 4px 12px;
-    border-radius: 999px;
-    border: 1px solid rgba(255,255,255,0.14);
-    font-size: 0.8rem;
-    cursor: pointer;
-    background: rgba(3,7,24,0.8);
-    color: var(--pqr-text-soft);
-}
-.pqr-tab-active {
-    background: linear-gradient(135deg, rgba(85,214,255,0.18), rgba(38,105,255,0.4));
-    border-color: rgba(85,214,255,0.75);
-    color: var(--pqr-accent);
-}
-
-/* Inputs */
-textarea, input, select {
-    border-radius: 12px !important;
-    border: 1px solid rgba(255,255,255,0.18) !important;
-    background: rgba(2,5,20,0.9) !important;
-    color: var(--pqr-text-main) !important;
-    font-size: 0.85rem !important;
-}
-
-/* Badge */
+/* badge */
 .pqr-badge {
     display:inline-block;
     padding:3px 10px;
@@ -266,14 +231,33 @@ textarea, input, select {
     font-size:0.72rem;
     letter-spacing:0.08em;
     text-transform:uppercase;
-    background:rgba(85,214,255,0.12);
-    border:1px solid rgba(85,214,255,0.7);
-    color:var(--pqr-accent);
+    background:var(--pqr-primary-soft);
+    border:1px solid rgba(37,99,235,0.3);
+    color:var(--pqr-primary);
+}
+
+/* inputs */
+textarea, input, select {
+    border-radius: 8px !important;
+}
+
+/* botões padrão */
+.stButton > button {
+    border-radius: 999px;
+    border: 1px solid rgba(15,23,42,0.12);
+    background: linear-gradient(135deg, #2563eb, #38bdf8);
+    color: #f9fafb;
+    font-size: 0.84rem;
+}
+
+/* radio da sidebar */
+[data-baseweb="radio"] > div {
+    gap: 4px;
 }
 </style>
 """
 
-st.markdown(LIQUID_CSS, unsafe_allow_html=True)
+st.markdown(MODERN_CSS, unsafe_allow_html=True)
 
 # ======================================================
 # MODELOS DE DADOS
@@ -285,6 +269,7 @@ class User:
     email: str
     type: str
     password: str
+    avatar_url: Optional[str] = None  # NOVO: foto de avatar por URL
 
 @dataclass
 class Card:
@@ -307,10 +292,29 @@ class ChatMessage:
 class MindNode:
     id: str
     label: str
+    note: str = ""              # NOVO: nota para o nó
+    tags: List[str] = field(default_factory=list)  # NOVO: tags
     children: List["MindNode"] = field(default_factory=list)
 
+@dataclass
+class Post:
+    id: str
+    user_name: str
+    user_avatar_url: Optional[str]
+    text: str
+    created_at: str
+    likes: int = 0
+    liked_by_me: bool = False
+
+@dataclass
+class Slide:
+    id: str
+    title: str
+    content: str
+    created_at: str
+
 # ======================================================
-# PERSISTÊNCIA EM ARQUIVO
+# PERSISTÊNCIA
 # ======================================================
 
 def default_state_dict() -> Dict[str, Any]:
@@ -320,10 +324,18 @@ def default_state_dict() -> Dict[str, Any]:
         "cards": [],
         "research_summary": "",
         "research_notes": "",
-        "mind_root": {"id": "root", "label": "Tema central", "children": []},
+        "mind_root": {
+            "id": "root",
+            "label": "Tema central",
+            "note": "",
+            "tags": [],
+            "children": [],
+        },
         "mind_selected_id": "root",
         "chat_messages": [],
         "chat_topic": "metodologia",
+        "posts": [],          # NOVO: feed social
+        "slides": [],         # NOVO: slides / canvas
     }
 
 def load_persistent_state():
@@ -332,17 +344,27 @@ def load_persistent_state():
     try:
         with open(STATE_FILE, "r", encoding="utf-8") as f:
             data = json.load(f)
-        return {**default_state_dict(), **data}
+        base = default_state_dict()
+        base.update(data)
+        return base
     except Exception:
         return default_state_dict()
 
 def mindnode_to_dict(n: MindNode) -> Dict[str, Any]:
-    return {"id": n.id, "label": n.label, "children": [mindnode_to_dict(c) for c in n.children]}
+    return {
+        "id": n.id,
+        "label": n.label,
+        "note": n.note,
+        "tags": n.tags,
+        "children": [mindnode_to_dict(c) for c in n.children],
+    }
 
 def dict_to_mindnode(d: Dict[str, Any]) -> MindNode:
     return MindNode(
         id=d.get("id", "no-id"),
         label=d.get("label", ""),
+        note=d.get("note", ""),
+        tags=d.get("tags", []),
         children=[dict_to_mindnode(c) for c in d.get("children", [])],
     )
 
@@ -357,11 +379,13 @@ def save_persistent_state():
         "mind_selected_id": st.session_state.mind_selected_id,
         "chat_messages": [asdict(m) for m in st.session_state.chat_messages],
         "chat_topic": st.session_state.chat_topic,
+        "posts": [asdict(p) for p in st.session_state.posts],
+        "slides": [asdict(s) for s in st.session_state.slides],
     }
     try:
         with open(STATE_FILE, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
-        st.success("Dados salvos com sucesso.")
+        st.toast("Dados salvos.", icon="✅")
     except Exception as e:
         st.warning(f"Não foi possível salvar em arquivo: {e}")
 
@@ -382,6 +406,8 @@ def init_state():
     st.session_state.mind_selected_id = persisted["mind_selected_id"]
     st.session_state.chat_messages = [ChatMessage(**m) for m in persisted["chat_messages"]]
     st.session_state.chat_topic = persisted["chat_topic"]
+    st.session_state.posts = [Post(**p) for p in persisted.get("posts", [])]
+    st.session_state.slides = [Slide(**s) for s in persisted.get("slides", [])]
     st.session_state.initialized = True
 
 init_state()
@@ -434,9 +460,9 @@ def extract_keywords(text: str, max_n: int = 6) -> List[str]:
     return [w for w, _ in freq.most_common(max_n)]
 
 def mind_list_nodes(node: MindNode, prefix: str = "") -> List[MindNode]:
-    nodes = [MindNode(id=node.id, label=prefix + node.label, children=[])]
+    nodes = [MindNode(id=node.id, label=prefix + node.label, note=node.note, tags=node.tags, children=[])]
     for ch in node.children:
-        nodes += mind_list_nodes(ch, prefix + " ")
+        nodes += mind_list_nodes(ch, prefix + "  ")
     return nodes
 
 def mind_find_node(node: MindNode, target_id: str) -> Optional[MindNode]:
@@ -462,8 +488,12 @@ def mind_print_tree(node: MindNode, indent: int = 0):
     sel_class = "mind-node-label"
     if node.id == st.session_state.mind_selected_id:
         sel_class += " mind-node-selected"
+    tags_str = ""
+    if node.tags:
+        tags_str = " · " + ", ".join(f"#{t}" for t in node.tags)
     st.markdown(
-        f'<div class="mind-node">{pad}<span class="{sel_class}">{node.label}</span></div>',
+        f'<div class="mind-node">{pad}<span class="{sel_class}">{node.label}</span>'
+        f'<span style="font-size:0.7rem;color:#64748b;">{tags_str}</span></div>',
         unsafe_allow_html=True,
     )
     for ch in node.children:
@@ -493,7 +523,7 @@ def auth_screen():
                 <div class="pqr-logo-avatar">PQR</div>
                 <div class="pqr-title-text">
                     <div class="pqr-title-main">PQR</div>
-                    <div class="pqr-title-sub">Pesquisa Qualitativa de Resultados</div>
+                    <div class="pqr-title-sub">Rede de pesquisa qualitativa com cara de social</div>
                 </div>
             </div>
             """,
@@ -506,7 +536,7 @@ def auth_screen():
         with tabs[0]:
             email = st.text_input("Email", key="login_email")
             password = st.text_input("Senha", type="password", key="login_password")
-            if st.button("Entrar", key="login_btn", help="Acessar sua pasta PQR"):
+            if st.button("Entrar", key="login_btn"):
                 user = next((u for u in st.session_state.users if u.email == email), None)
                 if not user or user.password != password:
                     st.error("Credenciais inválidas.")
@@ -534,6 +564,11 @@ def auth_screen():
             password_c = st.text_input(
                 "Senha (mín. 6 caracteres)", type="password", key="cad_senha"
             )
+            avatar_url = st.text_input(
+                "URL da foto de perfil (opcional, pode ser de Google Drive público, Imgur etc.)",
+                key="cad_avatar",
+            )
+
             if st.button("Criar conta", key="cad_btn"):
                 if type_label == "Selecione…":
                     st.warning("Escolha um tipo de bolsa.")
@@ -552,7 +587,13 @@ def auth_screen():
                     }
                     t = type_map.get(type_label, "ic")
                     st.session_state.users.append(
-                        User(name=name, email=email_c, type=t, password=password_c)
+                        User(
+                            name=name,
+                            email=email_c,
+                            type=t,
+                            password=password_c,
+                            avatar_url=avatar_url.strip() or None,
+                        )
                     )
                     st.session_state.current_user_email = email_c
                     save_persistent_state()
@@ -562,7 +603,106 @@ def auth_screen():
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: BOARD – FEED
+# VIEW: FEED SOCIAL (POSTS + CURTIR)
+# ======================================================
+
+def view_social_feed():
+    st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+    st.markdown("### Feed da rede (posts, curtidas, comentários simples)")
+    user = get_current_user()
+    if not user:
+        st.warning("Entre na sua conta para ver e publicar no feed.")
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+
+    # Criar novo post
+    with st.expander("Criar novo post", expanded=True):
+        text = st.text_area("Compartilhe um avanço, dúvida ou insight de pesquisa…", key="new_post_text")
+        if st.button("Publicar no feed", key="btn_new_post"):
+            if not text.strip():
+                st.warning("Escreva algo antes de publicar.")
+            else:
+                st.session_state.posts.insert(
+                    0,
+                    Post(
+                        id=str(uuid.uuid4()),
+                        user_name=user.name.split(" ")[0] or user.name,
+                        user_avatar_url=user.avatar_url,
+                        text=text.strip(),
+                        created_at=datetime.datetime.now().isoformat(),
+                    ),
+                )
+                save_persistent_state()
+                st.success("Post publicado no feed.")
+
+    st.write("---")
+    if not st.session_state.posts:
+        st.info("Ainda não há posts no feed. Publique o primeiro.")
+    else:
+        for idx, p in enumerate(st.session_state.posts):
+            # header
+            colA, colB = st.columns([0.13, 3])
+            with colA:
+                if p.user_avatar_url:
+                    st.markdown(
+                        f"""
+                        <div class="user-pill-avatar">
+                            <img src="{p.user_avatar_url}">
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+                else:
+                    ini = p.user_name[:1].upper() if p.user_name else "U"
+                    st.markdown(
+                        f"""
+                        <div class="user-pill-avatar">
+                            {ini}
+                        </div>
+                        """,
+                        unsafe_allow_html=True,
+                    )
+            with colB:
+                try:
+                    dt = datetime.datetime.fromisoformat(p.created_at)
+                    ts = dt.strftime("%d/%m %H:%M")
+                except Exception:
+                    ts = p.created_at
+                st.markdown(
+                    f"""
+                    <div class="post-card">
+                        <div class="post-header">
+                            <strong>{p.user_name}</strong>
+                        </div>
+                        <div class="post-meta">{ts}</div>
+                        <div class="post-body">{p.text}</div>
+                    """,
+                    unsafe_allow_html=True,
+                )
+
+                # ações (curtir)
+                col_like, col_meta = st.columns([0.26, 3])
+                with col_like:
+                    liked_label = "💙 Curtido" if p.liked_by_me else "🤍 Curtir"
+                    if st.button(liked_label, key=f"like_{p.id}"):
+                        if p.liked_by_me:
+                            p.liked_by_me = False
+                            p.likes = max(0, p.likes - 1)
+                        else:
+                            p.liked_by_me = True
+                            p.likes += 1
+                        save_persistent_state()
+                        st.experimental_rerun()
+                with col_meta:
+                    st.markdown(
+                        f'<div class="post-actions">{p.likes} curtida(s)</div></div>',
+                        unsafe_allow_html=True,
+                    )
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ======================================================
+# VIEW: TIMELINE / FEED DE PESQUISA (já existia, levemente adaptado)
 # ======================================================
 
 def view_board():
@@ -570,17 +710,16 @@ def view_board():
     top_l, top_c, top_r = st.columns([2.6, 3.5, 2.2])
 
     with top_l:
-        st.markdown("#### Timeline de pesquisa")
-        st.caption("Sua jornada de pesquisa organizada em etapas, como um feed de progresso.")
+        st.markdown("### Timeline de pesquisa")
+        st.caption("Sua jornada de pesquisa organizada em etapas.")
         st.markdown(
             '<span class="pqr-badge">PQR – PESQUISA QUALITATIVA DE RESULTADOS</span>',
             unsafe_allow_html=True,
         )
 
     with top_c:
-        st.write("")
         query = st.text_input(
-            "Busca global na sua pasta (protótipo de IA interna)",
+            "Busca global na sua pasta",
             key="global_search",
             placeholder="Procure termos em resumo, anotações e etapas…",
         )
@@ -598,7 +737,7 @@ def view_board():
             elif found:
                 st.success(
                     f'A pasta contém referências a **"{query}"**. '
-                    "Agora revise as seções para ver em que contexto isso aparece."
+                    "Confira resumo, notas e timeline."
                 )
             else:
                 st.info(
@@ -606,7 +745,6 @@ def view_board():
                 )
 
     with top_r:
-        st.write("")
         with st.expander("Nova etapa / atualização"):
             title = st.text_input("Título da etapa", key="new_card_title")
             desc = st.text_area("Descrição", key="new_card_desc")
@@ -698,9 +836,7 @@ def view_board():
     st.subheader("Progresso global da pesquisa")
     comp = timeline_completion()
     st.progress(comp / 100)
-    st.caption(
-        f"{comp}% concluído (estimativa via etapas em “Redação / Resultados”)."
-    )
+    st.caption(f"{comp}% concluído (estimativa via etapas em “Redação / Resultados”).")
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
@@ -709,15 +845,7 @@ def view_board():
 
 def view_research():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("#### Pasta principal da sua pesquisa")
-    tabs_html = """
-    <div class="pqr-tabs">
-        <div class="pqr-tab pqr-tab-active">Resumo & notas</div>
-        <div class="pqr-tab">Artigos & buscas</div>
-    </div>
-    """
-    st.markdown(tabs_html, unsafe_allow_html=True)
-
+    st.markdown("### Pasta principal da sua pesquisa")
     col1, col2 = st.columns(2)
 
     with col1:
@@ -729,9 +857,9 @@ def view_research():
         )
 
     with col2:
-        st.subheader("Anotações rápidas (tipo mural privado)")
+        st.subheader("Anotações rápidas")
         st.session_state.research_notes = st.text_area(
-            "Citações, ideias soltas, lembretes para você mesmo(a)…",
+            "Citações, ideias soltas, lembretes…",
             value=st.session_state.research_notes,
             height=240,
         )
@@ -746,9 +874,7 @@ def view_research():
         with c1:
             if st.button("Artigos gerais"):
                 if keywords.strip():
-                    url = "https://scholar.google.com/scholar?q=" + keywords.replace(
-                        " ", "+"
-                    )
+                    url = "https://scholar.google.com/scholar?q=" + keywords.replace(" ", "+")
                     st.markdown(f"[Abrir Google Acadêmico]({url})")
         with c2:
             if st.button("Últimos 5 anos"):
@@ -764,16 +890,14 @@ def view_research():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: MAPA MENTAL
+# VIEW: MAPA MENTAL MAIS PODEROSO
 # ======================================================
 
 def view_mindmap():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("#### Mapa mental da sua pesquisa")
-    st.markdown("Visualização hierárquica (protótipo textual em liquid glass):")
+    st.markdown("### Mapa mental da sua pesquisa (tópicos, notas e tags)")
     mind_print_tree(st.session_state.mind_root)
     st.write("---")
-    st.markdown("##### Editar nós do mapa")
 
     nodes_list = mind_list_nodes(st.session_state.mind_root)
     ids = [n.id for n in nodes_list]
@@ -788,28 +912,44 @@ def view_mindmap():
         format_func=lambda x: label_map.get(x, x),
     )
     st.session_state.mind_selected_id = selected
+    node = mind_find_node(st.session_state.mind_root, selected)
 
-    new_label = st.text_input("Novo tópico / sub‑tópico", key="mind_new_label")
-    col_a, col_b = st.columns(2)
+    colA, colB = st.columns(2)
+    with colA:
+        st.markdown("#### Editar nó selecionado")
+        if node:
+            new_label = st.text_input("Título do tópico", value=node.label)
+            new_note = st.text_area("Nota / descrição do tópico", value=node.note)
+            tags_str = st.text_input(
+                "Tags (separadas por vírgula)",
+                value=", ".join(node.tags),
+            )
+            if st.button("Salvar alterações no nó"):
+                node.label = new_label.strip() or node.label
+                node.note = new_note.strip()
+                node.tags = [t.strip() for t in tags_str.split(",") if t.strip()]
+                save_persistent_state()
+                st.success("Nó atualizado.")
 
-    with col_a:
+    with colB:
+        st.markdown("#### Criar / remover nós")
+        new_child_label = st.text_input("Adicionar sub‑tópico", key="mind_new_label")
         if st.button("Adicionar sub‑tópico ao nó selecionado"):
-            if new_label.strip():
-                parent = mind_find_node(st.session_state.mind_root, selected)
+            if new_child_label.strip():
+                parent = node
                 if parent:
                     parent.children.append(
                         MindNode(
                             id=str(uuid.uuid4()),
-                            label=new_label.strip(),
+                            label=new_child_label.strip(),
+                            note="",
+                            tags=[],
                             children=[],
                         )
                     )
                     save_persistent_state()
-                    st.success("Tópico adicionado ao mapa.")
-                else:
-                    st.error("Nó pai não encontrado.")
-
-    with col_b:
+                    st.success("Sub‑tópico adicionado.")
+        st.write("")
         if st.button("Remover nó selecionado"):
             if selected == "root":
                 st.warning("Não é possível remover o nó raiz.")
@@ -818,19 +958,92 @@ def view_mindmap():
                 if removed:
                     st.session_state.mind_selected_id = "root"
                     save_persistent_state()
-                    st.info("Nó removido do mapa mental.")
+                    st.info("Nó removido.")
                 else:
                     st.error("Não foi possível remover o nó.")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: ANÁLISE INTELIGENTE (MOCK)
+# VIEW: SLIDES / CANVAS SIMPLES
+# ======================================================
+
+def view_slides():
+    st.markdown('<div class="glass-main">', unsafe_allow_html=True)
+    st.markdown("### Canvas / Slides da pesquisa")
+    st.caption("Crie slides simples para apresentar sua pesquisa (protótipo).")
+
+    colA, colB = st.columns([1.5, 2])
+
+    with colA:
+        st.subheader("Criar / editar slide")
+        slide_titles = [s.title for s in st.session_state.slides]
+        slide_options = ["(Novo slide)"] + slide_titles
+        choice = st.selectbox("Selecionar slide", slide_options)
+
+        if choice == "(Novo slide)":
+            s_title = st.text_input("Título do novo slide")
+            s_content = st.text_area("Conteúdo (bullets, texto livre)")
+            if st.button("Salvar slide novo"):
+                if not s_title.strip():
+                    st.warning("Dê um título para o slide.")
+                else:
+                    st.session_state.slides.append(
+                        Slide(
+                            id=str(uuid.uuid4()),
+                            title=s_title.strip(),
+                            content=s_content.strip(),
+                            created_at=datetime.datetime.now().isoformat(),
+                        )
+                    )
+                    save_persistent_state()
+                    st.success("Slide criado.")
+        else:
+            slide = next(s for s in st.session_state.slides if s.title == choice)
+            s_title = st.text_input("Título do slide", value=slide.title)
+            s_content = st.text_area("Conteúdo do slide", value=slide.content, height=200)
+            col_ed1, col_ed2 = st.columns(2)
+            with col_ed1:
+                if st.button("Atualizar slide"):
+                    slide.title = s_title.strip() or slide.title
+                    slide.content = s_content.strip()
+                    save_persistent_state()
+                    st.success("Slide atualizado.")
+            with col_ed2:
+                if st.button("Excluir slide"):
+                    st.session_state.slides = [s for s in st.session_state.slides if s.id != slide.id]
+                    save_persistent_state()
+                    st.info("Slide excluído.")
+                    st.experimental_rerun()
+
+    with colB:
+        st.subheader("Visualização rápida")
+        if not st.session_state.slides:
+            st.info("Nenhum slide criado ainda.")
+        else:
+            for s in st.session_state.slides:
+                try:
+                    dt = datetime.datetime.fromisoformat(s.created_at)
+                    ts = dt.strftime("%d/%m %H:%M")
+                except Exception:
+                    ts = s.created_at
+                st.markdown(
+                    f"**{s.title}**  \n"
+                    f"<span style='font-size:0.75rem;color:#64748b;'>Criado em {ts}</span>",
+                    unsafe_allow_html=True,
+                )
+                st.markdown(f"> {s.content}")
+                st.write("---")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+# ======================================================
+# VIEW: ANÁLISE INTELIGENTE (igual, com layout novo)
 # ======================================================
 
 def view_analysis():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("#### Análise inteligente (protótipo local)")
+    st.markdown("### Análise inteligente (protótipo local)")
 
     if st.button("Rodar análise qualitativa agora"):
         summary = st.session_state.research_summary or ""
@@ -842,58 +1055,41 @@ def view_analysis():
         st.subheader("Síntese do que você já escreveu")
         if len(summary.strip()) < 60:
             st.write(
-                "- O resumo ainda está enxuto. Tente explicitar: (1) contexto, (2) problema, "
-                "(3) objetivos, (4) perguntas de pesquisa."
+                "- Resumo ainda enxuto. Tente explicitar: contexto, problema, objetivos, perguntas."
             )
         else:
             st.write(
-                "- O resumo já tem um corpo interessante. Revise se está claro o recorte qualitativo "
-                "(quem, onde, como, por quê)."
+                "- Resumo com bom corpo. Veja se está explícita a abordagem qualitativa (quem, onde, como, por quê)."
             )
 
         st.subheader("Andamento do projeto")
         st.write(f"- Etapas concluídas (redação/resultados): {done_cards}/{total_cards}.")
         if completion < 30:
             st.write(
-                "- Fase inicial: foque em consolidar problema, referencial e possíveis caminhos "
-                "metodológicos."
+                "- Fase inicial: foque em problema, referencial e caminhos metodológicos."
             )
         elif completion < 70:
             st.write(
-                "- Fase intermediária: revise se a forma de coleta (entrevista, grupo focal, "
-                "observação etc.) está coerente com o que você quer responder."
+                "- Fase intermediária: revise coerência entre coleta (entrevista, grupo focal, etc.) e perguntas."
             )
         else:
             st.write(
-                "- Fase avançada: agora é hora de conectar dados, categorias e discussões com a literatura."
+                "- Fase avançada: conecte dados, categorias e discussões com a literatura."
             )
 
-        st.subheader("Pistas qualitativas encontradas")
+        st.subheader("Pistas qualitativas")
         concat = (summary + " " + notes).lower()
         if "entrevista" in concat:
-            st.write(
-                "- Há entrevistas: explore estratégias como análise temática, análise de conteúdo "
-                "ou análise narrativa."
-            )
+            st.write("- Entrevistas: explore análise temática / de conteúdo / narrativa.")
         if "grupo focal" in concat or "focal" in concat:
-            st.write(
-                "- Menciona grupo focal: pense em como a interação entre participantes impacta os "
-                "sentidos produzidos."
-            )
+            st.write("- Grupo focal: considere o papel da interação na produção de sentidos.")
         if "questionário" in concat or "questionario" in concat:
-            st.write(
-                "- Questionários aparecem no texto: se houver questões abertas, trate-as como "
-                "narrativas/dizeres a serem categorizados."
-            )
+            st.write("- Questionários com questões abertas: trate respostas como narrativas a categorizar.")
         if len(notes) > 200:
-            st.write(
-                "- Muitas anotações: excelente. Talvez seja momento de criar um quadro de códigos/"
-                "categorias preliminares."
-            )
+            st.write("- Muitas anotações: hora de estruturar códigos/categorias preliminares.")
         if not summary.strip() and not notes.strip():
             st.info(
-                "Ainda não há conteúdo suficiente para análise. Escreva pelo menos um parágrafo de "
-                "resumo e algumas notas."
+                "Ainda não há conteúdo suficiente para análise. Escreva pelo menos um parágrafo de resumo e algumas notas."
             )
 
         st.write("---")
@@ -902,8 +1098,7 @@ def view_analysis():
         st.caption(f"{completion}% concluído (estimativa via timeline).")
     else:
         st.info(
-            "Clique em **Rodar análise qualitativa agora** para gerar um diagnóstico textual com "
-            "base no que você já registrou."
+            "Clique em **Rodar análise qualitativa agora** para gerar um diagnóstico textual com base no que você já registrou."
         )
 
     st.markdown("</div>", unsafe_allow_html=True)
@@ -914,8 +1109,7 @@ def view_analysis():
 
 def view_chat():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("#### Chat entre bolsistas (estilo feed)")
-
+    st.markdown("### Chat entre bolsistas (canais temáticos)")
     topics = {
         "metodologia": "Metodologia qualitativa",
         "referencias": "Referências e artigos",
@@ -926,7 +1120,7 @@ def view_chat():
     col_topics, col_chat = st.columns([1.1, 2.3])
 
     with col_topics:
-        st.markdown("**Canais temáticos**")
+        st.markdown("**Canais**")
         for key, label in topics.items():
             if st.button(label, key=f"topic_{key}"):
                 st.session_state.chat_topic = key
@@ -943,7 +1137,7 @@ def view_chat():
             topic = st.session_state.chat_topic
             msgs = [m for m in st.session_state.chat_messages if m.topic == topic]
             if not msgs:
-                st.caption("Ainda não há mensagens neste canal. Que tal iniciar a conversa?")
+                st.caption("Ainda não há mensagens neste canal. Comece a conversa.")
             for m in msgs:
                 try:
                     dt = datetime.datetime.fromisoformat(m.time)
@@ -978,24 +1172,21 @@ def view_chat():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: CADEIA DE LIGAÇÃO
+# VIEW: REDE DE INTERESSES
 # ======================================================
 
 def view_network():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("#### Cadeia de ligação de pesquisas (rede conceitual)")
-
+    st.markdown("### Cadeia de ligação de pesquisas (rede conceitual)")
     interest = st.text_input(
         "Interesse principal (tema eixo da rede)",
         key="net_interest",
         placeholder="ex.: inclusão digital, saúde mental, aprendizagem ativa",
     )
-
     if st.button("Gerar rede textual"):
         base_interest = interest.strip() or "Tema central"
         text = st.session_state.research_summary + " " + st.session_state.research_notes
         keywords = extract_keywords(text, max_n=8)
-
         st.subheader("Nós principais da rede")
         st.write(f"- **{base_interest}** (nó central)")
         if not keywords:
@@ -1012,7 +1203,6 @@ def view_network():
                     f"- **{base_interest} ↔ {kw}** – analisar como esse conceito aparece nos dados, "
                     "como se relaciona a outras categorias e que tensões/contradições emergem."
                 )
-
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
@@ -1021,16 +1211,21 @@ def view_network():
 
 def view_settings():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("#### Configurações, salvar & sair")
+    st.markdown("### Configurações, perfil & sessão")
     user = get_current_user()
     if user:
+        avatar_html = (
+            f'<img src="{user.avatar_url}">'
+            if user.avatar_url
+            else user.name[:1].upper()
+        )
         st.markdown(
             f"""
             <div class="user-pill">
-                <div class="user-pill-avatar">{user.name[:1].upper()}</div>
+                <div class="user-pill-avatar">{avatar_html}</div>
                 <div>
                     <strong>{user.name}</strong><br/>
-                    <span style="font-size:0.78rem;color:#a6aec9;">
+                    <span style="font-size:0.78rem;color:#64748b;">
                         {user.email} – {map_type_label(user.type)}
                     </span>
                 </div>
@@ -1038,15 +1233,20 @@ def view_settings():
             """,
             unsafe_allow_html=True,
         )
+        st.write("")
+        with st.expander("Atualizar foto de perfil"):
+            new_url = st.text_input("URL da nova foto de avatar", value=user.avatar_url or "")
+            if st.button("Salvar avatar"):
+                user.avatar_url = new_url.strip() or None
+                save_persistent_state()
+                st.success("Avatar atualizado.")
 
     st.write("---")
     st.subheader("Sessão")
     col_a, col_b = st.columns(2)
-
     with col_a:
         if st.button("Salvar tudo agora e continuar", key="btn_save_only"):
             save_persistent_state()
-
     with col_b:
         if st.button("Salvar e sair", key="btn_save_logout"):
             save_persistent_state()
@@ -1056,7 +1256,7 @@ def view_settings():
 
     st.write("---")
     st.caption(
-        "O PQR salva os dados em um arquivo `pqr_state.json` (quando o ambiente permite gravação em disco)."
+        "Os dados são salvos em `pqr_state.json` (se o ambiente permitir gravação em disco)."
     )
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -1070,6 +1270,7 @@ def main():
         auth_screen()
         return
 
+    # sidebar com cara de linkedin
     with st.sidebar:
         st.markdown(
             """
@@ -1084,13 +1285,18 @@ def main():
             unsafe_allow_html=True,
         )
         st.write("")
+        avatar_html = (
+            f'<img src="{user.avatar_url}">'
+            if user.avatar_url
+            else user.name[:1].upper()
+        )
         st.markdown(
             f"""
             <div class="user-pill">
-                <div class="user-pill-avatar">{user.name[:1].upper()}</div>
+                <div class="user-pill-avatar">{avatar_html}</div>
                 <div style="font-size:0.78rem;">
                     {user.name.split(" ")[0]}<br/>
-                    <span style="color:#a6aec9;">{map_type_label(user.type)}</span>
+                    <span style="color:#64748b;">{map_type_label(user.type)}</span>
                 </div>
             </div>
             """,
@@ -1100,9 +1306,11 @@ def main():
         view = st.radio(
             "Navegação",
             [
-                "Timeline / Feed",
+                "Feed social",
+                "Timeline / Etapas",
                 "Pasta da pesquisa",
                 "Mapa mental",
+                "Canvas / Slides",
                 "Análise inteligente",
                 "Chat",
                 "Cadeia de ligação",
@@ -1110,12 +1318,16 @@ def main():
             ],
         )
 
-    if view == "Timeline / Feed":
+    if view == "Feed social":
+        view_social_feed()
+    elif view == "Timeline / Etapas":
         view_board()
     elif view == "Pasta da pesquisa":
         view_research()
     elif view == "Mapa mental":
         view_mindmap()
+    elif view == "Canvas / Slides":
+        view_slides()
     elif view == "Análise inteligente":
         view_analysis()
     elif view == "Chat":
