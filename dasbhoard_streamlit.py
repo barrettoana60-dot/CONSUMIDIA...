@@ -100,7 +100,6 @@ MODERN_CSS = """
     color: var(--pqr-text-soft);
 }
 
-/* user pill / perfil */
 .user-pill {
     display: flex;
     align-items: center;
@@ -130,7 +129,6 @@ MODERN_CSS = """
     border-radius: 999px;
 }
 
-/* posts estilo feed */
 .post-card {
     background: #ffffff;
     border-radius: 12px;
@@ -160,7 +158,6 @@ MODERN_CSS = """
     color: var(--pqr-text-soft);
 }
 
-/* chat bubble */
 .chat-bubble {
     padding: 7px 9px;
     border-radius: 10px;
@@ -175,7 +172,6 @@ MODERN_CSS = """
     margin-bottom: 2px;
 }
 
-/* timeline */
 .timeline-card {
     border-radius: 12px;
     padding: 8px 10px;
@@ -202,7 +198,6 @@ MODERN_CSS = """
     margin-top: 4px;
 }
 
-/* mapa mental */
 .mind-node {
     font-size: 0.84rem;
     margin: 2px 0;
@@ -218,7 +213,6 @@ MODERN_CSS = """
     border: 1px solid rgba(37,99,235,0.7);
 }
 
-/* badge */
 .pqr-badge {
     display:inline-block;
     padding:3px 10px;
@@ -231,12 +225,10 @@ MODERN_CSS = """
     color:var(--pqr-primary);
 }
 
-/* inputs */
 textarea, input, select {
     border-radius: 8px !important;
 }
 
-/* botões padrão */
 .stButton > button {
     border-radius: 999px;
     border: 1px solid rgba(15,23,42,0.12);
@@ -245,7 +237,6 @@ textarea, input, select {
     font-size: 0.84rem;
 }
 
-/* radio da sidebar */
 [data-baseweb="radio"] > div {
     gap: 4px;
 }
@@ -346,12 +337,13 @@ def load_persistent_state():
         return default_state_dict()
 
 def mindnode_to_dict(n: MindNode) -> Dict[str, Any]:
+    # usa getattr para aguentar nós antigos sem note/tags
     return {
-        "id": n.id,
-        "label": n.label,
-        "note": n.note,
-        "tags": n.tags,
-        "children": [mindnode_to_dict(c) for c in n.children],
+        "id": getattr(n, "id", "no-id"),
+        "label": getattr(n, "label", ""),
+        "note": getattr(n, "note", ""),
+        "tags": getattr(n, "tags", []),
+        "children": [mindnode_to_dict(c) for c in getattr(n, "children", [])],
     }
 
 def dict_to_mindnode(d: Dict[str, Any]) -> MindNode:
@@ -392,7 +384,7 @@ def init_state():
         return
     persisted = load_persistent_state()
 
-    # users com avatar_url sempre
+    # users com avatar_url garantido
     users_norm = []
     for u in persisted["users"]:
         u2 = dict(u)
@@ -405,12 +397,29 @@ def init_state():
     st.session_state.cards = [Card(**c) for c in persisted["cards"]]
     st.session_state.research_summary = persisted["research_summary"]
     st.session_state.research_notes = persisted["research_notes"]
-    st.session_state.mind_root = dict_to_mindnode(persisted["mind_root"])
+
+    # normalizar mind_root: garantir note/tags/children
+    raw_root = persisted.get("mind_root", {})
+    def normalize_mind_dict(d: Dict[str, Any]) -> Dict[str, Any]:
+        d2 = dict(d)
+        if "note" not in d2:
+            d2["note"] = ""
+        if "tags" not in d2:
+            d2["tags"] = []
+        if "children" not in d2 or d2["children"] is None:
+            d2["children"] = []
+        else:
+            d2["children"] = [normalize_mind_dict(c) for c in d2["children"]]
+        return d2
+
+    raw_root_norm = normalize_mind_dict(raw_root)
+    st.session_state.mind_root = dict_to_mindnode(raw_root_norm)
+
     st.session_state.mind_selected_id = persisted["mind_selected_id"]
     st.session_state.chat_messages = [ChatMessage(**m) for m in persisted["chat_messages"]]
     st.session_state.chat_topic = persisted["chat_topic"]
 
-    # garantir posts e slides mesmo se não existirem
+    # posts
     raw_posts = persisted.get("posts", [])
     posts_norm = []
     for p in raw_posts:
@@ -422,6 +431,7 @@ def init_state():
         posts_norm.append(Post(**p2))
     st.session_state.posts = posts_norm
 
+    # slides
     raw_slides = persisted.get("slides", [])
     slides_norm = [Slide(**s) for s in raw_slides]
     st.session_state.slides = slides_norm
@@ -625,7 +635,6 @@ def auth_screen():
 def view_social_feed():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
 
-    # blindagem extra: garantir posts no session_state
     if "posts" not in st.session_state or st.session_state.posts is None:
         st.session_state.posts = []
 
