@@ -1,6 +1,3 @@
-m Streamlit
-GPT-5.1
-
 
 import streamlit as st
 import datetime
