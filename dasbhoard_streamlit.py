@@ -15,30 +15,36 @@ import uuid
 st.set_page_config(
     page_title="PQR – Rede de Pesquisa Qualitativa",
     layout="wide",
-    initial_sidebar_state="expanded",
+    initial_sidebar_state="collapsed",  # esconde sidebar
 )
 
 STATE_FILE = "pqr_state.json"
 
 # ======================================================
-# CSS – TEMA MAIS CLARO, ESTILO INSTAGRAM / LINKEDIN MODERNO
+# CSS – FUNDO BEGE, TEXTO ESCURO, GLASS, SEM SIDEBAR
 # ======================================================
 
 MODERN_CSS = """
 <style>
 :root {
     --pqr-primary: #2563eb;
-    --pqr-primary-soft: rgba(37, 99, 235, 0.08);
+    --pqr-primary-soft: rgba(37, 99, 235, 0.12);
     --pqr-accent: #10b981;
-    --pqr-bg: #f3f4f6;
-    --pqr-bg-card: #ffffff;
-    --pqr-border-soft: rgba(15, 23, 42, 0.08);
-    --pqr-text-main: #0f172a;
-    --pqr-text-soft: #64748b;
+    --pqr-bg: #f4ecdf;           /* bege suave */
+    --pqr-bg-card: rgba(255,255,255,0.85);
+    --pqr-border-soft: rgba(17,24,39,0.12);
+    --pqr-text-main: #111827;    /* quase preto */
+    --pqr-text-soft: #4b5563;
 }
 
+/* esconder visualmente a sidebar (mas ela ainda existe para Streamlit) */
+[data-testid="stSidebar"] {
+    display: none;
+}
+
+/* fundo geral */
 .stApp {
-    background: var(--pqr-bg);
+    background: radial-gradient(circle at top left, #fdf5e7, #f4ecdf 55%, #eadfcf);
     color: var(--pqr-text-main);
     font-family: system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
 }
@@ -46,28 +52,29 @@ MODERN_CSS = """
 .block-container {
     padding-top: 0.5rem;
     padding-bottom: 0.8rem;
+    max-width: 1100px;
 }
 
-[data-testid="stSidebar"] {
-    background: #ffffff;
-    border-right: 1px solid rgba(15,23,42,0.08);
+/* header tipo instagram/linkedin no topo */
+.pqr-header {
+    position: sticky;
+    top: 0;
+    z-index: 999;
+    padding: 10px 0 12px;
+    background: linear-gradient(to bottom, rgba(244,236,223,0.96), rgba(244,236,223,0.90));
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(17,24,39,0.06);
 }
 
-.glass-main {
-    background: var(--pqr-bg-card);
-    border-radius: 16px;
-    border: 1px solid var(--pqr-border-soft);
-    box-shadow: 0 10px 30px rgba(15,23,42,0.08);
-    padding: 18px 22px;
+/* linha com logo e perfil */
+.pqr-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 12px;
 }
 
-.glass-section {
-    background: #f9fafb;
-    border-radius: 14px;
-    border: 1px solid rgba(15,23,42,0.04);
-    padding: 12px 14px;
-}
-
+/* logo */
 .pqr-logo-line {
     display: flex;
     align-items: center;
@@ -76,8 +83,8 @@ MODERN_CSS = """
 .pqr-logo-avatar {
     width: 36px;
     height: 36px;
-    border-radius: 999px;
-    background: linear-gradient(135deg, #2563eb, #38bdf8);
+    border-radius: 12px;
+    background: linear-gradient(135deg, #2563eb, #f97316);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -90,25 +97,25 @@ MODERN_CSS = """
     flex-direction: column;
 }
 .pqr-title-main {
-    font-size: 1.4rem;
+    font-size: 1.3rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0.06em;
     text-transform: uppercase;
 }
 .pqr-title-sub {
-    font-size: 0.82rem;
+    font-size: 0.8rem;
     color: var(--pqr-text-soft);
 }
 
-.user-pill {
+/* user pill / perfil no header */
+.user-pill-header {
     display: flex;
     align-items: center;
     gap: 10px;
-    padding: 8px 10px;
-    border-radius: 12px;
-    background: #f9fafb;
-    border: 1px solid var(--pqr-border-soft);
-    font-size: 0.82rem;
+    padding: 4px 8px;
+    border-radius: 999px;
+    background: rgba(255,255,255,0.7);
+    border: 1px solid rgba(17,24,39,0.08);
 }
 .user-pill-avatar {
     width: 32px;
@@ -129,12 +136,55 @@ MODERN_CSS = """
     border-radius: 999px;
 }
 
-.post-card {
-    background: #ffffff;
-    border-radius: 12px;
+/* navegação tipo tabs horizontais */
+.pqr-nav {
+    margin-top: 8px;
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+.pqr-nav-item {
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(17,24,39,0.10);
+    font-size: 0.78rem;
+    color: var(--pqr-text-soft);
+    background: rgba(255,255,255,0.7);
+    cursor: pointer;
+    user-select: none;
+}
+.pqr-nav-item-active {
+    background: linear-gradient(135deg, #2563eb, #f97316);
+    color: #f9fafb;
+    border-color: rgba(17,24,39,0.1);
+}
+
+/* cartões glass principais */
+.glass-main {
+    margin-top: 14px;
+    background: var(--pqr-bg-card);
+    border-radius: 16px;
     border: 1px solid var(--pqr-border-soft);
+    box-shadow: 0 18px 40px rgba(15,23,42,0.12);
+    padding: 18px 22px;
+    backdrop-filter: blur(14px);
+}
+
+/* seções internas mais discretas */
+.glass-section {
+    background: rgba(255,255,255,0.7);
+    border-radius: 14px;
+    border: 1px solid rgba(17,24,39,0.06);
+    padding: 12px 14px;
+}
+
+/* posts estilo feed */
+.post-card {
+    background: rgba(255,255,255,0.85);
+    border-radius: 14px;
+    border: 1px solid rgba(17,24,39,0.08);
     padding: 10px 12px;
-    margin-bottom: 8px;
+    margin-bottom: 10px;
 }
 .post-header {
     display: flex;
@@ -158,26 +208,13 @@ MODERN_CSS = """
     color: var(--pqr-text-soft);
 }
 
-.chat-bubble {
-    padding: 7px 9px;
-    border-radius: 10px;
-    margin-bottom: 6px;
-    font-size: 0.84rem;
-    background: #f3f4f6;
-    border: 1px solid rgba(15,23,42,0.06);
-}
-.chat-meta {
-    font-size: 0.70rem;
-    color: var(--pqr-text-soft);
-    margin-bottom: 2px;
-}
-
+/* cards timeline */
 .timeline-card {
     border-radius: 12px;
     padding: 8px 10px;
     margin-bottom: 6px;
-    background: #ffffff;
-    border: 1px solid var(--pqr-border-soft);
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(17,24,39,0.08);
     font-size: 0.8rem;
 }
 .timeline-card-header {
@@ -198,6 +235,22 @@ MODERN_CSS = """
     margin-top: 4px;
 }
 
+/* chat bubble */
+.chat-bubble {
+    padding: 7px 9px;
+    border-radius: 10px;
+    margin-bottom: 6px;
+    font-size: 0.84rem;
+    background: rgba(255,255,255,0.9);
+    border: 1px solid rgba(17,24,39,0.08);
+}
+.chat-meta {
+    font-size: 0.70rem;
+    color: var(--pqr-text-soft);
+    margin-bottom: 2px;
+}
+
+/* mapa mental */
 .mind-node {
     font-size: 0.84rem;
     margin: 2px 0;
@@ -205,14 +258,15 @@ MODERN_CSS = """
 .mind-node-label {
     padding: 2px 8px;
     border-radius: 999px;
-    background: #e5e7eb;
+    background: rgba(17,24,39,0.06);
 }
 .mind-node-selected {
     background: var(--pqr-primary-soft);
     color: var(--pqr-primary);
-    border: 1px solid rgba(37,99,235,0.7);
+    border: 1px solid rgba(37,99,235,0.6);
 }
 
+/* badge */
 .pqr-badge {
     display:inline-block;
     padding:3px 10px;
@@ -225,18 +279,28 @@ MODERN_CSS = """
     color:var(--pqr-primary);
 }
 
+/* inputs */
 textarea, input, select {
-    border-radius: 8px !important;
+    border-radius: 9px !important;
 }
 
+/* botões glass */
 .stButton > button {
     border-radius: 999px;
-    border: 1px solid rgba(15,23,42,0.12);
-    background: linear-gradient(135deg, #2563eb, #38bdf8);
-    color: #f9fafb;
+    border: 1px solid rgba(17,24,39,0.14);
+    background: radial-gradient(circle at top left, rgba(255,255,255,0.85), rgba(255,255,255,0.72));
+    color: var(--pqr-text-main);
     font-size: 0.84rem;
+    padding: 0.35rem 0.9rem;
+    transition: all 0.15s ease-out;
+}
+.stButton > button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 8px 18px rgba(15,23,42,0.22);
+    border-color: rgba(37,99,235,0.6);
 }
 
+/* radio nativo do Streamlit (não usamos mais para nav, mas deixo bonito) */
 [data-baseweb="radio"] > div {
     gap: 4px;
 }
@@ -337,7 +401,6 @@ def load_persistent_state():
         return default_state_dict()
 
 def mindnode_to_dict(n: MindNode) -> Dict[str, Any]:
-    # usa getattr para aguentar nós antigos sem note/tags
     return {
         "id": getattr(n, "id", "no-id"),
         "label": getattr(n, "label", ""),
@@ -384,7 +447,7 @@ def init_state():
         return
     persisted = load_persistent_state()
 
-    # users com avatar_url garantido
+    # users
     users_norm = []
     for u in persisted["users"]:
         u2 = dict(u)
@@ -398,7 +461,7 @@ def init_state():
     st.session_state.research_summary = persisted["research_summary"]
     st.session_state.research_notes = persisted["research_notes"]
 
-    # normalizar mind_root: garantir note/tags/children
+    # mind_root normalizado
     raw_root = persisted.get("mind_root", {})
     def normalize_mind_dict(d: Dict[str, Any]) -> Dict[str, Any]:
         d2 = dict(d)
@@ -435,6 +498,9 @@ def init_state():
     raw_slides = persisted.get("slides", [])
     slides_norm = [Slide(**s) for s in raw_slides]
     st.session_state.slides = slides_norm
+
+    # view atual (navegação topo)
+    st.session_state.current_view = st.session_state.get("current_view", "Feed social")
 
     st.session_state.initialized = True
 
@@ -538,7 +604,7 @@ def timeline_completion() -> int:
     return round(done / total * 100)
 
 # ======================================================
-# AUTENTICAÇÃO
+# AUTENTICAÇÃO (TELA INICIAL)
 # ======================================================
 
 def auth_screen():
@@ -548,7 +614,7 @@ def auth_screen():
         st.markdown(
             """
             <div class="pqr-logo-line">
-                <div class="pqr-logo-avatar">PQR</div>
+                <div class="pqr-logo-avatar">P</div>
                 <div class="pqr-title-text">
                     <div class="pqr-title-main">PQR</div>
                     <div class="pqr-title-sub">Rede de pesquisa qualitativa com cara de social</div>
@@ -638,7 +704,9 @@ def view_social_feed():
     if "posts" not in st.session_state or st.session_state.posts is None:
         st.session_state.posts = []
 
-    st.markdown("### Feed da rede (posts, curtidas)")
+    st.markdown("### Feed da rede")
+    st.caption("Compartilhamentos rápidos de avanços, dúvidas e insights.")
+
     user = get_current_user()
     if not user:
         st.warning("Entre na sua conta para ver e publicar no feed.")
@@ -646,7 +714,7 @@ def view_social_feed():
         return
 
     with st.expander("Criar novo post", expanded=True):
-        text = st.text_area("Compartilhe um avanço, dúvida ou insight…", key="new_post_text")
+        text = st.text_area("Escreva algo…", key="new_post_text")
         if st.button("Publicar no feed", key="btn_new_post"):
             if not text.strip():
                 st.warning("Escreva algo antes de publicar.")
@@ -734,19 +802,17 @@ def view_social_feed():
 
 def view_board():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    top_l, top_c, top_r = st.columns([2.6, 3.5, 2.2])
+    st.markdown("### Timeline da pesquisa")
+    top_l, top_r = st.columns([3, 2.2])
 
     with top_l:
-        st.markdown("### Timeline de pesquisa")
         st.caption("Sua jornada de pesquisa organizada em etapas.")
         st.markdown(
             '<span class="pqr-badge">PQR – PESQUISA QUALITATIVA DE RESULTADOS</span>',
             unsafe_allow_html=True,
         )
-
-    with top_c:
         query = st.text_input(
-            "Busca global na sua pasta",
+            "Busca global na pasta",
             key="global_search",
             placeholder="Procure termos em resumo, anotações e etapas…",
         )
@@ -847,17 +913,6 @@ def view_board():
                         """,
                         unsafe_allow_html=True,
                     )
-                    novo_status = st.selectbox(
-                        "Mover para",
-                        statuses,
-                        index=[s[0] for s in statuses].index(status_key),
-                        format_func=lambda x: x[1],
-                        key=f"move_{c.id}",
-                    )
-                    if novo_status[0] != c.status:
-                        c.status = novo_status[0]
-                        save_persistent_state()
-                        st.info("Etapa movida na timeline.")
 
     st.write("---")
     st.subheader("Progresso global da pesquisa")
@@ -872,11 +927,11 @@ def view_board():
 
 def view_research():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("### Pasta principal da sua pesquisa")
+    st.markdown("### Pasta principal da pesquisa")
     col1, col2 = st.columns(2)
 
     with col1:
-        st.subheader("Resumo da pesquisa")
+        st.subheader("Resumo")
         st.session_state.research_summary = st.text_area(
             "Tema, objetivos, perguntas, contexto…",
             value=st.session_state.research_summary,
@@ -890,29 +945,6 @@ def view_research():
             value=st.session_state.research_notes,
             height=240,
         )
-        st.write("")
-        st.subheader("Atalhos para Google Acadêmico")
-        keywords = st.text_input(
-            "Palavras‑chave principais",
-            key="ga_kw",
-            placeholder="ex.: inclusão digital, aprendizagem ativa",
-        )
-        c1, c2 = st.columns(2)
-        with c1:
-            if st.button("Artigos gerais"):
-                if keywords.strip():
-                    url = "https://scholar.google.com/scholar?q=" + keywords.replace(" ", "+")
-                    st.markdown(f"[Abrir Google Acadêmico]({url})")
-        with c2:
-            if st.button("Últimos 5 anos"):
-                if keywords.strip():
-                    year = datetime.date.today().year - 5
-                    url = (
-                        "https://scholar.google.com/scholar?q="
-                        + keywords.replace(" ", "+")
-                        + f"&as_ylo={year}"
-                    )
-                    st.markdown(f"[Abrir (últimos 5 anos)]({url})")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
@@ -922,7 +954,7 @@ def view_research():
 
 def view_mindmap():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("### Mapa mental da sua pesquisa (tópicos, notas e tags)")
+    st.markdown("### Mapa mental (tópicos, notas e tags)")
     mind_print_tree(st.session_state.mind_root)
     st.write("---")
 
@@ -943,7 +975,7 @@ def view_mindmap():
 
     colA, colB = st.columns(2)
     with colA:
-        st.markdown("#### Editar nó selecionado")
+        st.markdown("#### Editar nó")
         if node:
             new_label = st.text_input("Título do tópico", value=node.label)
             new_note = st.text_area("Nota / descrição do tópico", value=node.note)
@@ -961,7 +993,7 @@ def view_mindmap():
     with colB:
         st.markdown("#### Criar / remover nós")
         new_child_label = st.text_input("Adicionar sub‑tópico", key="mind_new_label")
-        if st.button("Adicionar sub‑tópico ao nó selecionado"):
+        if st.button("Adicionar sub‑tópico"):
             if new_child_label.strip() and node:
                 node.children.append(
                     MindNode(
@@ -996,7 +1028,6 @@ def view_mindmap():
 def view_slides():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
     st.markdown("### Canvas / Slides da pesquisa")
-    st.caption("Crie slides simples para apresentar sua pesquisa (protótipo).")
 
     colA, colB = st.columns([1.5, 2])
 
@@ -1095,7 +1126,7 @@ def view_analysis():
             )
         elif completion < 70:
             st.write(
-                "- Fase intermediária: revise coerência entre coleta (entrevista, grupo focal, etc.) e perguntas."
+                "- Fase intermediária: revise coerência entre coleta (entrevista, grupo focal etc.) e perguntas."
             )
         else:
             st.write(
@@ -1202,7 +1233,7 @@ def view_chat():
 
 def view_network():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("### Cadeia de ligação de pesquisas (rede conceitual)")
+    st.markdown("### Cadeia de ligação conceitual")
     interest = st.text_input(
         "Interesse principal (tema eixo da rede)",
         key="net_interest",
@@ -1247,7 +1278,7 @@ def view_settings():
         )
         st.markdown(
             f"""
-            <div class="user-pill">
+            <div class="user-pill-header" style="margin-bottom:8px;">
                 <div class="user-pill-avatar">{avatar_html}</div>
                 <div>
                     <strong>{user.name}</strong><br/>
@@ -1259,7 +1290,6 @@ def view_settings():
             """,
             unsafe_allow_html=True,
         )
-        st.write("")
         with st.expander("Atualizar foto de perfil"):
             current_avatar = getattr(user, "avatar_url", None)
             new_url = st.text_input("URL da nova foto de avatar", value=current_avatar or "")
@@ -1288,6 +1318,81 @@ def view_settings():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
+# HEADER E NAVEGAÇÃO (SEM SIDEBAR)
+# ======================================================
+
+VIEWS = [
+    "Feed social",
+    "Timeline / Etapas",
+    "Pasta da pesquisa",
+    "Mapa mental",
+    "Canvas / Slides",
+    "Análise inteligente",
+    "Chat",
+    "Cadeia de ligação",
+    "Configurações",
+]
+
+def render_header(user: User):
+    st.markdown('<div class="pqr-header">', unsafe_allow_html=True)
+    colL, colR = st.columns([3, 2])
+
+    with colL:
+        st.markdown(
+            """
+            <div class="pqr-header-row">
+                <div class="pqr-logo-line">
+                    <div class="pqr-logo-avatar">P</div>
+                    <div class="pqr-title-text">
+                        <div class="pqr-title-main">PQR</div>
+                        <div class="pqr-title-sub">sua rede de pesquisa qualitativa</div>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    with colR:
+        avatar_url = getattr(user, "avatar_url", None)
+        avatar_html = (
+            f'<img src="{avatar_url}">'
+            if avatar_url
+            else user.name[:1].upper()
+        )
+        st.markdown(
+            f"""
+            <div class="pqr-header-row" style="justify-content:flex-end;">
+                <div class="user-pill-header">
+                    <div class="user-pill-avatar">{avatar_html}</div>
+                    <div style="font-size:0.78rem;">
+                        {user.name.split(" ")[0]}<br/>
+                        <span style="color:#64748b;">{map_type_label(user.type)}</span>
+                    </div>
+                </div>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    # nav horizontal
+    st.markdown('<div class="pqr-nav">', unsafe_allow_html=True)
+    nav_cols = st.columns(len(VIEWS))
+    for i, (view_name, col) in enumerate(zip(VIEWS, nav_cols)):
+        with col:
+            active = (st.session_state.current_view == view_name)
+            cls = "pqr-nav-item-active" if active else "pqr-nav-item"
+            if st.button(view_name, key=f"nav_{i}"):
+                st.session_state.current_view = view_name
+                st.experimental_rerun()
+            st.markdown(
+                f'<div class="{cls}" style="display:none;">{view_name}</div>',
+                unsafe_allow_html=True,
+            )
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================================================
 # MAIN
 # ======================================================
 
@@ -1297,53 +1402,9 @@ def main():
         auth_screen()
         return
 
-    with st.sidebar:
-        st.markdown(
-            """
-            <div class="pqr-logo-line">
-                <div class="pqr-logo-avatar">P</div>
-                <div class="pqr-title-text">
-                    <div class="pqr-title-main">PQR</div>
-                    <div class="pqr-title-sub">sua rede de pesquisa qualitativa</div>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.write("")
-        avatar_url = getattr(user, "avatar_url", None)
-        avatar_html = (
-            f'<img src="{avatar_url}">'
-            if avatar_url
-            else user.name[:1].upper()
-        )
-        st.markdown(
-            f"""
-            <div class="user-pill">
-                <div class="user-pill-avatar">{avatar_html}</div>
-                <div style="font-size:0.78rem;">
-                    {user.name.split(" ")[0]}<br/>
-                    <span style="color:#64748b;">{map_type_label(user.type)}</span>
-                </div>
-            </div>
-            """,
-            unsafe_allow_html=True,
-        )
-        st.write("")
-        view = st.radio(
-            "Navegação",
-            [
-                "Feed social",
-                "Timeline / Etapas",
-                "Pasta da pesquisa",
-                "Mapa mental",
-                "Canvas / Slides",
-                "Análise inteligente",
-                "Chat",
-                "Cadeia de ligação",
-                "Configurações",
-            ],
-        )
+    render_header(user)
+
+    view = st.session_state.current_view
 
     if view == "Feed social":
         view_social_feed()
