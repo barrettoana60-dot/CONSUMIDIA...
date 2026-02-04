@@ -26,31 +26,27 @@ AVATAR_DIR = Path("avatars")
 AVATAR_DIR.mkdir(exist_ok=True)
 
 # ======================================================
-# CSS – TEMA AZUL ESCURO MODERNO + LIQUID GLASS
+# CSS – AZUL ESCURO MODERNO + LIQUID GLASS
 # ======================================================
 
 MODERN_CSS = """
 <style>
 :root {
-    --pqr-primary: #3b82f6;      /* azul */
+    --pqr-primary: #3b82f6;
     --pqr-primary-soft: rgba(59, 130, 246, 0.18);
-    --pqr-accent: #22c55e;       /* verde */
-    --pqr-bg: #020617;           /* quase preto azulado */
+    --pqr-accent: #22c55e;
+    --pqr-bg: #020617;
     --pqr-bg-card: rgba(15,23,42,0.92);
     --pqr-border-soft: rgba(148,163,184,0.35);
     --pqr-text-main: #e5e7eb;
     --pqr-text-soft: #9ca3af;
 }
 
-/* esconder sidebar */
-[data-testid="stSidebar"] {
-    display: none;
-}
+[data-testid="stSidebar"] { display: none; }
 
-/* fundo geral */
 .stApp {
     background:
-      radial-gradient(circle at top left, #0b1120, #020617 50%, #020617),
+      radial-gradient(circle at top left, #0b1120, #020617 55%, #020617),
       #020617;
     color: var(--pqr-text-main);
     font-family: system-ui,-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",sans-serif;
@@ -73,7 +69,6 @@ MODERN_CSS = """
     border-bottom: 1px solid rgba(148,163,184,0.4);
 }
 
-/* linha com logo, nav e perfil */
 .pqr-header-row {
     display: flex;
     justify-content: space-between;
@@ -81,7 +76,6 @@ MODERN_CSS = """
     gap: 16px;
 }
 
-/* logo */
 .pqr-logo-line {
     display: flex;
     align-items: center;
@@ -100,20 +94,14 @@ MODERN_CSS = """
     font-size: 0.9rem;
     box-shadow: 0 0 18px rgba(59,130,246,0.7);
 }
-.pqr-title-text {
-    display: flex;
-    flex-direction: column;
-}
+.pqr-title-text { display: flex; flex-direction: column; }
 .pqr-title-main {
     font-size: 1.2rem;
     font-weight: 700;
     letter-spacing: 0.10em;
     text-transform: uppercase;
 }
-.pqr-title-sub {
-    font-size: 0.78rem;
-    color: var(--pqr-text-soft);
-}
+.pqr-title-sub { font-size: 0.78rem; color: var(--pqr-text-soft); }
 
 /* user pill header */
 .user-pill-header {
@@ -131,54 +119,31 @@ MODERN_CSS = """
     height: 32px;
     border-radius: 999px;
     background: linear-gradient(135deg, #1d4ed8, #22c55e);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: #020617;
-    font-weight: 700;
-    overflow: hidden;
+    display:flex;align-items:center;justify-content:center;
+    color:#020617;font-weight:700;overflow:hidden;
 }
 .user-pill-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    border-radius: 999px;
+    width:100%;height:100%;object-fit:cover;border-radius:999px;
 }
 
-/* sininho */
+/* bell */
 .pqr-bell {
     margin-left: 10px;
-    width: 28px;
-    height: 28px;
+    width: 28px; height: 28px;
     border-radius: 999px;
     background: radial-gradient(circle at top, rgba(148,163,184,0.3), rgba(15,23,42,1));
-    display:flex;
-    align-items:center;
-    justify-content:center;
+    display:flex;align-items:center;justify-content:center;
     border: 1px solid rgba(148,163,184,0.6);
-    cursor:pointer;
-    position: relative;
+    cursor:pointer; position: relative;
 }
-.pqr-bell span {
-    font-size: 0.9rem;
-}
+.pqr-bell span { font-size: 0.9rem; }
 .pqr-bell-dot {
-    position:absolute;
-    top:3px;
-    right:4px;
-    width: 7px;
-    height: 7px;
-    border-radius:999px;
-    background:#f97316;
+    position:absolute;top:3px;right:4px;
+    width:7px;height:7px;border-radius:999px;background:#f97316;
 }
 
-/* navegação */
-.pqr-nav {
-    margin-top: 10px;
-    display: flex;
-    gap: 8px;
-    flex-wrap: wrap;
-}
+/* nav */
+.pqr-nav { margin-top: 10px; display:flex;gap:8px;flex-wrap:wrap; }
 .pqr-nav-item {
     padding: 5px 12px;
     border-radius: 999px;
@@ -186,8 +151,7 @@ MODERN_CSS = """
     font-size: 0.78rem;
     color: var(--pqr-text-soft);
     background: radial-gradient(circle at top left, rgba(15,23,42,0.9), rgba(15,23,42,0.96));
-    cursor: pointer;
-    user-select: none;
+    cursor:pointer;user-select:none;
 }
 .pqr-nav-item-active {
     background: linear-gradient(135deg, #3b82f6, #22c55e);
@@ -195,7 +159,7 @@ MODERN_CSS = """
     border-color: rgba(59,130,246,0.9);
 }
 
-/* cartões glass */
+/* cards */
 .glass-main {
     margin-top: 16px;
     background: var(--pqr-bg-card);
@@ -205,8 +169,6 @@ MODERN_CSS = """
     padding: 18px 22px;
     backdrop-filter: blur(26px);
 }
-
-/* seções internas */
 .glass-section {
     background: rgba(15,23,42,0.9);
     border-radius: 14px;
@@ -222,78 +184,23 @@ MODERN_CSS = """
     padding: 10px 12px;
     margin-bottom: 10px;
 }
-.post-header {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    margin-bottom: 4px;
-    font-size: 0.84rem;
-}
-.post-meta {
-    font-size: 0.75rem;
-    color: var(--pqr-text-soft);
-}
-.post-body {
-    font-size: 0.88rem;
-    margin: 6px 0 8px;
-}
-.post-actions {
-    display: flex;
-    gap: 16px;
-    font-size: 0.78rem;
-    color: var(--pqr-text-soft);
-}
+.post-header { display:flex;align-items:center;gap:8px;margin-bottom:4px;font-size:0.84rem; }
+.post-meta { font-size:0.75rem;color:var(--pqr-text-soft); }
+.post-body { font-size:0.88rem;margin:6px 0 8px; }
+.post-actions { display:flex;gap:16px;font-size:0.78rem;color:var(--pqr-text-soft); }
 
-/* ícones de ação */
-.post-action-pill {
-    display:inline-flex;
-    align-items:center;
-    gap:4px;
-    padding:3px 9px;
-    border-radius:999px;
-    border:1px solid rgba(148,163,184,0.45);
-    background:rgba(15,23,42,0.9);
-}
-
-/* chat bubble */
+/* chat */
 .chat-bubble {
-    padding: 7px 9px;
-    border-radius: 10px;
-    margin-bottom: 6px;
-    font-size: 0.84rem;
-    background: rgba(15,23,42,0.96);
-    border: 1px solid rgba(148,163,184,0.5);
+    padding:7px 9px;border-radius:10px;margin-bottom:6px;
+    font-size:0.84rem;background:rgba(15,23,42,0.96);
+    border:1px solid rgba(148,163,184,0.5);
 }
-.chat-meta {
-    font-size: 0.70rem;
-    color: var(--pqr-text-soft);
-    margin-bottom: 2px;
-}
-
-/* mapa mental resumo */
-.mind-node {
-    font-size: 0.84rem;
-    margin: 2px 0;
-}
-.mind-node-label {
-    padding: 2px 8px;
-    border-radius: 999px;
-    background: rgba(30,64,175,0.7);
-}
-.mind-node-selected {
-    background: var(--pqr-primary-soft);
-    color: var(--pqr-primary);
-    border: 1px solid rgba(37,99,235,0.8);
-}
+.chat-meta { font-size:0.70rem;color:var(--pqr-text-soft);margin-bottom:2px; }
 
 /* badge */
 .pqr-badge {
-    display:inline-block;
-    padding:3px 10px;
-    border-radius:999px;
-    font-size:0.72rem;
-    letter-spacing:0.08em;
-    text-transform:uppercase;
+    display:inline-block;padding:3px 10px;border-radius:999px;
+    font-size:0.72rem;letter-spacing:0.08em;text-transform:uppercase;
     background:var(--pqr-primary-soft);
     border:1px solid rgba(37,99,235,0.6);
     color:var(--pqr-primary);
@@ -307,7 +214,7 @@ textarea, input, select {
     border:1px solid rgba(148,163,184,0.5) !important;
 }
 
-/* botões glass */
+/* botões */
 .stButton > button {
     border-radius: 999px;
     border: 1px solid rgba(148,163,184,0.6);
@@ -322,14 +229,8 @@ textarea, input, select {
     box-shadow: 0 10px 26px rgba(0,0,0,0.8);
     border-color: rgba(59,130,246,0.9);
 }
-
-/* radio (caso apareça) */
-[data-baseweb="radio"] > div {
-    gap: 4px;
-}
 </style>
 """
-
 st.markdown(MODERN_CSS, unsafe_allow_html=True)
 
 # ======================================================
@@ -344,7 +245,7 @@ class User:
     type: str
     password: str
     interests: List[str] = field(default_factory=list)
-    avatar_path: Optional[str] = None   # caminho local para PNG/JPG
+    avatar_path: Optional[str] = None
 
 @dataclass
 class Post:
@@ -353,25 +254,18 @@ class Post:
     text: str
     created_at: str
     likes: int = 0
-    liked_by: List[str] = field(default_factory=list)   # user_ids
-    saved_by: List[str] = field(default_factory=list)   # user_ids
-    comments: List[Dict[str, str]] = field(default_factory=list)  # {user_name, text, time}
+    liked_by: List[str] = field(default_factory=list)
+    saved_by: List[str] = field(default_factory=list)
+    comments: List[Dict[str, str]] = field(default_factory=list)
     shared_count: int = 0
 
 @dataclass
 class ChatMessage:
     id: str
     from_id: str
-    to_id: Optional[str]  # None => canal geral
+    to_id: Optional[str]
     text: str
     time: str
-
-# conexões de interesse simples
-@dataclass
-class Connection:
-    user_id: str
-    other_id: str
-    score: float
 
 # ======================================================
 # PERSISTÊNCIA
@@ -383,7 +277,7 @@ def default_state_dict() -> Dict[str, Any]:
         "current_user_id": None,
         "posts": [],
         "chat_messages": [],
-        "notifications": [],  # texto simples
+        "notifications": [],
         "current_view": "Feed",
     }
 
@@ -401,11 +295,11 @@ def load_state() -> Dict[str, Any]:
 
 def save_state():
     data = {
-        "users": [asdict(u) for u in st.session_state.users],
-        "current_user_id": st.session_state.current_user_id,
-        "posts": [asdict(p) for p in st.session_state.posts],
-        "chat_messages": [asdict(c) for c in st.session_state.chat_messages],
-        "notifications": st.session_state.notifications,
+        "users": [asdict(u) for u in st.session_state.get("users", [])],
+        "current_user_id": st.session_state.get("current_user_id"),
+        "posts": [asdict(p) for p in st.session_state.get("posts", [])],
+        "chat_messages": [asdict(c) for c in st.session_state.get("chat_messages", [])],
+        "notifications": st.session_state.get("notifications", []),
         "current_view": st.session_state.get("current_view", "Feed"),
     }
     try:
@@ -415,32 +309,29 @@ def save_state():
         st.warning(f"Não foi possível salvar o estado: {e}")
 
 # ======================================================
-# SESSION INIT
+# SESSION INIT SEM ERRO
 # ======================================================
 
-def init_state():
-    if "initialized" in st.session_state:
-        return
+if "initialized" not in st.session_state:
     persisted = load_state()
     st.session_state.users = [User(**u) for u in persisted["users"]]
-    st.session_state.current_user_id = persisted["current_user_id"]
+    st.session_state.current_user_id = persisted.get("current_user_id")
     st.session_state.posts = [Post(**p) for p in persisted["posts"]]
     st.session_state.chat_messages = [ChatMessage(**c) for c in persisted["chat_messages"]]
     st.session_state.notifications = persisted.get("notifications", [])
     st.session_state.current_view = persisted.get("current_view", "Feed")
     st.session_state.initialized = True
 
-init_state()
-
 # ======================================================
 # HELPERS
 # ======================================================
 
 def get_current_user() -> Optional[User]:
-    if not st.session_state.current_user_id:
+    user_id = st.session_state.get("current_user_id")
+    if not user_id:
         return None
-    for u in st.session_state.users:
-        if u.id == st.session_state.current_user_id:
+    for u in st.session_state.get("users", []):
+        if u.id == user_id:
             return u
     return None
 
@@ -456,22 +347,6 @@ def map_type_label(t: str) -> str:
 
 def parse_interests(s: str) -> List[str]:
     return [x.strip().lower() for x in s.split(",") if x.strip()]
-
-def calc_interest_connections(current: User, users: List[User]) -> List[Connection]:
-    res: List[Connection] = []
-    set_i = set(current.interests)
-    if not set_i:
-        return []
-    for u in users:
-        if u.id == current.id:
-            continue
-        inter = set_i.intersection(set(u.interests))
-        if not inter:
-            continue
-        score = len(inter) / max(len(set_i), 1)
-        res.append(Connection(user_id=current.id, other_id=u.id, score=score))
-    res.sort(key=lambda c: c.score, reverse=True)
-    return res
 
 def avatar_html(user: User, size: int = 32) -> str:
     if user.avatar_path and os.path.exists(user.avatar_path):
@@ -502,99 +377,68 @@ def auth_screen():
         st.write("")
         tabs = st.tabs(["Entrar", "Criar conta"])
 
+        # ENTRAR
         with tabs[0]:
-            email = st.text_input("Email", key="login_email")
-            password = st.text_input("Senha", type="password", key="login_pw")
+            email = st.text_input("E‑mail")
+            pwd = st.text_input("Senha", type="password")
             if st.button("Entrar"):
-                user = next((u for u in st.session_state.users if u.email == email), None)
-                if not user or user.password != password:
-                    st.error("Credenciais inválidas.")
-                else:
+                user = next((u for u in st.session_state.users if u.email == email and u.password == pwd), None)
+                if user:
                     st.session_state.current_user_id = user.id
                     save_state()
                     st.experimental_rerun()
+                else:
+                    st.error("E‑mail ou senha incorretos.")
 
+        # CRIAR CONTA
         with tabs[1]:
-            name = st.text_input("Nome completo", key="reg_name")
-            email_c = st.text_input("Email institucional", key="reg_email")
-            type_label = st.selectbox(
-                "Tipo de vínculo",
+            name = st.text_input("Nome completo")
+            email2 = st.text_input("E‑mail para cadastro")
+            pwd2 = st.text_input("Defina uma senha", type="password")
+            tipo = st.selectbox(
+                "Tipo",
                 [
-                    "Selecione…",
-                    "Iniciação Científica",
-                    "Extensão",
-                    "Doutorando",
-                    "Voluntário",
-                    "PRODIG",
-                    "Mentoria",
+                    ("ic", "Iniciação Científica"),
+                    ("extensao", "Extensão"),
+                    ("doutorando", "Doutorando"),
+                    ("voluntario", "Voluntário"),
+                    ("prodig", "PRODIG"),
+                    ("mentoria", "Mentoria"),
                 ],
-                key="reg_type",
+                format_func=lambda x: x[1],
             )
-            pw = st.text_input("Senha (mín. 6 caracteres)", type="password", key="reg_pw")
-            interests_str = st.text_input(
-                "Interesses (separados por vírgula)",
-                placeholder="ex.: inclusão digital, saúde mental, aprendizagem ativa",
-                key="reg_interests",
-            )
-            avatar_file = st.file_uploader(
-                "Foto de perfil (PNG/JPG)",
-                type=["png", "jpg", "jpeg"],
-                key="reg_avatar",
-            )
+            intr = st.text_input("Interesses (separados por vírgula)")
 
             if st.button("Criar conta"):
-                if not name.strip() or not email_c.strip():
-                    st.warning("Nome e email são obrigatórios.")
-                elif len(pw) < 6:
-                    st.warning("Senha muito curta.")
-                elif type_label == "Selecione…":
-                    st.warning("Selecione o tipo de vínculo.")
-                elif any(u.email == email_c for u in st.session_state.users):
-                    st.error("Já existe usuário com este email.")
+                if not name.strip() or not email2.strip() or not pwd2.strip():
+                    st.warning("Preencha nome, e‑mail e senha.")
+                elif any(u.email == email2 for u in st.session_state.users):
+                    st.error("Já existe usuário com este e‑mail.")
                 else:
-                    t_map = {
-                        "Iniciação Científica": "ic",
-                        "Extensão": "extensao",
-                        "Doutorando": "doutorando",
-                        "Voluntário": "voluntario",
-                        "PRODIG": "prodig",
-                        "Mentoria": "mentoria",
-                    }
-                    t = t_map.get(type_label, "ic")
-                    avatar_path = None
-                    if avatar_file is not None:
-                        img = Image.open(avatar_file).convert("RGB")
-                        uid = str(uuid.uuid4())
-                        avatar_path = str(AVATAR_DIR / f"{uid}.jpg")
-                        img.save(avatar_path, format="JPEG", quality=90)
-
-                    new_user = User(
+                    u = User(
                         id=str(uuid.uuid4()),
                         name=name.strip(),
-                        email=email_c.strip(),
-                        type=t,
-                        password=pw,
-                        interests=parse_interests(interests_str),
-                        avatar_path=avatar_path,
+                        email=email2.strip(),
+                        password=pwd2.strip(),
+                        type=tipo[0],
+                        interests=parse_interests(intr),
+                        avatar_path=None,
                     )
-                    st.session_state.users.append(new_user)
-                    st.session_state.current_user_id = new_user.id
+                    st.session_state.users.append(u)
+                    st.session_state.current_user_id = u.id
                     save_state()
-                    st.success("Conta criada.")
+                    st.success("Conta criada. Você já está logada(o).")
                     st.experimental_rerun()
 
         st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# HEADER + NAV + NOTIFICAÇÕES
+# HEADER + NAV
 # ======================================================
 
-VIEWS = ["Feed", "Análises", "Conexões", "Chat", "Configurações"]
+NAV_VIEWS = ["Feed", "Análises", "Conexões", "Chat", "Configurações"]
 
 def render_header(user: User):
-    if "current_view" not in st.session_state:
-        st.session_state.current_view = "Feed"
-
     st.markdown('<div class="pqr-header">', unsafe_allow_html=True)
     colL, colR = st.columns([3, 2])
 
@@ -606,7 +450,7 @@ def render_header(user: User):
                     <div class="pqr-logo-avatar">P</div>
                     <div class="pqr-title-text">
                         <div class="pqr-title-main">PQR</div>
-                        <div class="pqr-title-sub">sua pesquisa, como rede social</div>
+                        <div class="pqr-title-sub">sua rede de pesquisa qualitativa</div>
                     </div>
                 </div>
             </div>
@@ -616,86 +460,75 @@ def render_header(user: User):
 
     with colR:
         av_html = avatar_html(user)
-        notif_count = len(st.session_state.notifications)
-        dot_html = '<div class="pqr-bell-dot"></div>' if notif_count > 0 else ""
+        notif_count = len(st.session_state.get("notifications", []))
+        dot = '<div class="pqr-bell-dot"></div>' if notif_count > 0 else ""
         st.markdown(
             f"""
             <div class="pqr-header-row" style="justify-content:flex-end;">
-                <div style="display:flex;align-items:center;gap:8px;">
-                    <div class="pqr-bell">
-                        <span>🔔</span>
-                        {dot_html}
+                <div class="user-pill-header">
+                    <div class="user-pill-avatar">{av_html}</div>
+                    <div style="font-size:0.78rem;">
+                        {user.name.split(" ")[0]}<br/>
+                        <span style="color:#9ca3af;">{map_type_label(user.type)}</span>
                     </div>
-                    <div class="user-pill-header">
-                        <div class="user-pill-avatar">{av_html}</div>
-                        <div style="font-size:0.78rem;">
-                            {user.name.split(" ")[0]}<br/>
-                            <span style="color:#9ca3af;">{map_type_label(user.type)}</span>
-                        </div>
-                    </div>
+                    <div class="pqr-bell">{dot}<span>🔔</span></div>
                 </div>
             </div>
             """,
             unsafe_allow_html=True,
         )
 
-        # ao clicar no sininho, mostramos notificações
-        if notif_count > 0:
-            with st.expander(f"Notificações ({notif_count})", expanded=False):
-                for n in reversed(st.session_state.notifications[-20:]):
-                    st.write("- " + n)
-
     # nav
     st.markdown('<div class="pqr-nav">', unsafe_allow_html=True)
-    nav_cols = st.columns(len(VIEWS))
-    for i, (vname, col) in enumerate(zip(VIEWS, nav_cols)):
+    nav_cols = st.columns(len(NAV_VIEWS))
+    for i, (view_name, col) in enumerate(zip(NAV_VIEWS, nav_cols)):
         with col:
-            active = (st.session_state.current_view == vname)
+            active = (st.session_state.get("current_view", "Feed") == view_name)
             cls = "pqr-nav-item-active" if active else "pqr-nav-item"
-            if st.button(vname, key=f"nav_{i}"):
-                st.session_state.current_view = vname
+            if st.button(view_name, key=f"nav_btn_{i}"):
+                st.session_state.current_view = view_name
                 save_state()
                 st.experimental_rerun()
-            # div oculto só pra CSS
             st.markdown(
-                f'<div class="{cls}" style="display:none;">{vname}</div>',
+                f'<div class="{cls}" style="display:none;">{view_name}</div>',
                 unsafe_allow_html=True,
             )
-
     st.markdown('</div>', unsafe_allow_html=True)
     st.markdown('</div>', unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: FEED (curtir, salvar, comentar, compartilhar)
+# VIEW: FEED
 # ======================================================
 
 def view_feed():
     st.markdown('<div class="glass-main">', unsafe_allow_html=True)
-    st.markdown("### Feed da pesquisa")
+    st.markdown("### Feed de pesquisa")
 
     user = get_current_user()
     if not user:
-        st.warning("Entre na sua conta para ver e publicar no feed.")
+        st.warning("Entre para ver e postar no feed.")
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
-    with st.expander("Criar novo post", expanded=True):
-        text = st.text_area("Compartilhe um avanço, dúvida ou insight…", key="new_post")
-        if st.button("Publicar"):
-            if not text.strip():
-                st.warning("Escreva algo antes de publicar.")
-            else:
-                p = Post(
-                    id=str(uuid.uuid4()),
-                    user_id=user.id,
-                    text=text.strip(),
-                    created_at=datetime.datetime.now().isoformat(),
-                )
-                st.session_state.posts.insert(0, p)
-                save_state()
-                st.success("Post publicado.")
+    # criar post
+    with st.form("new_post"):
+        st.write("Compartilhe um avanço, dúvida ou insight:")
+        text = st.text_area("Escreva algo", key="post_text", label_visibility="collapsed")
+        ok = st.form_submit_button("Publicar")
+        if ok and text.strip():
+            p = Post(
+                id=str(uuid.uuid4()),
+                user_id=user.id,
+                text=text.strip(),
+                created_at=datetime.datetime.now().isoformat(),
+            )
+            st.session_state.posts.insert(0, p)
+            st.session_state.notifications.append("Seu post foi publicado.")
+            save_state()
+            st.experimental_rerun()
 
     st.write("---")
+
     if not st.session_state.posts:
         st.info("Ainda não há posts. Publique o primeiro.")
     else:
@@ -725,7 +558,6 @@ def view_feed():
                 unsafe_allow_html=True,
             )
 
-            # ações
             col_like, col_save, col_comment, col_share = st.columns([0.7,0.7,1.1,0.9])
             with col_like:
                 liked = user.id in p.liked_by
@@ -737,7 +569,6 @@ def view_feed():
                     else:
                         p.liked_by.append(user.id)
                         p.likes += 1
-                        # notificação simples pro autor
                         if author.id != user.id:
                             st.session_state.notifications.append(
                                 f"{user.name} curtiu seu post."
@@ -765,7 +596,6 @@ def view_feed():
                     save_state()
                     st.success("Post marcado como compartilhado.")
 
-            # contagem
             st.markdown(
                 f"""
                 <div class="post-actions">
@@ -778,13 +608,10 @@ def view_feed():
                 unsafe_allow_html=True,
             )
 
-            # área de comentários
             if st.session_state.get(f"show_comments_{p.id}", False):
                 st.write("— Comentários —")
                 for c in p.comments[-10:]:
-                    st.markdown(
-                        f"**{c['user_name']}** – {c['time']}  \n{c['text']}"
-                    )
+                    st.markdown(f"**{c['user_name']}** – {c['time']}  \n{c['text']}")
                 c_text = st.text_input(
                     "Seu comentário", key=f"comment_input_{p.id}", label_visibility="collapsed"
                 )
@@ -807,13 +634,13 @@ def view_feed():
                     else:
                         st.warning("Escreva algo no comentário.")
 
-            st.markdown("</div>", unsafe_allow_html=True)  # fecha post-card
+            st.markdown("</div>", unsafe_allow_html=True)
             st.write("")
 
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: ANÁLISES – GRÁFICOS SIMPLES
+# VIEW: ANÁLISES
 # ======================================================
 
 def view_analytics():
@@ -824,11 +651,10 @@ def view_analytics():
 
     user = get_current_user()
     if not user:
-        st.warning("Entre na sua conta para ver análises.")
+        st.warning("Entre para ver análises.")
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
-    # posts por dia (gerais e do usuário)
     if not st.session_state.posts:
         st.info("Ainda não há posts suficientes para gráficos.")
         st.markdown("</div>", unsafe_allow_html=True)
@@ -837,13 +663,7 @@ def view_analytics():
     rows = []
     for p in st.session_state.posts:
         d = p.created_at[:10]
-        rows.append(
-            {
-                "data": d,
-                "autor": p.user_id,
-                "likes": p.likes,
-            }
-        )
+        rows.append({"data": d, "autor": p.user_id, "likes": p.likes})
     df = pd.DataFrame(rows)
 
     st.subheader("Volume de posts")
@@ -877,7 +697,7 @@ def view_analytics():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: CONEXÕES (INTERESSES EM COMUM)
+# VIEW: CONEXÕES
 # ======================================================
 
 def view_connections():
@@ -886,30 +706,40 @@ def view_connections():
 
     user = get_current_user()
     if not user:
-        st.warning("Entre na sua conta para ver conexões.")
+        st.warning("Entre na sua conta.")
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
-    # permitir atualizar interesses
     with st.expander("Seus interesses"):
         intr_str = ", ".join(user.interests)
-        new_intr = st.text_input(
-            "Interesses (separados por vírgula)",
-            value=intr_str,
-        )
+        new_intr = st.text_input("Interesses (separados por vírgula)", value=intr_str)
         if st.button("Atualizar interesses"):
             user.interests = parse_interests(new_intr)
             save_state()
             st.success("Interesses atualizados.")
 
-    conns = calc_interest_connections(user, st.session_state.users)
+    set_i = set(user.interests)
+    if not set_i:
+        st.info("Adicione interesses para ver conexões.")
+        st.markdown("</div>", unsafe_allow_html=True)
+        return
+
+    conns = []
+    for other in st.session_state.users:
+        if other.id == user.id:
+            continue
+        inter = set_i.intersection(set(other.interests))
+        if not inter:
+            continue
+        score = len(inter) / max(len(set_i), 1)
+        conns.append((other, score, inter))
+    conns.sort(key=lambda x: x[1], reverse=True)
+
     if not conns:
-        st.info("Ainda não encontrei conexões fortes de interesse. Adicione interesses e convide mais pessoas.")
+        st.info("Por enquanto ninguém compartilha interesses. Convide colegas.")
     else:
         st.write("Pessoas com maior afinidade temática:")
-        for c in conns[:10]:
-            other = next(u for u in st.session_state.users if u.id == c.other_id)
-            inter = set(user.interests).intersection(set(other.interests))
+        for other, score, inter in conns[:10]:
             av_html = avatar_html(other, size=28)
             st.markdown(
                 f"""
@@ -917,7 +747,9 @@ def view_connections():
                     <div class="user-pill-avatar" style="width:28px;height:28px;">{av_html}</div>
                     <div style="font-size:0.82rem;">
                         <strong>{other.name}</strong><br/>
-                        <span style="color:#9ca3af;">Afinidade: {c.score:.0%} · Interesses comuns: {', '.join(inter)}</span>
+                        <span style="color:#9ca3af;">
+                            Afinidade: {score:.0%} · Interesses comuns: {', '.join(inter)}
+                        </span>
                     </div>
                 </div>
                 """,
@@ -927,7 +759,7 @@ def view_connections():
     st.markdown("</div>", unsafe_allow_html=True)
 
 # ======================================================
-# VIEW: CHAT (mínimo, geral)
+# VIEW: CHAT
 # ======================================================
 
 def view_chat():
@@ -940,7 +772,6 @@ def view_chat():
         st.markdown("</div>", unsafe_allow_html=True)
         return
 
-    # mensagens gerais (to_id=None)
     msgs = [m for m in st.session_state.chat_messages if m.to_id is None]
     for m in msgs[-50:]:
         author = next((u for u in st.session_state.users if u.id == m.from_id), None)
@@ -997,7 +828,9 @@ def view_settings():
             <div class="user-pill-avatar" style="width:48px;height:48px;">{av_html}</div>
             <div>
                 <strong>{user.name}</strong><br/>
-                <span style="font-size:0.78rem;color:#9ca3af;">{user.email} – {map_type_label(user.type)}</span>
+                <span style="font-size:0.78rem;color:#9ca3af;">
+                    {user.email} – {map_type_label(user.type)}
+                </span>
             </div>
         </div>
         """,
@@ -1051,7 +884,7 @@ def main():
 
     render_header(user)
 
-    view = st.session_state.current_view
+    view = st.session_state.get("current_view", "Feed")
     if view == "Feed":
         view_feed()
     elif view == "Análises":
