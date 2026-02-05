@@ -24,7 +24,7 @@ AVATAR_DIR = Path("avatars")
 AVATAR_DIR.mkdir(exist_ok=True)
 
 # ======================================================
-# CSS – EXATAMENTE COMO O ANVIL
+# CSS MODERNO AZUL ESCURO COM GLASSMORPHISM
 # ======================================================
 CSS = """
 <style>
@@ -32,11 +32,12 @@ CSS = """
     margin: 0;
     padding: 0;
     box-sizing: border-box;
+    font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
 }
 .stApp {
-    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
-    background-color: #f0f2f5;
-    color: #333333;
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
+    color: #f1f5f9;
+    min-height: 100vh;
 }
 [data-testid="stSidebar"] { display: none; }
 .main-container {
@@ -48,10 +49,12 @@ CSS = """
 }
 .sidebar {
     width: 280px;
-    background: #ffffff;
-    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
     padding: 20px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(2, 8, 32, 0.3);
     height: fit-content;
     position: sticky;
     top: 20px;
@@ -61,19 +64,19 @@ CSS = """
     align-items: center;
     gap: 12px;
     margin-bottom: 30px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
 }
 .sidebar-avatar {
     width: 44px;
     height: 44px;
     border-radius: 50%;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
     display: flex;
     align-items: center;
     justify-content: center;
-    color: white;
-    font-weight: bold;
-    font-size: 18px;
     overflow: hidden;
+    border: 2px solid rgba(255, 255, 255, 0.1);
 }
 .sidebar-avatar img {
     width: 100%;
@@ -87,36 +90,40 @@ CSS = """
 .sidebar-user-name {
     font-size: 14px;
     font-weight: 600;
-    color: #333;
+    color: #f8fafc;
 }
 .sidebar-user-role {
     font-size: 12px;
-    color: #999;
+    color: #94a3b8;
 }
 .sidebar-menu {
     display: flex;
     flex-direction: column;
-    gap: 8px;
+    gap: 4px;
 }
 .sidebar-item {
     display: flex;
     align-items: center;
     gap: 12px;
-    padding: 10px 12px;
-    border-radius: 8px;
+    padding: 12px 16px;
+    border-radius: 12px;
     cursor: pointer;
     font-size: 14px;
-    color: #666;
-    transition: all 0.2s;
+    color: #cbd5e1;
+    transition: all 0.3s;
     user-select: none;
+    background: transparent;
+    border: none;
+    text-align: left;
+    width: 100%;
 }
 .sidebar-item:hover {
-    background-color: #f5f5f5;
-    color: #333;
+    background: rgba(30, 41, 59, 0.5);
+    color: #e2e8f0;
 }
 .sidebar-item-active {
-    background-color: #e8eaf6;
-    color: #667eea;
+    background: rgba(79, 70, 229, 0.2);
+    color: #818cf8;
     font-weight: 600;
 }
 .sidebar-icon {
@@ -134,16 +141,16 @@ CSS = """
     display: flex;
     gap: 20px;
     flex: 1;
+    flex-direction: column;
 }
 .profile-card {
-    width: 320px;
-    background: #ffffff;
-    border-radius: 12px;
+    width: 100%;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
     padding: 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
-    height: fit-content;
-    position: sticky;
-    top: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(2, 8, 32, 0.3);
 }
 .profile-header {
     text-align: center;
@@ -154,11 +161,12 @@ CSS = """
     height: 120px;
     border-radius: 50%;
     margin: 0 auto 16px;
-    background: #e0e0e0;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 3px solid rgba(255, 255, 255, 0.1);
 }
 .profile-avatar-big img {
     width: 100%;
@@ -166,34 +174,37 @@ CSS = """
     object-fit: cover;
 }
 .profile-name {
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
+    font-size: 20px;
+    font-weight: 700;
+    color: #f8fafc;
     margin-bottom: 4px;
 }
 .profile-role {
-    font-size: 13px;
-    color: #999;
+    font-size: 14px;
+    color: #94a3b8;
     margin-bottom: 16px;
 }
 .profile-follow-btn {
     width: 100%;
-    padding: 10px;
+    padding: 12px;
     border: none;
-    border-radius: 8px;
-    background-color: #b3d9ff;
-    color: #0066cc;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
     font-size: 14px;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s;
+    transition: all 0.3s;
+    margin: 10px 0;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
 }
 .profile-follow-btn:hover {
-    background-color: #99ccff;
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
 }
 .profile-divider {
     height: 1px;
-    background-color: #e0e0e0;
+    background: linear-gradient(90deg, transparent, rgba(148, 163, 184, 0.3), transparent);
     margin: 16px 0;
 }
 .profile-stat {
@@ -206,52 +217,60 @@ CSS = """
     flex: 1;
 }
 .profile-stat-number {
-    font-size: 16px;
-    font-weight: 600;
-    color: #333;
+    font-size: 18px;
+    font-weight: 700;
+    color: #f8fafc;
 }
 .profile-stat-label {
     font-size: 12px;
-    color: #999;
+    color: #94a3b8;
 }
 .profile-bio {
-    font-size: 13px;
-    color: #666;
-    line-height: 1.5;
+    font-size: 14px;
+    color: #cbd5e1;
+    line-height: 1.6;
     margin: 16px 0;
+    text-align: center;
 }
 .profile-interests {
     display: flex;
     flex-wrap: wrap;
-    gap: 6px;
+    gap: 8px;
     margin-top: 12px;
+    justify-content: center;
 }
 .profile-interest-tag {
     display: inline-block;
-    background-color: #f0f0f0;
-    color: #666;
-    padding: 4px 10px;
-    border-radius: 16px;
+    background: rgba(30, 41, 59, 0.5);
+    color: #e2e8f0;
+    padding: 6px 14px;
+    border-radius: 20px;
     font-size: 12px;
+    font-weight: 500;
+    border: 1px solid rgba(255, 255, 255, 0.1);
 }
 .feed-card {
     flex: 1;
-    background: #ffffff;
-    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.7);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
     padding: 24px;
-    box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 8px 32px rgba(2, 8, 32, 0.3);
 }
 .feed-header {
-    font-size: 16px;
-    font-weight: 600;
-    color: #333;
+    font-size: 18px;
+    font-weight: 700;
+    color: #f8fafc;
     margin-bottom: 20px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
 }
 .feed-item {
     display: flex;
     gap: 12px;
     padding: 16px 0;
-    border-bottom: 1px solid #f0f0f0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
 }
 .feed-item:last-child {
     border-bottom: none;
@@ -260,12 +279,13 @@ CSS = """
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: #e0e0e0;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
     flex-shrink: 0;
     overflow: hidden;
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 2px solid rgba(255, 255, 255, 0.1);
 }
 .feed-item-avatar img {
     width: 100%;
@@ -281,22 +301,22 @@ CSS = """
     margin-bottom: 4px;
 }
 .feed-item-name {
-    font-size: 13px;
+    font-size: 14px;
     font-weight: 600;
-    color: #333;
+    color: #f8fafc;
 }
 .feed-item-time {
     font-size: 12px;
-    color: #999;
+    color: #94a3b8;
 }
 .feed-item-text {
-    font-size: 13px;
-    color: #666;
-    line-height: 1.4;
+    font-size: 14px;
+    color: #cbd5e1;
+    line-height: 1.5;
 }
 .feed-item-action {
     font-size: 12px;
-    color: #999;
+    color: #94a3b8;
     margin-top: 6px;
 }
 .auth-container {
@@ -304,80 +324,32 @@ CSS = """
     align-items: center;
     justify-content: center;
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%);
 }
 .auth-card {
-    background: white;
-    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.8);
+    backdrop-filter: blur(10px);
+    border-radius: 24px;
     padding: 40px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 20px 50px rgba(2, 8, 32, 0.4);
     width: 100%;
     max-width: 400px;
 }
 .auth-title {
     font-size: 28px;
-    font-weight: 700;
-    color: #333;
+    font-weight: 800;
+    background: linear-gradient(135deg, #818cf8 0%, #c084fc 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
     text-align: center;
     margin-bottom: 8px;
 }
 .auth-subtitle {
     font-size: 14px;
-    color: #999;
+    color: #94a3b8;
     text-align: center;
     margin-bottom: 24px;
-}
-.post-card {
-    background: #f9f9f9;
-    border-radius: 8px;
-    padding: 12px;
-    margin-bottom: 12px;
-}
-.post-header {
-    display: flex;
-    justify-content: space-between;
-    margin-bottom: 8px;
-}
-.post-author {
-    font-size: 13px;
-    font-weight: 600;
-    color: #333;
-}
-.post-time {
-    font-size: 12px;
-    color: #999;
-}
-.post-content {
-    font-size: 13px;
-    color: #666;
-    line-height: 1.4;
-    margin-bottom: 8px;
-}
-.post-tags {
-    display: flex;
-    flex-wrap: wrap;
-    gap: 6px;
-}
-.post-tag {
-    display: inline-block;
-    background-color: #e8eaf6;
-    color: #667eea;
-    padding: 3px 8px;
-    border-radius: 4px;
-    font-size: 11px;
-}
-.post-actions {
-    display: flex;
-    gap: 12px;
-    margin-top: 8px;
-    font-size: 12px;
-}
-.post-action {
-    cursor: pointer;
-    color: #999;
-}
-.post-action:hover {
-    color: #667eea;
 }
 .avatar-upload-container {
     display: flex;
@@ -387,13 +359,164 @@ CSS = """
 }
 .avatar-upload-btn {
     margin-top: 10px;
-    background: #667eea;
-    color: white;
-    border: none;
-    border-radius: 4px;
-    padding: 6px 12px;
+    background: rgba(79, 70, 229, 0.2);
+    color: #818cf8;
+    border: 1px solid rgba(129, 140, 248, 0.3);
+    border-radius: 12px;
+    padding: 8px 16px;
     cursor: pointer;
     font-size: 12px;
+    font-weight: 500;
+    transition: all 0.3s;
+}
+.avatar-upload-btn:hover {
+    background: rgba(79, 70, 229, 0.3);
+}
+.glass-card {
+    background: rgba(30, 41, 59, 0.5);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 20px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    margin-bottom: 20px;
+}
+.glass-card h3 {
+    font-size: 18px;
+    font-weight: 700;
+    color: #f8fafc;
+    margin-bottom: 15px;
+}
+.glass-input {
+    background: rgba(15, 23, 42, 0.5);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 12px;
+    padding: 12px 16px;
+    color: #f1f5f9;
+    width: 100%;
+    margin-bottom: 15px;
+}
+.glass-input:focus {
+    outline: none;
+    border-color: #6366f1;
+}
+.glass-button {
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    color: white;
+    border: none;
+    border-radius: 12px;
+    padding: 12px 20px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.3s;
+    width: 100%;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+}
+.glass-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 8px rgba(0, 0, 0, 0.15);
+}
+.post-card {
+    background: rgba(30, 41, 59, 0.5);
+    backdrop-filter: blur(10px);
+    border-radius: 16px;
+    padding: 16px;
+    margin-bottom: 16px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}
+.post-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 12px;
+}
+.post-author {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f8fafc;
+}
+.post-time {
+    font-size: 12px;
+    color: #94a3b8;
+}
+.post-content {
+    font-size: 14px;
+    color: #cbd5e1;
+    line-height: 1.6;
+    margin-bottom: 12px;
+}
+.post-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 12px;
+}
+.post-tag {
+    display: inline-block;
+    background: rgba(79, 70, 229, 0.2);
+    color: #818cf8;
+    padding: 4px 12px;
+    border-radius: 20px;
+    font-size: 12px;
+    font-weight: 500;
+}
+.post-actions {
+    display: flex;
+    gap: 20px;
+    margin-top: 12px;
+    font-size: 14px;
+}
+.post-action {
+    cursor: pointer;
+    color: #94a3b8;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    transition: color 0.3s;
+}
+.post-action:hover {
+    color: #818cf8;
+}
+.stories-container {
+    display: flex;
+    gap: 15px;
+    overflow-x: auto;
+    padding: 10px 0;
+    margin-bottom: 20px;
+}
+.story {
+    width: 80px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    flex-shrink: 0;
+}
+.story-avatar {
+    width: 60px;
+    height: 60px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+    border: 2px solid transparent;
+    padding: 2px;
+    background-clip: padding-box;
+}
+.story-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 50%;
+}
+.story-name {
+    font-size: 12px;
+    color: #cbd5e1;
+    margin-top: 6px;
+    text-align: center;
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
 }
 </style>
 """
@@ -510,359 +633,5 @@ def init_session_state():
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = []
     if "notifications" not in st.session_state:
-        st.session_state.notifications = []
-    if "current_user_id" not in st.session_state:
-        st.session_state.current_user_id = None
-    if "current_view" not in st.session_state:
-        st.session_state.current_view = "Pages"
-    if "auth_mode" not in st.session_state:
-        st.session_state.auth_mode = "login"
-    if "avatar_upload" not in st.session_state:
-        st.session_state.avatar_upload = None
+        st.session_state.notifications =
 
-init_session_state()
-
-# ======================================================
-# FUNÇÕES DE ESTADO
-# ======================================================
-def save_state_to_file():
-    data = {
-        "users": [asdict(u) for u in st.session_state.users],
-        "posts": [asdict(p) for p in st.session_state.posts],
-        "comments": [asdict(c) for c in st.session_state.comments],
-        "timeline": [asdict(t) for t in st.session_state.timeline],
-        "docs": [asdict(d) for d in st.session_state.docs],
-        "mindnodes": [asdict(m) for m in st.session_state.mindnodes],
-        "slides": [asdict(s) for s in st.session_state.slides],
-        "chat_messages": [asdict(m) for m in st.session_state.chat_messages],
-        "notifications": [asdict(n) for n in st.session_state.notifications],
-    }
-    with open(STATE_FILE, "w") as f:
-        json.dump(data, f, indent=2)
-
-def load_state_from_file():
-    if not os.path.exists(STATE_FILE):
-        return
-    with open(STATE_FILE, "r") as f:
-        data = json.load(f)
-    st.session_state.users = [User(**u) for u in data.get("users", [])]
-    st.session_state.posts = [Post(**p) for p in data.get("posts", [])]
-    st.session_state.comments = [Comment(**c) for c in data.get("comments", [])]
-    st.session_state.timeline = [TimelineStep(**t) for t in data.get("timeline", [])]
-    st.session_state.docs = [ResearchDoc(**d) for d in data.get("docs", [])]
-    st.session_state.mindnodes = [MindNode(**m) for m in data.get("mindnodes", [])]
-    st.session_state.slides = [Slide(**s) for s in data.get("slides", [])]
-    st.session_state.chat_messages = [ChatMessage(**m) for m in data.get("chat_messages", [])]
-    st.session_state.notifications = [Notification(**n) for n in data.get("notifications", [])]
-
-load_state_from_file()
-
-# ======================================================
-# FUNÇÕES AUXILIARES
-# ======================================================
-def get_current_user() -> Optional[User]:
-    if not st.session_state.current_user_id:
-        return None
-    return next((u for u in st.session_state.users if u.id == st.session_state.current_user_id), None)
-
-def avatar_html(user: User, size: int = 44) -> str:
-    if user.avatar_path and os.path.exists(user.avatar_path):
-        return f'<img src="file://{os.path.abspath(user.avatar_path)}" style="width:{size}px;height:{size}px;border-radius:50%;object-fit:cover;">'
-    initials = "".join([n[0].upper() for n in user.name.split()[:2]])
-    return f'<div style="width:{size}px;height:{size}px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:{size//2}px;">{initials}</div>'
-
-def save_avatar(user_id: str, image_bytes: bytes) -> str:
-    avatar_path = AVATAR_DIR / f"{user_id}.png"
-    with open(avatar_path, "wb") as f:
-        f.write(image_bytes)
-    return str(avatar_path)
-
-# ======================================================
-# TELA DE AUTENTICAÇÃO
-# ======================================================
-def auth_screen():
-    st.markdown('<div class="auth-container">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-card">', unsafe_allow_html=True)
-    st.markdown('<div class="auth-title">PQR</div>', unsafe_allow_html=True)
-    st.markdown('<div class="auth-subtitle">Social Research Dashboard</div>', unsafe_allow_html=True)
-    col1, col2 = st.columns(2)
-    with col1:
-        if st.button("Entrar", key="tab_login", use_container_width=True):
-            st.session_state.auth_mode = "login"
-    with col2:
-        if st.button("Criar conta", key="tab_signup", use_container_width=True):
-            st.session_state.auth_mode = "signup"
-    st.markdown("---")
-    if st.session_state.auth_mode == "login":
-        st.markdown("#### Entrar na sua conta")
-        email = st.text_input("Email", key="login_email")
-        password = st.text_input("Senha", type="password", key="login_password")
-        if st.button("Entrar", key="btn_login", use_container_width=True):
-            user = next((u for u in st.session_state.users if u.email == email and u.password == password), None)
-            if user:
-                st.session_state.current_user_id = user.id
-                st.success("Bem-vindo!")
-                st.experimental_rerun()
-            else:
-                st.error("Email ou senha incorretos.")
-    else:
-        st.markdown("#### Criar nova conta")
-        name = st.text_input("Nome completo", key="signup_name")
-        email = st.text_input("Email", key="signup_email")
-        password = st.text_input("Senha", type="password", key="signup_password")
-        password_confirm = st.text_input("Confirmar senha", type="password", key="signup_confirm")
-        if st.button("Criar conta", key="btn_signup", use_container_width=True):
-            if not name or not email or not password:
-                st.error("Preencha todos os campos.")
-            elif password != password_confirm:
-                st.error("As senhas não conferem.")
-            elif any(u.email == email for u in st.session_state.users):
-                st.error("Este email já está registrado.")
-            else:
-                new_user = User(
-                    id=str(uuid.uuid4()),
-                    name=name,
-                    email=email,
-                    password=password,
-                )
-                st.session_state.users.append(new_user)
-                save_state_to_file()
-                st.session_state.current_user_id = new_user.id
-                st.success("Conta criada com sucesso!")
-                st.experimental_rerun()
-    st.markdown("</div>", unsafe_allow_html=True)
-    st.markdown("</div>", unsafe_allow_html=True)
-
-# ======================================================
-# SIDEBAR
-# ======================================================
-def render_sidebar(user: User):
-    st.markdown('<div class="sidebar">', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-header">', unsafe_allow_html=True)
-    st.markdown(f'<div class="sidebar-avatar">{avatar_html(user, 44)}</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-user-info">', unsafe_allow_html=True)
-    st.markdown(f'<div class="sidebar-user-name">{user.name.split()[0]}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="sidebar-user-role">{user.role}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('<div class="sidebar-menu">', unsafe_allow_html=True)
-    menu_items = [
-        ("📄", "Pages"),
-        ("📊", "Analytics"),
-        ("✓", "Tasks"),
-        ("💰", "Invoice"),
-        ("⭐", "Subscribe"),
-        ("✉️", "Contact"),
-        ("⚙️", "Settings"),
-    ]
-    for icon, label in menu_items:
-        is_active = st.session_state.current_view == label
-        active_class = "sidebar-item-active" if is_active else ""
-        if st.button(f"{icon} {label}", key=f"nav_{label}", use_container_width=True):
-            st.session_state.current_view = label
-            save_state_to_file()
-            st.experimental_rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ======================================================
-# PROFILE CARD
-# ======================================================
-def render_profile_card(user: User):
-    st.markdown('<div class="profile-card">', unsafe_allow_html=True)
-    st.markdown('<div class="profile-header">', unsafe_allow_html=True)
-
-    # Avatar upload section
-    st.markdown('<div class="avatar-upload-container">', unsafe_allow_html=True)
-    st.markdown(f'<div class="profile-avatar-big">{avatar_html(user, 120)}</div>', unsafe_allow_html=True)
-
-    # File uploader for avatar
-    uploaded_file = st.file_uploader("Escolha uma imagem", type=["png", "jpg", "jpeg"], key="avatar_upload")
-    if uploaded_file is not None:
-        # Save the uploaded file
-        avatar_path = save_avatar(user.id, uploaded_file.getvalue())
-        user.avatar_path = avatar_path
-
-        # Update user in session state
-        for i, u in enumerate(st.session_state.users):
-            if u.id == user.id:
-                st.session_state.users[i] = user
-                break
-
-        save_state_to_file()
-        st.success("Avatar atualizado!")
-        st.experimental_rerun()
-
-    st.markdown('</div>', unsafe_allow_html=True)  # Close avatar-upload-container
-
-    st.markdown(f'<div class="profile-name">{user.name}</div>', unsafe_allow_html=True)
-    st.markdown(f'<div class="profile-role">{user.role}</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    if st.button("Follow", key="btn_follow", use_container_width=True):
-        st.success("Você está seguindo este usuário!")
-
-    st.markdown('<div class="profile-divider"></div>', unsafe_allow_html=True)
-    st.markdown('<div class="profile-stat">', unsafe_allow_html=True)
-    st.markdown('<div class="profile-stat-item"><div class="profile-stat-number">42</div><div class="profile-stat-label">Posts</div></div>', unsafe_allow_html=True)
-    st.markdown('<div class="profile-stat-item"><div class="profile-stat-number">128</div><div class="profile-stat-label">Seguidores</div></div>', unsafe_allow_html=True)
-    st.markdown('<div class="profile-stat-item"><div class="profile-stat-number">89</div><div class="profile-stat-label">Seguindo</div></div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown(f'<div class="profile-bio">{user.bio or "Sem bio ainda"}</div>', unsafe_allow_html=True)
-
-    if user.interests:
-        st.markdown('<div class="profile-interests">', unsafe_allow_html=True)
-        for interest in user.interests:
-            st.markdown(f'<span class="profile-interest-tag">{interest}</span>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ======================================================
-# FEED CARD
-# ======================================================
-def render_feed_card():
-    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
-    st.markdown('<div class="feed-header">Atividades recentes</div>', unsafe_allow_html=True)
-    # Feed de exemplo
-    feed_items = [
-        {"name": "João Silva", "action": "curtiu seu post", "time": "há 2 horas"},
-        {"name": "Maria Santos", "action": "comentou em seu post", "time": "há 4 horas"},
-        {"name": "Pedro Costa", "action": "começou a seguir você", "time": "há 1 dia"},
-        {"name": "Ana Oliveira", "action": "compartilhou seu post", "time": "há 2 dias"},
-        {"name": "Carlos Mendes", "action": "salvou seu post", "time": "há 3 dias"},
-    ]
-    for item in feed_items:
-        st.markdown('<div class="feed-item">', unsafe_allow_html=True)
-        st.markdown(f'<div class="feed-item-avatar" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;font-weight:bold;">{item["name"][0]}</div>', unsafe_allow_html=True)
-        st.markdown('<div class="feed-item-content">', unsafe_allow_html=True)
-        st.markdown(f'<div class="feed-item-header"><div class="feed-item-name">{item["name"]}</div><div class="feed-item-time">{item["time"]}</div></div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="feed-item-action">{item["action"]}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ======================================================
-# VIEWS
-# ======================================================
-def view_pages():
-    user = get_current_user()
-    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
-    st.markdown("### Pages")
-    st.write("Aqui você pode criar e gerenciar suas páginas de pesquisa.")
-    st.markdown("#### Criar nova página")
-    page_title = st.text_input("Título da página", key="page_title")
-    page_content = st.text_area("Conteúdo", key="page_content", height=150)
-    if st.button("Criar página", key="btn_create_page"):
-        if page_title and page_content:
-            st.success("Página criada com sucesso!")
-        else:
-            st.error("Preencha todos os campos.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def view_analytics():
-    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
-    st.markdown("### Analytics")
-    st.write("Estatísticas e análises da sua pesquisa.")
-    col1, col2, col3 = st.columns(3)
-    col1.metric("Posts", 42)
-    col2.metric("Engajamento", "89%")
-    col3.metric("Seguidores", 128)
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def view_tasks():
-    user = get_current_user()
-    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
-    st.markdown("### Tasks")
-    st.markdown("#### Criar nova tarefa")
-    task_title = st.text_input("Título da tarefa", key="task_title")
-    task_desc = st.text_area("Descrição", key="task_desc", height=100)
-    task_status = st.selectbox("Status", ["Não iniciado", "Em progresso", "Concluído"], key="task_status")
-    task_date = st.date_input("Data limite", key="task_date")
-    if st.button("Criar tarefa", key="btn_create_task"):
-        if task_title:
-            new_task = TimelineStep(
-                id=str(uuid.uuid4()),
-                owner_id=user.id,
-                title=task_title,
-                description=task_desc,
-                status=task_status,
-                due_date=str(task_date),
-            )
-            st.session_state.timeline.append(new_task)
-            save_state_to_file()
-            st.success("Tarefa criada!")
-            st.experimental_rerun()
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def view_invoice():
-    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
-    st.markdown("### Invoice")
-    st.write("Gerenciamento de faturas e pagamentos.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def view_subscribe():
-    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
-    st.markdown("### Subscribe")
-    st.write("Gerenciamento de assinaturas.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def view_contact():
-    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
-    st.markdown("### Contact")
-    st.write("Contatos e suporte.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-def view_settings():
-    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
-    st.markdown("### Settings")
-    st.write("Configurações da conta.")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-# ======================================================
-# MAIN APP
-# ======================================================
-def main():
-    current_user = get_current_user()
-
-    if not current_user:
-        auth_screen()
-    else:
-        st.markdown('<div class="main-container">', unsafe_allow_html=True)
-
-        # Sidebar
-        with st.container():
-            render_sidebar(current_user)
-
-        # Main Content
-        st.markdown('<div class="content-wrapper">', unsafe_allow_html=True)
-
-        # Left Column (Profile Card)
-        with st.container():
-            render_profile_card(current_user)
-
-        # Right Column (Content)
-        with st.container():
-            if st.session_state.current_view == "Pages":
-                view_pages()
-            elif st.session_state.current_view == "Analytics":
-                view_analytics()
-            elif st.session_state.current_view == "Tasks":
-                view_tasks()
-            elif st.session_state.current_view == "Invoice":
-                view_invoice()
-            elif st.session_state.current_view == "Subscribe":
-                view_subscribe()
-            elif st.session_state.current_view == "Contact":
-                view_contact()
-            elif st.session_state.current_view == "Settings":
-                view_settings()
-            else:
-                render_feed_card()
-
-        st.markdown('</div>', unsafe_allow_html=True)  # Close content-wrapper
-        st.markdown('</div>', unsafe_allow_html=True)  # Close main-container
-
-if __name__ == "__main__":
-    main()
