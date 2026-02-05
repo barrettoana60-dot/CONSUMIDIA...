@@ -24,7 +24,7 @@ AVATAR_DIR = Path("avatars")
 AVATAR_DIR.mkdir(exist_ok=True)
 
 # ======================================================
-# CSS – EXATAMENTE COMO O ANVIL (CINZA CLARO, CARDS BRANCOS)
+# CSS – EXATAMENTE COMO O ANVIL
 # ======================================================
 
 CSS = """
@@ -51,7 +51,6 @@ CSS = """
     margin: 0 auto;
 }
 
-/* SIDEBAR */
 .sidebar {
     width: 280px;
     background: #ffffff;
@@ -149,14 +148,12 @@ CSS = """
     flex: 1;
 }
 
-/* CONTEÚDO PRINCIPAL */
 .content-wrapper {
     display: flex;
     gap: 20px;
     flex: 1;
 }
 
-/* PROFILE CARD */
 .profile-card {
     width: 320px;
     background: #ffffff;
@@ -223,63 +220,55 @@ CSS = """
 
 .profile-divider {
     height: 1px;
-    background-color: #e8e8e8;
+    background-color: #e0e0e0;
     margin: 16px 0;
 }
 
-.profile-bio {
-    font-size: 13px;
-    color: #666;
-    line-height: 1.5;
-    margin-bottom: 16px;
-}
-
-.profile-stats {
+.profile-stat {
     display: flex;
     justify-content: space-around;
-    padding: 12px 0;
-    border-top: 1px solid #e8e8e8;
-    border-bottom: 1px solid #e8e8e8;
-    margin-bottom: 16px;
-}
-
-.profile-stat {
+    margin: 16px 0;
     text-align: center;
 }
 
-.profile-stat-value {
+.profile-stat-item {
+    flex: 1;
+}
+
+.profile-stat-number {
     font-size: 16px;
     font-weight: 600;
     color: #333;
 }
 
 .profile-stat-label {
-    font-size: 11px;
+    font-size: 12px;
     color: #999;
-    margin-top: 4px;
+}
+
+.profile-bio {
+    font-size: 13px;
+    color: #666;
+    line-height: 1.5;
+    margin: 16px 0;
 }
 
 .profile-interests {
-    font-size: 12px;
-    color: #666;
-}
-
-.profile-interests-label {
-    font-weight: 600;
-    margin-bottom: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 12px;
 }
 
 .profile-interest-tag {
     display: inline-block;
     background-color: #f0f0f0;
-    padding: 4px 8px;
-    border-radius: 4px;
-    margin-right: 4px;
-    margin-bottom: 4px;
-    font-size: 11px;
+    color: #666;
+    padding: 4px 10px;
+    border-radius: 16px;
+    font-size: 12px;
 }
 
-/* FEED CARD */
 .feed-card {
     flex: 1;
     background: #ffffff;
@@ -292,12 +281,6 @@ CSS = """
     font-size: 16px;
     font-weight: 600;
     color: #333;
-    margin-bottom: 8px;
-}
-
-.feed-subheader {
-    font-size: 12px;
-    color: #999;
     margin-bottom: 20px;
 }
 
@@ -305,7 +288,7 @@ CSS = """
     display: flex;
     gap: 12px;
     padding: 16px 0;
-    border-bottom: 1px solid #e8e8e8;
+    border-bottom: 1px solid #f0f0f0;
 }
 
 .feed-item:last-child {
@@ -334,119 +317,35 @@ CSS = """
     flex: 1;
 }
 
+.feed-item-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 4px;
+}
+
 .feed-item-name {
     font-size: 13px;
     font-weight: 600;
     color: #333;
 }
 
-.feed-item-action {
-    font-size: 13px;
-    color: #666;
-}
-
 .feed-item-time {
     font-size: 12px;
     color: #999;
-    margin-top: 4px;
 }
 
 .feed-item-text {
     font-size: 13px;
     color: #666;
-    margin-top: 8px;
     line-height: 1.4;
-    font-style: italic;
 }
 
-.feed-item-heart {
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    cursor: pointer;
-    font-size: 16px;
-    flex-shrink: 0;
+.feed-item-action {
+    font-size: 12px;
+    color: #999;
+    margin-top: 6px;
 }
 
-/* FORM INPUTS */
-.form-group {
-    margin-bottom: 16px;
-}
-
-.form-label {
-    display: block;
-    font-size: 13px;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 6px;
-}
-
-.form-input {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 13px;
-    font-family: inherit;
-}
-
-.form-input:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.form-textarea {
-    width: 100%;
-    padding: 8px 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 13px;
-    font-family: inherit;
-    resize: vertical;
-}
-
-.form-textarea:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.btn-primary {
-    padding: 10px 20px;
-    border: none;
-    border-radius: 6px;
-    background-color: #667eea;
-    color: white;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-primary:hover {
-    background-color: #5568d3;
-}
-
-.btn-secondary {
-    padding: 10px 20px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    background-color: #f5f5f5;
-    color: #333;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.btn-secondary:hover {
-    background-color: #eeeeee;
-}
-
-/* AUTH SCREEN */
 .auth-container {
     display: flex;
     align-items: center;
@@ -459,192 +358,88 @@ CSS = """
     background: white;
     border-radius: 12px;
     padding: 40px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
     width: 100%;
     max-width: 400px;
-    box-shadow: 0 10px 40px rgba(0,0,0,0.2);
 }
 
 .auth-title {
-    font-size: 24px;
+    font-size: 28px;
     font-weight: 700;
     color: #333;
+    text-align: center;
     margin-bottom: 8px;
 }
 
 .auth-subtitle {
-    font-size: 13px;
+    font-size: 14px;
     color: #999;
-    margin-bottom: 24px;
-}
-
-.auth-tabs {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 24px;
-    border-bottom: 1px solid #e8e8e8;
-}
-
-.auth-tab {
-    padding: 12px 0;
-    border: none;
-    background: none;
-    color: #999;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    border-bottom: 2px solid transparent;
-    transition: all 0.2s;
-}
-
-.auth-tab-active {
-    color: #667eea;
-    border-bottom-color: #667eea;
-}
-
-.auth-form {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-}
-
-.auth-input {
-    padding: 10px 12px;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    font-size: 13px;
-    font-family: inherit;
-}
-
-.auth-input:focus {
-    outline: none;
-    border-color: #667eea;
-    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
-}
-
-.auth-btn {
-    padding: 12px;
-    border: none;
-    border-radius: 6px;
-    background-color: #667eea;
-    color: white;
-    font-size: 13px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-
-.auth-btn:hover {
-    background-color: #5568d3;
-}
-
-.auth-link {
     text-align: center;
+    margin-bottom: 24px;
+}
+
+.post-card {
+    background: #f9f9f9;
+    border-radius: 8px;
+    padding: 12px;
+    margin-bottom: 12px;
+}
+
+.post-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 8px;
+}
+
+.post-author {
+    font-size: 13px;
+    font-weight: 600;
+    color: #333;
+}
+
+.post-time {
     font-size: 12px;
     color: #999;
 }
 
-.auth-link a {
-    color: #667eea;
-    text-decoration: none;
-    cursor: pointer;
-}
-
-.auth-link a:hover {
-    text-decoration: underline;
-}
-
-/* NOTIFICAÇÕES */
-.notification-success {
-    background-color: #d4edda;
-    border: 1px solid #c3e6cb;
-    color: #155724;
-    padding: 12px;
-    border-radius: 6px;
-    margin-bottom: 16px;
+.post-content {
     font-size: 13px;
+    color: #666;
+    line-height: 1.4;
+    margin-bottom: 8px;
 }
 
-.notification-error {
-    background-color: #f8d7da;
-    border: 1px solid #f5c6cb;
-    color: #721c24;
-    padding: 12px;
-    border-radius: 6px;
-    margin-bottom: 16px;
-    font-size: 13px;
-}
-
-.notification-info {
-    background-color: #d1ecf1;
-    border: 1px solid #bee5eb;
-    color: #0c5460;
-    padding: 12px;
-    border-radius: 6px;
-    margin-bottom: 16px;
-    font-size: 13px;
-}
-
-/* MODAL / EXPANDER */
-.modal-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background: rgba(0,0,0,0.5);
+.post-tags {
     display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
+    flex-wrap: wrap;
+    gap: 6px;
 }
 
-.modal-content {
-    background: white;
-    border-radius: 12px;
-    padding: 32px;
-    width: 100%;
-    max-width: 500px;
-    box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+.post-tag {
+    display: inline-block;
+    background-color: #e8eaf6;
+    color: #667eea;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px;
 }
 
-.modal-title {
-    font-size: 18px;
-    font-weight: 600;
-    color: #333;
-    margin-bottom: 16px;
+.post-actions {
+    display: flex;
+    gap: 12px;
+    margin-top: 8px;
+    font-size: 12px;
 }
 
-.modal-close {
-    position: absolute;
-    top: 16px;
-    right: 16px;
-    background: none;
-    border: none;
-    font-size: 24px;
+.post-action {
     cursor: pointer;
     color: #999;
 }
 
-/* RESPONSIVE */
-@media (max-width: 1200px) {
-    .main-container {
-        flex-direction: column;
-    }
-    .sidebar {
-        width: 100%;
-        position: static;
-    }
-    .content-wrapper {
-        flex-direction: column;
-    }
-    .profile-card {
-        width: 100%;
-        position: static;
-    }
-    .feed-card {
-        width: 100%;
-    }
+.post-action:hover {
+    color: #667eea;
 }
+
 </style>
 """
 
@@ -676,7 +471,7 @@ class Post:
     likes: List[str] = field(default_factory=list)
     comments: List[str] = field(default_factory=list)
     shares: List[str] = field(default_factory=list)
-    created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+    created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 @dataclass
 class Comment:
@@ -684,7 +479,7 @@ class Comment:
     post_id: str
     author_id: str
     text: str
-    created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+    created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 @dataclass
 class TimelineStep:
@@ -692,7 +487,7 @@ class TimelineStep:
     owner_id: str
     title: str
     description: str
-    status: str = "Planejado"
+    status: str = "Não iniciado"
     due_date: str = ""
     created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d"))
 
@@ -703,15 +498,17 @@ class ResearchDoc:
     title: str
     category: str
     content: str
-    url: str = ""
+    link: str = ""
     created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d"))
 
 @dataclass
 class MindNode:
     id: str
-    text: str
-    children: List['MindNode'] = field(default_factory=list)
+    owner_id: str
+    title: str
+    description: str
     tags: List[str] = field(default_factory=list)
+    children: List[str] = field(default_factory=list)
 
 @dataclass
 class Slide:
@@ -728,7 +525,7 @@ class ChatMessage:
     id: str
     from_id: str
     text: str
-    created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+    created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 @dataclass
 class Notification:
@@ -736,19 +533,11 @@ class Notification:
     user_id: str
     type: str
     from_user_id: str
-    action: str = ""
-    created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
-
-@dataclass
-class Activity:
-    id: str
-    user_id: str
-    type: str
-    message: str
-    timestamp: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M"))
+    text: str = ""
+    created_at: str = field(default_factory=lambda: datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"))
 
 # ======================================================
-# ESTADO GLOBAL
+# INICIALIZAÇÃO DE SESSION STATE
 # ======================================================
 
 def init_session_state():
@@ -762,16 +551,14 @@ def init_session_state():
         st.session_state.timeline = []
     if "docs" not in st.session_state:
         st.session_state.docs = []
-    if "mindmap" not in st.session_state:
-        st.session_state.mindmap = None
+    if "mindnodes" not in st.session_state:
+        st.session_state.mindnodes = []
     if "slides" not in st.session_state:
         st.session_state.slides = []
     if "chat_messages" not in st.session_state:
         st.session_state.chat_messages = []
     if "notifications" not in st.session_state:
         st.session_state.notifications = []
-    if "activities" not in st.session_state:
-        st.session_state.activities = []
     if "current_user_id" not in st.session_state:
         st.session_state.current_user_id = None
     if "current_view" not in st.session_state:
@@ -782,7 +569,7 @@ def init_session_state():
 init_session_state()
 
 # ======================================================
-# PERSISTÊNCIA
+# FUNÇÕES DE ESTADO
 # ======================================================
 
 def save_state_to_file():
@@ -792,10 +579,10 @@ def save_state_to_file():
         "comments": [asdict(c) for c in st.session_state.comments],
         "timeline": [asdict(t) for t in st.session_state.timeline],
         "docs": [asdict(d) for d in st.session_state.docs],
+        "mindnodes": [asdict(m) for m in st.session_state.mindnodes],
         "slides": [asdict(s) for s in st.session_state.slides],
         "chat_messages": [asdict(m) for m in st.session_state.chat_messages],
         "notifications": [asdict(n) for n in st.session_state.notifications],
-        "activities": [asdict(a) for a in st.session_state.activities],
     }
     with open(STATE_FILE, "w") as f:
         json.dump(data, f, indent=2)
@@ -812,31 +599,27 @@ def load_state_from_file():
     st.session_state.comments = [Comment(**c) for c in data.get("comments", [])]
     st.session_state.timeline = [TimelineStep(**t) for t in data.get("timeline", [])]
     st.session_state.docs = [ResearchDoc(**d) for d in data.get("docs", [])]
+    st.session_state.mindnodes = [MindNode(**m) for m in data.get("mindnodes", [])]
     st.session_state.slides = [Slide(**s) for s in data.get("slides", [])]
     st.session_state.chat_messages = [ChatMessage(**m) for m in data.get("chat_messages", [])]
     st.session_state.notifications = [Notification(**n) for n in data.get("notifications", [])]
-    st.session_state.activities = [Activity(**a) for a in data.get("activities", [])]
 
 load_state_from_file()
 
 # ======================================================
-# HELPERS
+# FUNÇÕES AUXILIARES
 # ======================================================
 
 def get_current_user() -> Optional[User]:
     if not st.session_state.current_user_id:
         return None
-    for u in st.session_state.users:
-        if u.id == st.session_state.current_user_id:
-            return u
-    return None
+    return next((u for u in st.session_state.users if u.id == st.session_state.current_user_id), None)
 
-def avatar_html(user: User, size: int = 40) -> str:
+def avatar_html(user: User, size: int = 44) -> str:
     if user.avatar_path and os.path.exists(user.avatar_path):
         return f'<img src="file://{os.path.abspath(user.avatar_path)}" style="width:{size}px;height:{size}px;border-radius:50%;object-fit:cover;">'
-    else:
-        initials = "".join([n[0].upper() for n in user.name.split()[:2]])
-        return f'<div style="width:{size}px;height:{size}px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:{size//2}px;">{initials}</div>'
+    initials = "".join([n[0].upper() for n in user.name.split()[:2]])
+    return f'<div style="width:{size}px;height:{size}px;border-radius:50%;background:linear-gradient(135deg,#667eea,#764ba2);display:flex;align-items:center;justify-content:center;color:white;font-weight:bold;font-size:{size//2}px;">{initials}</div>'
 
 # ======================================================
 # TELA DE AUTENTICAÇÃO
@@ -933,12 +716,134 @@ def render_sidebar(user: User):
     for icon, label in menu_items:
         is_active = st.session_state.current_view == label
         active_class = "sidebar-item-active" if is_active else ""
-        st.markdown(f'<div class="sidebar-item {active_class}" onclick="alert(\'{label}\')">', unsafe_allow_html=True)
-        st.markdown(f'<div class="sidebar-icon">{icon}</div>', unsafe_allow_html=True)
-        st.markdown(f'<div class="sidebar-label">{label}</div>', unsafe_allow_html=True)
-        st.markdown('</div>', unsafe_allow_html=True)
 
-        if st.button(label, key=f"nav_{label}", use_container_width=True):
+        if st.button(f"{icon} {label}", key=f"nav_{label}", use_container_width=True):
             st.session_state.current_view = label
             save_state_to_file()
+            st.experimental_rerun()
+
+    st.markdown('</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================================================
+# PROFILE CARD
+# ======================================================
+
+def render_profile_card(user: User):
+    st.markdown('<div class="profile-card">', unsafe_allow_html=True)
+
+    st.markdown('<div class="profile-header">', unsafe_allow_html=True)
+    st.markdown(f'<div class="profile-avatar-big">{avatar_html(user, 120)}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="profile-name">{user.name}</div>', unsafe_allow_html=True)
+    st.markdown(f'<div class="profile-role">{user.role}</div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    if st.button("Follow", key="btn_follow", use_container_width=True):
+        st.success("Você está seguindo este usuário!")
+
+    st.markdown('<div class="profile-divider"></div>', unsafe_allow_html=True)
+
+    st.markdown('<div class="profile-stat">', unsafe_allow_html=True)
+    st.markdown('<div class="profile-stat-item"><div class="profile-stat-number">42</div><div class="profile-stat-label">Posts</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="profile-stat-item"><div class="profile-stat-number">128</div><div class="profile-stat-label">Seguidores</div></div>', unsafe_allow_html=True)
+    st.markdown('<div class="profile-stat-item"><div class="profile-stat-number">89</div><div class="profile-stat-label">Seguindo</div></div>', unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown(f'<div class="profile-bio">{user.bio or "Sem bio ainda"}</div>', unsafe_allow_html=True)
+
+    if user.interests:
+        st.markdown('<div class="profile-interests">', unsafe_allow_html=True)
+        for interest in user.interests:
+            st.markdown(f'<span class="profile-interest-tag">{interest}</span>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================================================
+# FEED CARD
+# ======================================================
+
+def render_feed_card():
+    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
+    st.markdown('<div class="feed-header">Atividades recentes</div>', unsafe_allow_html=True)
+
+    # Feed de exemplo
+    feed_items = [
+        {"name": "João Silva", "action": "curtiu seu post", "time": "há 2 horas"},
+        {"name": "Maria Santos", "action": "comentou em seu post", "time": "há 4 horas"},
+        {"name": "Pedro Costa", "action": "começou a seguir você", "time": "há 1 dia"},
+        {"name": "Ana Oliveira", "action": "compartilhou seu post", "time": "há 2 dias"},
+        {"name": "Carlos Mendes", "action": "salvou seu post", "time": "há 3 dias"},
+    ]
+
+    for item in feed_items:
+        st.markdown('<div class="feed-item">', unsafe_allow_html=True)
+        st.markdown(f'<div class="feed-item-avatar" style="background:linear-gradient(135deg,#667eea,#764ba2);color:white;font-weight:bold;">{item["name"][0]}</div>', unsafe_allow_html=True)
+        st.markdown('<div class="feed-item-content">', unsafe_allow_html=True)
+        st.markdown(f'<div class="feed-item-header"><div class="feed-item-name">{item["name"]}</div><div class="feed-item-time">{item["time"]}</div></div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="feed-item-action">{item["action"]}</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+        st.markdown('</div>', unsafe_allow_html=True)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ======================================================
+# VIEWS
+# ======================================================
+
+def view_pages():
+    user = get_current_user()
+    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
+    st.markdown("### Pages")
+    st.write("Aqui você pode criar e gerenciar suas páginas de pesquisa.")
+
+    st.markdown("#### Criar nova página")
+    page_title = st.text_input("Título da página", key="page_title")
+    page_content = st.text_area("Conteúdo", key="page_content", height=150)
+
+    if st.button("Criar página", key="btn_create_page"):
+        if page_title and page_content:
+            st.success("Página criada com sucesso!")
+        else:
+            st.error("Preencha todos os campos.")
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def view_analytics():
+    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
+    st.markdown("### Analytics")
+    st.write("Estatísticas e análises da sua pesquisa.")
+
+    col1, col2, col3 = st.columns(3)
+    col1.metric("Posts", 42)
+    col2.metric("Engajamento", "89%")
+    col3.metric("Seguidores", 128)
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+def view_tasks():
+    user = get_current_user()
+    st.markdown('<div class="feed-card">', unsafe_allow_html=True)
+    st.markdown("### Tasks")
+
+    st.markdown("#### Criar nova tarefa")
+    task_title = st.text_input("Título da tarefa", key="task_title")
+    task_desc = st.text_area("Descrição", key="task_desc", height=100)
+    task_status = st.selectbox("Status", ["Não iniciado", "Em progresso", "Concluído"], key="task_status")
+    task_date = st.date_input("Data limite", key="task_date")
+
+    if st.button("Criar tarefa", key="btn_create_task"):
+        if task_title:
+            new_task = TimelineStep(
+                id=str(uuid.uuid4()),
+                owner_id=user.id,
+                title=task_title,
+                description=task_desc,
+                status=task_status,
+                due_date=str(task_date),
+            )
+            st.session_state.timeline.append(new_task)
+            save_state_to_file()
+            st.success("Tarefa criada!")
+            st.experimental_rerun()
 
